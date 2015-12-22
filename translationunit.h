@@ -35,11 +35,14 @@ public:
         swap(first.m_LastPos.line, second.m_LastPos.line);
         swap(first.m_LastPos.column, second.m_LastPos.column);
     }
+#if __cplusplus < 201103L
     ClTranslationUnit& operator=(ClTranslationUnit other)
     {
         swap(*this,other);
         return *this;
     }
+#endif
+public:
     bool UsesClangIndex( const CXIndex& idx ){ return idx == m_ClIndex; }
 
     void AddInclude(ClFileId fId);
@@ -57,7 +60,20 @@ public:
     }
     ClTranslUnitId GetId() const { return m_Id; }
 
-    // note that complete_line and complete_column are 1 index, not 0 index!
+    /**
+     * Load this translation unit from disk
+     */
+    bool Load( const wxString& filename );
+    /**
+     * Store this translation unit to disk
+     */
+    bool Store( const wxString& filename );
+
+    /**
+     * Calculate code completion at a specific location, usually where the cursor is
+     *
+     * note that complete_line and complete_column are 1 index, not 0 index!
+     */
     CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,
                                            struct CXUnsavedFile* unsaved_files,
                                            unsigned num_unsaved_files );

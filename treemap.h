@@ -12,11 +12,13 @@ class ClTreeMap<int>
 {
     public:
         ClTreeMap();
+        ClTreeMap(const ClTreeMap<int>& other);
         ~ClTreeMap();
         int Insert(const wxString& key, int value); // returns value
         void Shrink();
         std::vector<int> GetIdSet(const wxString& key) const;
         int GetValue(int id) const; // returns id
+        int GetCount() const;
     private:
         TreeNode* m_Root;
 };
@@ -59,6 +61,10 @@ class ClTreeMap
         _TpVal& GetValue(int id)
         {
             return m_Data[id];
+        }
+        int GetCount() const
+        {
+            return m_Data.size();
         }
 
     private:

@@ -7,19 +7,34 @@
 
 #include "clangpluginapi.h"
 
+/** Clang Code completion class
+ *
+ *  This class is responsible to handle all Code Completion operations of the plugin
+ */
 class ClangCodeCompletion : public ClangPluginComponent {
 public:
     ClangCodeCompletion();
     virtual ~ClangCodeCompletion();
 
+    /** Static name of this class to use in settings */
     static const wxString SettingName;
 
+    /** Called when this component is activated. Registers most event handlers here */
     void OnAttach( IClangPlugin* pClangPlugin );
+
+    /** Called when this component is desactivated. Unregisters most event handlers here */
     void OnRelease( IClangPlugin* pClangPlugin );
 
+    /** Return the provider status for the supplied editor. Only returns a success code when the code is identified as C/C++ */
     cbCodeCompletionPlugin::CCProviderStatus GetProviderStatusFor( cbEditor* ed );
+
+    /** Return the Auto Completion list data for the supplied editor and token. This function might return an empty list and request a new code-completion when code-completion is slow. */
     std::vector<cbCodeCompletionPlugin::CCToken> GetAutocompList(bool isAuto, cbEditor* ed, int& tknStart, int& tknEnd);
+
+    /** Return documentation linked to a certain Code Completion token */
     wxString GetDocumentation( const cbCodeCompletionPlugin::CCToken& token );
+
+    /** Insert the auto complete text that the user has chosen */
     bool DoAutocomplete( const cbCodeCompletionPlugin::CCToken& /*token*/, cbEditor* /*ed*/);
 
     /**
@@ -83,7 +98,6 @@ private:
     int m_EditorHookId;
 
     wxTimer m_ReparseTimer;
-    wxTimer m_DiagnosticTimer;
     wxTimer m_HightlightTimer;
 
     unsigned int m_CCOutstanding;

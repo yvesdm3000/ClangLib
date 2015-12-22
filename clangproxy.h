@@ -5,6 +5,7 @@
 #include <vector>
 #include <list>
 #include <wx/string.h>
+#include <wx/wfstream.h>
 #include <queue>
 #include <backgroundthread.h>
 #include "clangpluginapi.h"
@@ -27,16 +28,20 @@ public:
     {
     public:
         enum JobType {
-            CreateTranslationUnitType,
-            RemoveTranslationUnitType,
-            ReparseType,
-            GetDiagnosticsType,
-            CodeCompleteAtType,
-            DocumentCCTokenType,
-            GetTokensAtType,
-            GetCallTipsAtType,
-            GetOccurrencesOfType,
-            GetFunctionScopeAtType
+            CreateTranslationUnitType   = 1,
+            RemoveTranslationUnitType   = 2,
+            ReparseType                 = 3,
+            GetDiagnosticsType          = 4,
+            CodeCompleteAtType          = 5,
+            DocumentCCTokenType         = 6,
+            GetTokensAtType             = 7,
+            GetCallTipsAtType           = 8,
+            GetOccurrencesOfType        = 9,
+            GetFunctionScopeAtType      = 10,
+
+            IndexerGroupType            = 1<< 7, // Jobs that run on the indexer thread
+
+            SerializeTokenDatabaseType  = 1 | IndexerGroupType,
         };
     protected:
         ClangJob( JobType JobType ) :
@@ -133,7 +138,9 @@ public:
             m_TranslationUnitId = clangproxy.GetTranslationUnitId(m_TranslationUnitId, m_Filename);
             if (m_TranslationUnitId == wxNOT_FOUND )
             {
-                clangproxy.CreateTranslationUnit(m_Filename, m_Commands, m_UnsavedFiles, m_TranslationUnitId);
+                ClTokenDatabase db(clangproxy.m_Database.GetFileDB());
+                clangproxy.CreateTranslationUnit(m_Filename, m_Commands, m_UnsavedFiles, m_TranslationUnitId, db);
+                clangproxy.m_Database.Update(db);
             }
             m_UnsavedFiles.clear();
         }
@@ -662,6 +669,62 @@ public:
         }
     };
 
+    class SerializeTokenDatabaseJob : public ClangJob
+    {
+    public:
+        SerializeTokenDatabaseJob( const ClTokenDatabase& db, const wxString& filename ) :
+            ClangJob(SerializeTokenDatabaseType),
+            m_TokenDatabase(db),
+            m_Filename( filename.c_str() )
+        {}
+        ClangJob* Clone() const
+        {
+            SerializeTokenDatabaseJob* pJob = new SerializeTokenDatabaseJob(*this);
+            return static_cast<ClangJob*>(pJob);
+        }
+        void Execute(ClangProxy& /*clangproxy*/)
+        {
+            wxFileOutputStream out(m_Filename);
+            if (out.IsOk())
+                ClTokenDatabase::WriteOut( m_TokenDatabase, out );
+        }
+    private:
+        SerializeTokenDatabaseJob( const SerializeTokenDatabaseJob& other ) :
+            ClangJob(other),
+            m_TokenDatabase(other.m_TokenDatabase),
+            m_Filename( other.m_Filename.c_str() ){}
+        ClTokenDatabase m_TokenDatabase;
+        wxString m_Filename;
+    };
+
+    class LoadTokenDatabaseJob : public ClangJob
+    {
+    public:
+        LoadTokenDatabaseJob( const ClTokenDatabase& db, const wxString& filename ) :
+            ClangJob(SerializeTokenDatabaseType),
+            m_TokenDatabase(db),
+            m_Filename( filename.c_str() )
+        {}
+        ClangJob* Clone() const
+        {
+            LoadTokenDatabaseJob* pJob = new LoadTokenDatabaseJob(*this);
+            return static_cast<ClangJob*>(pJob);
+        }
+        void Execute(ClangProxy& /*clangproxy*/)
+        {
+            wxFileInputStream in(m_Filename);
+            if (in.IsOk())
+                ClTokenDatabase::ReadIn( m_TokenDatabase, in );
+        }
+    private:
+        LoadTokenDatabaseJob( const LoadTokenDatabaseJob& other ) :
+            ClangJob(other),
+            m_TokenDatabase(other.m_TokenDatabase),
+            m_Filename( other.m_Filename.c_str() ){}
+        ClTokenDatabase m_TokenDatabase;
+        wxString m_Filename;
+    };
+
 public:
     ClangProxy( wxEvtHandler* pEvtHandler, ClTokenDatabase& database, const std::vector<wxString>& cppKeywords);
     ~ClangProxy();
@@ -673,14 +736,18 @@ public:
     ClTranslUnitId GetTranslationUnitId(ClTranslUnitId CtxTranslUnitId, ClFileId fId);
     ClTranslUnitId GetTranslationUnitId(ClTranslUnitId CtxTranslUnitId, const wxString& filename);
 
+    void SetPersistencyDirectory( const wxString& dir );
+
+    wxString GetTokenDatabaseFilename();
+
 protected: // jobs that are run only on the thread
-    void CreateTranslationUnit(const wxString& filename, const wxString& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);
+    void CreateTranslationUnit(const wxString& filename, const wxString& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId, ClTokenDatabase& tokenDatabase);
     void RemoveTranslationUnit(ClTranslUnitId TranslUnitId);
     /** Reparse translation id
      *
      * @param unsavedFiles reference to the unsaved files data. This function takes the data and this list will be empty after this call
      */
-    void Reparse(         ClTranslUnitId translId, const wxString& compileCommand, const std::map<wxString, wxString>& unsavedFiles);
+    void Reparse(         ClTranslUnitId translId, const wxString& compileCommand, const std::map<wxString, wxString>& unsavedFiles, ClTokenDatabase &tokenDatabase);
     void GetDiagnostics(  ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     void CodeCompleteAt(  ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
             bool isAuto, const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
@@ -702,14 +769,15 @@ public:
 
 private:
     mutable wxMutex m_Mutex;
+    wxString m_PersistencyDirectory;
     ClTokenDatabase& m_Database;
     const std::vector<wxString>& m_CppKeywords;
     std::vector<ClTranslationUnit> m_TranslUnits;
-    CXIndex m_ClIndex[2];
+    CXIndex m_ClIndex;
 private: // Thread
     wxEvtHandler* m_pEventCallbackHandler;
     BackgroundThread* m_pThread;
-    //BackgroundThread* m_pParsingThread;
+    BackgroundThread* m_pIndexerThread;
 };
 
 #endif // CLANGPROXY_H
