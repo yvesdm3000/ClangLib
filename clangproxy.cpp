@@ -807,7 +807,6 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
     //}
 
     const int numResults = clResults->NumResults;
-    //fprintf(stdout,"numresults=%d\n", (int)numResults);
     results.reserve(numResults);
     for (int resIdx = 0; resIdx < numResults; ++resIdx)
     {
