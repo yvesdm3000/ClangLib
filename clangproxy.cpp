@@ -17,6 +17,7 @@
 
 #include "tokendatabase.h"
 #include "translationunit.h"
+#include "cclogger.h"
 #include <cbcolourmanager.h>
 
 namespace ProxyHelper
@@ -600,6 +601,7 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
         }
         for (std::set<ClTranslUnitId>::iterator it = parentTranslUnits.begin(); it != parentTranslUnits.end(); ++it)
         {
+            CCLogger::Get()->DebugLog(F(_T("Reparsing parent/child %d"), (int)*it));
             //fprintf(stdout,"Reparsing parent/child %d\n", (int)*it);
             clangproxy.Reparse( *it, m_CompileCommand, m_UnsavedFiles, db );
         }
@@ -642,7 +644,7 @@ ClangProxy::~ClangProxy()
 
 void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId, ClTokenDatabase& tokenDatabase)
 {
-    //fprintf(stdout,"%s '%s'\n", __PRETTY_FUNCTION__, (const char*)filename.mb_str());
+    CCLogger::Get()->DebugLog(F(_T("CreateTranslationUnit '%s'"), filename.wx_str()));
 
     if( filename.Length() == 0 )
         return;
@@ -796,7 +798,7 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
             clUnsavedFiles.size());
     if (!clResults)
     {
-        //fprintf(stdout,"%s No results...\n", __PRETTY_FUNCTION__);
+        CCLogger::Get()->DebugLog(_T("CodeCompleteAt: No results..."));
         return;
     }
 
@@ -877,7 +879,7 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
         m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, diagnostics );
     }
 
-    //fprintf(stdout,"CodeCompleteAt done (%p) (%d elements)\n", (void*)m_TranslUnits[translUnitId].GetId(), (int)results.size());
+    CCLogger::Get()->DebugLog(F(_T("CodeCompleteAt done (%d) (%d elements)\n"), m_TranslUnits[translUnitId].GetId(), (int)results.size()));
 }
 
 wxString ClangProxy::DocumentCCToken(ClTranslUnitId translUnitId, int tknId)

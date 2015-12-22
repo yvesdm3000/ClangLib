@@ -346,6 +346,21 @@ void ClTokenDatabase::Shrink()
     m_pFileTokens->Shrink();
 }
 
+void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstractToken& token )
+{
+    ClAbstractToken& tokenRef = m_pTokens->GetValue(freeTokenId);
+    assert( (tokenRef.fileId == wxNOT_FOUND)&&"Only an unused token can be updated");
+    tokenRef.displayName = token.displayName;
+    tokenRef.fileId = token.fileId;
+    tokenRef.identifier = token.identifier;
+    tokenRef.location = token.location;
+    tokenRef.scopeName = token.scopeName;
+    tokenRef.tokenHash = token.tokenHash;
+    tokenRef.tokenType = token.tokenType;
+    wxString filen = wxString::Format(wxT("%d"), token.fileId);
+    m_pFileTokens->Insert(filen, freeTokenId);
+}
+
 void ClTokenDatabase::Update( ClTokenDatabase& db )
 {
     int i;
@@ -357,20 +372,43 @@ void ClTokenDatabase::Update( ClTokenDatabase& db )
     for (i=0;i<cnt;++i)
     {
         ClAbstractToken tok = db.m_pTokens->GetValue(i);
-        fileIds.insert(tok.fileId);
+        if(tok.fileId == -1)
+        {
+            freeTokenIds.insert(i);
+        }
+        else
+        {
+            fileIds.insert(tok.fileId);
+        }
     }
     // Clear old entries
     for (std::set<ClFileId>::iterator it = fileIds.begin(); it != fileIds.end(); ++it)
     {
-        std::vector<ClTokenId> l = m_pFileTokens->GetIdSet(key)(*it);
+        wxString key = wxString::Format(wxT("%d"), *it);
+        std::vector<ClTokenId> l = m_pFileTokens->GetIdSet(key);
         for (std::vector<ClTokenId>::iterator it2 = l.begin(); it2 != l.end(); ++it2)
         {
             freeTokenIds.insert( *it2 );
-            ClAbstractToken& tokenRef = m_pTokens->GetValue(*it);
+            ClAbstractToken& tokenRef = m_pTokens->GetValue(*it2);
             tokenRef.tokenType = ClTokenType_Unknown;
             tokenRef.displayName = wxString();
             tokenRef.fileId = -1;
             tokenRef.scopeName = wxString();
+        }
+    }
+
+    std::set<ClTokenId>::iterator freeTokenIt = freeTokenIds.begin();
+    for (i=0;i<cnt;++i)
+    {
+        ClAbstractToken tok = db.m_pTokens->GetValue(i);
+        if( freeTokenIt != freeTokenIds.end())
+        {
+            UpdateToken( *freeTokenIt, tok );
+            ++freeTokenIt;
+        }
+        else
+        {
+            InsertToken(tok);
         }
     }
 }

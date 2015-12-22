@@ -7,6 +7,7 @@
 #include <iostream>
 #include "clangplugin.h"
 #include "clangccsettingsdlg.h"
+#include "cclogger.h"
 
 #include <cbcolourmanager.h>
 #include <cbstyledtextctrl.h>
@@ -32,7 +33,31 @@
 #include <wx/dir.h>
 #endif // CB_PRECOMP
 
-#define CLANGPLUGIN_TRACE_FUNCTIONS
+// let the global debug macro overwrite the local debug macro value
+#if defined(CC_GLOBAL_DEBUG_OUTPUT)
+    #undef CC_CODECOMPLETION_DEBUG_OUTPUT
+    #define CC_CODECOMPLETION_DEBUG_OUTPUT CC_GLOBAL_DEBUG_OUTPUT
+#endif
+
+#if CC_CODECOMPLETION_DEBUG_OUTPUT == 1
+    #define TRACE(format, args...) \
+        CCLogger::Get()->DebugLog(F(format, ##args))
+    #define TRACE2(format, args...)
+#elif CC_CODECOMPLETION_DEBUG_OUTPUT == 2
+    #define TRACE(format, args...)                                              \
+        do                                                                      \
+        {                                                                       \
+            if (g_EnableDebugTrace)                                             \
+                CCLogger::Get()->DebugLog(F(format, ##args));                   \
+        }                                                                       \
+        while (false)
+    #define TRACE2(format, args...) \
+        CCLogger::Get()->DebugLog(F(format, ##args))
+#else
+    #define TRACE(format, args...)
+    #define TRACE2(format, args...)
+#endif
+
 
 // this auto-registers the plugin
 namespace
@@ -91,9 +116,17 @@ ClangPlugin::~ClangPlugin()
 
 void ClangPlugin::OnAttach()
 {
+    // CCLogger are the log event bridges, those events were finally handled by its parent, here
+    // it is the CodeCompletion plugin ifself.
+    CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger);
+
     wxString path;
     path = wxStandardPaths::Get().GetTempDir();
     m_Proxy.SetPersistencyDirectory( path );
+
+    // handling events send from CCLogger
+    Connect(g_idCCLogger,                wxEVT_COMMAND_MENU_SELECTED, CodeBlocksThreadEventHandler(ClangPlugin::OnCCLogger)     );
+    Connect(g_idCCDebugLogger,           wxEVT_COMMAND_MENU_SELECTED, CodeBlocksThreadEventHandler(ClangPlugin::OnCCDebugLogger));
 
     wxFileInputStream in( m_Proxy.GetTokenDatabaseFilename());
     ClTokenDatabase::ReadIn( m_Database, in );
@@ -227,6 +260,10 @@ void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
     Disconnect(idReparseTimer);
     Manager::Get()->RemoveAllEventSinksFor(this);
     m_ImageList.RemoveAll();
+
+    Disconnect(g_idCCLogger,                wxEVT_COMMAND_MENU_SELECTED, CodeBlocksThreadEventHandler(ClangPlugin::OnCCLogger));
+    Disconnect(g_idCCDebugLogger,           wxEVT_COMMAND_MENU_SELECTED, CodeBlocksThreadEventHandler(ClangPlugin::OnCCDebugLogger));
+
 }
 
 bool ClangPlugin::ActivateComponent( ClangPluginComponent* pComponent )
@@ -1116,6 +1153,18 @@ void ClangPlugin::OnClangSyncTaskFinished( wxEvent& event )
     }
 
     pJob->Finalize();
+}
+
+void ClangPlugin::OnCCLogger( CodeBlocksThreadEvent& event )
+{
+    if (!Manager::IsAppShuttingDown())
+        Manager::Get()->GetLogManager()->Log(event.GetString());
+}
+
+void ClangPlugin::OnCCDebugLogger( CodeBlocksThreadEvent& event )
+{
+    if (!Manager::IsAppShuttingDown())
+        Manager::Get()->GetLogManager()->DebugLog(event.GetString());
 }
 
 bool ClangPlugin::IsProviderFor(cbEditor* ed)

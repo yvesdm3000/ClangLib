@@ -120,16 +120,6 @@ private:
     // Async
     void OnCreateTranslationUnit( wxCommandEvent& evt );
 
-    /**
-     * Update editor diagnostic mark up
-     *
-     * @param ed The editor to diagnose
-     * @param diagLv Update only the highlights, or highlights and text annotations
-     */
-    //void DiagnoseEd(cbEditor* ed, DiagnosticLevel diagLv);
-    //void OnDiagnoseEd( wxCommandEvent& event );
-
-
     /// Set the clang translation unit (callback)
     void OnClangCreateTUFinished( wxEvent& event );
     /// Update after clang has reparsing done (callback)
@@ -139,15 +129,8 @@ private:
     /// Update after clang has finished a synchronous task
     void OnClangSyncTaskFinished( wxEvent& event );
 
-    /**
-     * Semantically highlight all occurrences of the token under the cursor
-     * within the editor
-     *
-     * @param ed The editor to work in
-     */
-    //void HighlightOccurrences(cbEditor* ed);
-
-
+    void OnCCLogger( CodeBlocksThreadEvent& event );
+    void OnCCDebugLogger( CodeBlocksThreadEvent& event );
 
 private: // Internal utility functions
     // Builds compile command

@@ -232,7 +232,6 @@ void ClTranslationUnit::Parse( const wxString& filename, ClFileId fileId, const 
         {
             std::pair<ClTranslationUnit*, ClTokenDatabase*> visitorData = std::make_pair(this, pDatabase);
             clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
-            //m_FileId = pDatabase->GetFilenameId(filename);
             m_Files.reserve(1024);
             m_Files.push_back(m_FileId);
             std::sort(m_Files.begin(), m_Files.end());
@@ -242,14 +241,13 @@ void ClTranslationUnit::Parse( const wxString& filename, ClFileId fileId, const 
         #else
             std::vector<ClFileId>(m_Files).swap(m_Files);
         #endif
-            //Reparse(0, nullptr); // seems to improve performance for some reason?
             int ret = clang_reparseTranslationUnit(m_ClTranslUnit, clUnsavedFiles.size(),
                             clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0],
                             clang_defaultReparseOptions(m_ClTranslUnit) );
 
             struct ClangVisitorContext ctx(pDatabase);
             unsigned rc = clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
-            fprintf(stdout,"Visit count: %d, rc=%d\n", (int)ctx.tokenCount, (int)rc);
+            //fprintf(stdout,"Visit count: %d, rc=%d\n", (int)ctx.tokenCount, (int)rc);
         //database->Shrink();
         }
     }
