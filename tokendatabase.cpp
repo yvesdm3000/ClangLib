@@ -275,7 +275,6 @@ void ClTokenDatabase::Clear()
     m_pTokens = new ClTreeMap<ClAbstractToken>(),
     m_pFileTokens = new ClTreeMap<int>();
 }
-
 ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename)
 {
     return m_FileDB.GetFilenameId(filename);
@@ -284,7 +283,6 @@ wxString ClTokenDatabase::GetFilename(ClFileId fId)
 {
     return m_FileDB.GetFilename(fId);
 }
-
 
 ClTokenId ClTokenDatabase::InsertToken(const ClAbstractToken& token)
 {

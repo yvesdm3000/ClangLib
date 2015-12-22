@@ -602,7 +602,6 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
         for (std::set<ClTranslUnitId>::iterator it = parentTranslUnits.begin(); it != parentTranslUnits.end(); ++it)
         {
             CCLogger::Get()->DebugLog(F(_T("Reparsing parent/child %d"), (int)*it));
-            //fprintf(stdout,"Reparsing parent/child %d\n", (int)*it);
             clangproxy.Reparse( *it, m_CompileCommand, m_UnsavedFiles, db );
         }
     }
