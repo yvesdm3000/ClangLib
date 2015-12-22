@@ -27,7 +27,7 @@ public:
 
 struct ClangVisitorContext
 {
-    ClangVisitorContext( ClTokenDatabase* pDatabase ){ database = pDatabase; tokenCount = 0;}
+    ClangVisitorContext( ClTokenDatabase* pDatabase){ database = pDatabase; tokenCount = 0;}
     ClTokenDatabase* database;
     unsigned long long tokenCount;
 };
@@ -589,8 +589,38 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         //fprintf(stdout,"Inserting token '%s', file='%s', line=%d, col=%d\n", (const char*)identifier.mb_str(), (const char*)filename.mb_str(), line, col);
-        ctx->database->InsertToken(identifier, ClAbstractToken(typ,ctx->database->GetFilenameId(filename), ClTokenPosition(line, col), displayName, scopeName, tokenHash));
+        ClFileId fileId = ctx->database->GetFilenameId(filename);
+        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, displayName, scopeName, tokenHash);
+        ctx->database->InsertToken(tok);
         ctx->tokenCount++;
     }
     return ret;
 }
+
+bool ClTranslationUnit::Load( const wxString& filename )
+{
+    CXTranslationUnit oldTU = m_ClTranslUnit;
+    m_ClTranslUnit = clang_createTranslationUnit( m_ClIndex, (const char*)filename.ToUTF8() );
+    if( m_ClTranslUnit == nullptr )
+    {
+        m_ClTranslUnit = oldTU;
+
+        return false;
+    }
+    if (oldTU != nullptr )
+        clang_disposeTranslationUnit( oldTU );
+    if (m_LastCC != nullptr)
+        clang_disposeCodeCompleteResults( m_LastCC );
+    m_LastCC = nullptr;
+    m_Occupied = true;
+
+    return true;
+}
+
+bool ClTranslationUnit::Store( const wxString& filename )
+{
+    if( clang_saveTranslationUnit( m_ClTranslUnit, (const char*)filename.ToUTF8(), CXSaveTranslationUnit_None ) == CXSaveError_None )
+        return true;
+    return false;
+}
+
