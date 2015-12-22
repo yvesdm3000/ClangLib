@@ -14,6 +14,7 @@
 #include <editor_hooks.h>
 
 #include <wx/tokenzr.h>
+#include <wx/stdpaths.h>
 
 #ifndef CB_PRECOMP
 #include <cbeditor.h>
@@ -76,7 +77,9 @@ ClangPlugin::ClangPlugin() :
     m_TranslUnitId(wxNOT_FOUND),
     m_UpdateCompileCommand(0),
     m_ReparseNeeded(0),
-    m_LastModifyLine(-1)
+    m_LastModifyLine(-1),
+    m_FileDatabase(),
+    m_Database(m_FileDatabase)
 {
     if (!Manager::LoadResource(_T("clanglib.zip")))
         NotifyMissingFile(_T("clanglib.zip"));
@@ -88,6 +91,13 @@ ClangPlugin::~ClangPlugin()
 
 void ClangPlugin::OnAttach()
 {
+    wxString path;
+    path = wxStandardPaths::Get().GetTempDir();
+    m_Proxy.SetPersistencyDirectory( path );
+
+    wxFileInputStream in( m_Proxy.GetTokenDatabaseFilename());
+    ClTokenDatabase::ReadIn( m_Database, in );
+
     wxBitmap bmp;
     ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
     wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/codecompletion/");
@@ -1141,7 +1151,7 @@ std::pair<wxString,wxString> ClangPlugin::GetFunctionScopeAt( const ClTranslUnit
 
 ClTokenPosition ClangPlugin::GetFunctionScopeLocation( const ClTranslUnitId id, const wxString& filename, const wxString& scope, const wxString& functioname)
 {
-    ClFileId fId = m_Database.GetFilenameId(filename);
+    ClFileId fId = m_FileDatabase.GetFilenameId(filename);
     std::vector<ClTokenId> tokenIdList = m_Database.GetFileTokens(fId);
     for ( std::vector<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
     {
@@ -1156,12 +1166,12 @@ ClTokenPosition ClangPlugin::GetFunctionScopeLocation( const ClTranslUnitId id, 
 
 void ClangPlugin::GetFunctionScopes( const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes )
 {
-    ClFileId fId = m_Database.GetFilenameId(filename);
+    ClFileId fId = m_FileDatabase.GetFilenameId(filename);
     std::vector<ClTokenId> tokenIdList = m_Database.GetFileTokens(fId);
     for ( std::vector<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
     {
         ClAbstractToken token = m_Database.GetToken(*it);
-        if ( token.type == ClTokenType_FuncDecl )
+        if ( token.tokenType == ClTokenType_FuncDecl )
         {
             out_scopes.push_back( std::make_pair(token.scopeName, token.displayName) );
         }
@@ -1295,3 +1305,5 @@ bool ClangPlugin::ProcessEvent(ClangEvent& event)
     }
     return true;
 }
+
+

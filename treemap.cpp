@@ -164,6 +164,12 @@ ClTreeMap<int>::ClTreeMap() :
 {
 }
 
+ClTreeMap<int>::ClTreeMap( const ClTreeMap<int>& other ) :
+    m_Root(new TreeNode(*other.m_Root))
+{
+
+}
+
 ClTreeMap<int>::~ClTreeMap()
 {
     delete m_Root;
@@ -209,3 +215,9 @@ int ClTreeMap<int>::GetValue(int id) const
 {
     return id;
 }
+
+int ClTreeMap<int>::GetCount() const
+{
+    return 0;
+}
+

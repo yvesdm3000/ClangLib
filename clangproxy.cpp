@@ -7,6 +7,7 @@
 #include "clangproxy.h"
 
 #include <wx/tokenzr.h>
+#include <wx/filename.h>
 
 #ifndef CB_PRECOMP
 #include <algorithm>
@@ -576,12 +577,13 @@ namespace HTML_Writer
 
 void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
 {
-    clangproxy.Reparse( m_TranslId, m_CompileCommand, m_UnsavedFiles);
+    ClTokenDatabase db(clangproxy.m_Database.GetFileDB());
+    clangproxy.Reparse( m_TranslId, m_CompileCommand, m_UnsavedFiles, db);
 
     if( m_Parents )
     {
             // Following code also includes children. Will fix that later
-        ClFileId fileId = clangproxy.m_Database.GetFilenameId(m_Filename);
+        ClFileId fileId = db.GetFilenameId(m_Filename);
         std::set<ClTranslUnitId> parentTranslUnits;
         {
             wxMutexLocker l(clangproxy.m_Mutex);
@@ -599,12 +601,21 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
         for (std::set<ClTranslUnitId>::iterator it = parentTranslUnits.begin(); it != parentTranslUnits.end(); ++it)
         {
             //fprintf(stdout,"Reparsing parent/child %d\n", (int)*it);
-            clangproxy.Reparse( *it, m_CompileCommand, m_UnsavedFiles );
+            clangproxy.Reparse( *it, m_CompileCommand, m_UnsavedFiles, db );
         }
     }
 
     // Get rid of some copied memory
     m_UnsavedFiles.clear();
+
+    clangproxy.m_Database.Update(db);
+
+    wxString dbFilename = clangproxy.GetTokenDatabaseFilename();
+    if( dbFilename.Length() > 0 )
+    {
+        SerializeTokenDatabaseJob saveTokenDb( clangproxy.m_Database, dbFilename );
+        clangproxy.AppendPendingJob( saveTokenDb );
+    }
 
     //wxMutexLocker lock(clangproxy.m_Mutex);
     //AbstractJob* pJob = new AsyncParseJob( &clangproxy, m_TranslId, m_Filename, m_CompileCommand, m_UnsavedFiles, &clangproxy.m_Database, this );
@@ -618,33 +629,24 @@ ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, ClTokenDatabase& data
     m_CppKeywords(cppKeywords),
     m_pEventCallbackHandler(pEvtCallbackHandler)
 {
-    m_ClIndex[0] = clang_createIndex(1, 1);
-    m_ClIndex[1] = clang_createIndex(1, 1);
+    m_ClIndex = clang_createIndex(1, 1);
     m_pThread = new BackgroundThread(false);
+    m_pIndexerThread = new BackgroundThread(true);
 }
 
 ClangProxy::~ClangProxy()
 {
-#if 0
-    //TaskThread* pThread = m_pThread;
-    {
-        wxMutexLocker lock(m_Mutex);
-        m_pThread = NULL;
-        m_ConditionQueueNotEmpty.Signal();
-        m_TranslUnits.clear();
-    }
-#endif
     //pThread->Wait();
-    clang_disposeIndex(m_ClIndex[0]);
-    clang_disposeIndex(m_ClIndex[1]);
+    clang_disposeIndex(m_ClIndex);
 }
 
-void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
+void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId, ClTokenDatabase& tokenDatabase)
 {
     //fprintf(stdout,"%s '%s'\n", __PRETTY_FUNCTION__, (const char*)filename.mb_str());
 
     if( filename.Length() == 0 )
         return;
+
 
     wxString cmd = commands + wxT(" -ferror-limit=0");
     wxStringTokenizer tokenizer(cmd);
@@ -682,8 +684,8 @@ void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString&
             translId = m_TranslUnits.size();
         }
     }
-    ClTranslationUnit tu = ClTranslationUnit(translId, m_ClIndex[0]);
-    tu.Parse(filename, m_Database.GetFilenameId(filename), args, unsavedFiles, &m_Database);
+    ClTranslationUnit tu = ClTranslationUnit(translId, m_ClIndex);
+    tu.Parse(filename, tokenDatabase.GetFilenameId(filename), args, unsavedFiles, &tokenDatabase);
     {
         wxMutexLocker lock(m_Mutex);
         if (it == m_TranslUnits.end())
@@ -701,18 +703,6 @@ void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString&
     }
     out_TranslId = translId;
 
-#if 0
-    wxMutexLocker lock(m_Mutex);
-    int translUnitId = m_TranslUnits.size();
-    m_TranslUnits.push_back(ClTranslationUnit(translUnitId, m_ClIndex[0]));
-    std::map<wxString, wxString> unsavedFiles;
-    //AsyncParseJob* parse = new AsyncParseJob(this, translUnitId, filename, commands, unsavedFiles, &m_Database, NULL );
-    //m_pParsingThread->Queue(parse);
-    //AsyncParseJob* parse2 = new AsyncParseJob(this, translUnitId, filename, commands, unsavedFiles, &m_Database, NULL );
-    //m_pParsingThread->Queue(parse2);
-
-    out_TranslId = translUnitId;
-#endif
     //fprintf(stdout,"CreateTU done. New TU id: %d, filename='%s'\n", (int)out_TranslId, (const char*)filename.mb_str());
 }
 
@@ -1586,7 +1576,7 @@ void ClangProxy::GetFunctionScopeAt(ClTranslUnitId translUnitId, const wxString&
 }
 
 
-void ClangProxy::Reparse(ClTranslUnitId translUnitId, const wxString& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles)
+void ClangProxy::Reparse(ClTranslUnitId translUnitId, const wxString& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles, ClTokenDatabase& tokenDatabase )
 {
     #if 0
     std::vector<CXUnsavedFile> clUnsavedFiles;
@@ -1617,7 +1607,7 @@ void ClangProxy::Reparse(ClTranslUnitId translUnitId, const wxString& /*compileC
         swap(m_TranslUnits[translUnitId], tu);
     }
     if( tu.IsValid() )
-        tu.Reparse(unsavedFiles, &m_Database);
+        tu.Reparse(unsavedFiles, &tokenDatabase);
     {
         wxMutexLocker lock(m_Mutex);
         swap(m_TranslUnits[translUnitId], tu);
@@ -1638,15 +1628,46 @@ void ClangProxy::GetDiagnostics(ClTranslUnitId translUnitId, const wxString& fil
     m_TranslUnits[translUnitId].GetDiagnostics(filename, diagnostics);
 }
 
+void ClangProxy::SetPersistencyDirectory( const wxString& dir )
+{
+    fprintf(stdout,"%s %s\n", __PRETTY_FUNCTION__, (const char*)dir.mb_str());
+    wxMutexLocker lock(m_Mutex);
+    m_PersistencyDirectory = dir;
+}
+
+wxString ClangProxy::GetTokenDatabaseFilename()
+{
+    fprintf(stdout,"%s %s\n", __PRETTY_FUNCTION__, (const char*)m_PersistencyDirectory.mb_str());
+    wxMutexLocker lock(m_Mutex);
+    if ( (m_PersistencyDirectory.Length() > 0)&& wxDirExists( m_PersistencyDirectory ))
+    {
+        wxFileName name = wxFileName::DirName( m_PersistencyDirectory );
+        name.SetFullName(wxT("tokendatabase.dat"));
+        return name.GetFullPath();
+    }
+    return wxString();
+}
+
 void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
 {
     if (!m_pThread)
     {
         return;
     }
+    if (!m_pIndexerThread)
+    {
+        return;
+    }
     ClangProxy::ClangJob* pJob = job.Clone();
     pJob->SetProxy(this);
-    m_pThread->Queue(pJob);
+    if ( (pJob->GetJobType() & ClangJob::IndexerGroupType) != ClangJob::IndexerGroupType )
+    {
+        m_pThread->Queue(pJob);
+    }
+    else
+    {
+        m_pIndexerThread->Queue( pJob );
+    }
 
     return;
 }
