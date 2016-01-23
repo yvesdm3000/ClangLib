@@ -262,7 +262,7 @@
 								</object>
 								<object class="sizeritem">
 									<object class="wxStaticBoxSizer">
-										<label>Options</label>
+										<label>Display options</label>
 										<orient>wxVERTICAL</orient>
 										<object class="sizeritem">
 											<object class="wxCheckBox" name="chkInlineDiagnostics">
@@ -288,6 +288,35 @@
 										<object class="sizeritem">
 											<object class="wxCheckBox" name="chkDiagnosticNotes">
 												<label>Show notes</label>
+											</object>
+											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+									</object>
+									<flag>wxALL|wxEXPAND</flag>
+									<border>8</border>
+								</object>
+								<object class="sizeritem">
+									<object class="wxStaticBoxSizer">
+										<label>Diagnostic options</label>
+										<orient>wxVERTICAL</orient>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkDocumentationDiagnostics">
+												<label>Emit documentation warnings</label>
+											</object>
+											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkNoUnknownDocumentationDiagnostics">
+												<label>Don't warn about unknown documentation fields</label>
+											</object>
+											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkAllCommentsDiagnostics">
+												<label>Parse all comments for documentation fields, not only DoxyGen style</label>
 											</object>
 											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
 											<border>5</border>

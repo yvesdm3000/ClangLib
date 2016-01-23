@@ -554,8 +554,8 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         }
 
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
-        //fprintf(stdout,"Inserting token '%s', file='%s', line=%d, col=%d\n", (const char*)identifier.mb_str(), (const char*)filename.mb_str(), line, col);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
+        //fprintf(stdout,"Inserting token '%s' '%s', file='%s' (%d), line=%d, col=%d hash=%x\n", (const char*)identifier.mb_str(), (const char*)displayName.mb_str(), (const char*)filename.mb_str(), fileId, line, col, tokenHash);
         ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, displayName, scopeName, tokenHash);
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
@@ -587,6 +587,7 @@ bool ClTranslationUnit::Store( const wxString& filename )
 {
     if( clang_saveTranslationUnit( m_ClTranslUnit, (const char*)filename.ToUTF8(), CXSaveTranslationUnit_None ) == CXSaveError_None )
         return true;
+    wxRemoveFile( filename );
     return false;
 }
 

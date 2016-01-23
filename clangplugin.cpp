@@ -95,16 +95,17 @@ const int idClangGetCCDocumentationTask = wxNewId();
 const int idClangGetOccurrencesTask = wxNewId();
 
 ClangPlugin::ClangPlugin() :
-    m_Proxy(this, m_Database, m_CppKeywords),
+    m_FileDatabase(),
+    m_Database(m_FileDatabase),
+    m_pPersistency( new SinglePathPersistencyManager( wxT("")) ),
+    m_Proxy(this, m_Database, *m_pPersistency, m_CppKeywords),
     m_ImageList(16, 16),
     m_ReparseTimer(this, idReparseTimer),
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND),
     m_UpdateCompileCommand(0),
     m_ReparseNeeded(0),
-    m_LastModifyLine(-1),
-    m_FileDatabase(),
-    m_Database(m_FileDatabase)
+    m_LastModifyLine(-1)
 {
     if (!Manager::LoadResource(_T("clanglib.zip")))
         NotifyMissingFile(_T("clanglib.zip"));
@@ -122,7 +123,7 @@ void ClangPlugin::OnAttach()
 
     wxString path;
     path = wxStandardPaths::Get().GetTempDir();
-    m_Proxy.SetPersistencyDirectory( path );
+    //m_Proxy.SetPersistencyDirectory( path );
 
     // handling events send from CCLogger
     Connect(g_idCCLogger,                wxEVT_COMMAND_MENU_SELECTED, CodeBlocksThreadEventHandler(ClangPlugin::OnCCLogger)     );
@@ -196,6 +197,7 @@ void ClangPlugin::OnAttach()
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new ClEvent(this, &ClangPlugin::OnEditorActivate));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_SAVE,      new ClEvent(this, &ClangPlugin::OnEditorSave));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_CLOSE,     new ClEvent(this, &ClangPlugin::OnEditorClose));
+    Manager::Get()->RegisterEventSink(cbEVT_PROJECT_OPEN,     new ClEvent(this, &ClangPlugin::OnProjectOpen));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_ACTIVATE, new ClEvent(this, &ClangPlugin::OnProjectActivate));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_FILE_CHANGED, new ClEvent(this, &ClangPlugin::OnProjectFileChanged));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_OPTIONS_CHANGED, new ClEvent(this, &ClangPlugin::OnProjectOptionsChanged));
@@ -317,6 +319,16 @@ void ClangPlugin::UpdateComponents()
     }
     if( activationChanged )
         Manager::Get()->GetEditorManager()->SetActiveEditor( Manager::Get()->GetEditorManager()->GetActiveEditor() );
+
+    wxString extraCompileCommands;
+    if( cfg->ReadBool(_T("/diagnostics_documentation") ) )
+        extraCompileCommands = extraCompileCommands.Append( _T("-Wdocumentation") );
+    if( cfg->ReadBool(_T("/diagnostics_documentation_skipunknown") ) )
+        extraCompileCommands = extraCompileCommands.Append( _T(" -Wno-documentation-unknown-command") );
+    if( cfg->ReadBool(_T("/diagnostics_documentation_allcomments") ) )
+        extraCompileCommands = extraCompileCommands.Append( _T(" -fparse-all-comments") );
+
+    m_Proxy.SetExtraCompileArgs( extraCompileCommands );
 }
 
 ClangPlugin::CCProviderStatus ClangPlugin::GetProviderStatusFor(cbEditor* ed)
@@ -669,9 +681,38 @@ void ClangPlugin::OnEditorClose(CodeBlocksEvent& event)
     }
 }
 
+void ClangPlugin::OnProjectOpen(CodeBlocksEvent& event)
+{
+    fprintf(stdout, "%s\n", __PRETTY_FUNCTION__);
+    event.Skip();
+
+    std::vector<ClFileId> fileIds;
+    int cnt = event.GetProject()->GetFilesCount();
+    fprintf(stdout, "Files in project: %d\n", cnt);
+    for( int i = 0; i<cnt; ++i )
+    {
+        ClFileId id = m_FileDatabase.GetFilenameId( event.GetProject()->GetFile( i )->file.GetLongPath() );
+        fileIds.push_back( id );
+    }
+    ClangProxy::ReindexListJob job( fileIds, m_CompileCommand );
+    m_Proxy.AppendPendingJob( job );
+}
+
+
 void ClangPlugin::OnProjectActivate(CodeBlocksEvent& event)
 {
     event.Skip();
+
+    std::vector<ClFileId> fileIds;
+    int cnt = event.GetProject()->GetFilesCount();
+    fprintf(stdout, "Files in project: %d\n", cnt);
+    for( int i = 0; i<cnt; ++i )
+    {
+        ClFileId id = m_FileDatabase.GetFilenameId( event.GetProject()->GetFile( i )->file.GetLongPath() );
+        fileIds.push_back( id );
+    }
+    ClangProxy::ReindexListJob job( fileIds, m_CompileCommand );
+    m_Proxy.AppendPendingJob( job );
     return;
 }
 
@@ -1105,12 +1146,24 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
             {
                 RequestReparse();
             }
+            else
+            {
+                if (m_ReparseNeeded > 0)
+                {
+                    m_ReparseTimer.Stop();
+                    m_ReparseTimer.Start(REPARSE_DELAY, wxTIMER_ONE_SHOT);
+                }
+            }
             m_LastModifyLine = line;
         }
     }
     else if (event.GetEventType() == wxEVT_SCI_CHANGE)
     {
-        //fprintf(stdout,"wxEVT_SCI_CHANGE\n");
+        if (m_ReparseNeeded > 0)
+        {
+            m_ReparseTimer.Stop();
+            m_ReparseTimer.Start(REPARSE_DELAY, wxTIMER_ONE_SHOT);
+        }
     }
 }
 

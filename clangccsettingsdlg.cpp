@@ -125,6 +125,10 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     XRCCTRL(*this, "chkDiagnosticErrors",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_errors"),   true));
     XRCCTRL(*this, "chkDiagnosticNotes",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_notes"),   false));
 
+    XRCCTRL(*this, "chkDocumentationDiagnostics",          wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_documentation"),   false));
+    XRCCTRL(*this, "chkNoUnknownDocumentationDiagnostics", wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_documentation_skipunknown"),   false));
+    XRCCTRL(*this, "chkAllCommentsDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_documentation_allcomments"),   false));
+
     // Page "C / C++ parser"
     // NOTE (Morten#1#): Keep this in sync with files in the XRC file (settings.xrc) and nativeparser.cpp
     //XRCCTRL(*this, "spnThreadsNum",            wxSpinCtrl)->SetValue(cfg->ReadInt(_T("/max_threads"), 1));
@@ -237,11 +241,25 @@ void ClangSettingsDlg::OnApply()
     //cfg->Write(_T("/browser_tree_members"),     (bool) XRCCTRL(*this, "chkTreeMembers", wxCheckBox)->GetValue());
     //cfg->Write(_T("/scope_filter"),             (bool) XRCCTRL(*this, "chkScopeFilter", wxCheckBox)->GetValue());
 
+    // Page "Diagnostics"
+    cfg->Write(_T("/diagnostics"),              (bool) XRCCTRL(*this, "chkDiagnostics",       wxCheckBox)->GetValue());
+
+    cfg->Write(_T("/diagnostics_show_inline"),  (bool) XRCCTRL(*this, "chkInlineDiagnostics", wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_warnings"),(bool) XRCCTRL(*this, "chkDiagnosticWarnings",wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_errors"),  (bool) XRCCTRL(*this, "chkDiagnosticErrors",  wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_notes"),   (bool) XRCCTRL(*this, "chkDiagnosticNotes",   wxCheckBox)->GetValue());
+
+    cfg->Write(_T("/diagnostics_documentation"),            (bool) XRCCTRL(*this, "chkDocumentationDiagnostics", wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_documentation_skipunknown"),(bool) XRCCTRL(*this, "chkNoUnknownDocumentationDiagnostics", wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_documentation_allcomments"),(bool) XRCCTRL(*this, "chkAllCommentsDiagnostics", wxCheckBox)->GetValue());
+
     // Page "Documentation"
     //cfg->Write(_T("/use_documentation_helper"), (bool) XRCCTRL(*this, "chkDocumentation", wxCheckBox)->GetValue());
     cfg->Write(_T("/documentation_helper_background_color"), (wxColour) XRCCTRL(*this, "btnDocBgColor",   wxButton)->GetBackgroundColour());
     cfg->Write(_T("/documentation_helper_text_color"),       (wxColour) XRCCTRL(*this, "btnDocTextColor", wxButton)->GetBackgroundColour());
     cfg->Write(_T("/documentation_helper_link_color"),       (wxColour) XRCCTRL(*this, "btnDocLinkColor", wxButton)->GetBackgroundColour());
+
+
     // -----------------------------------------------------------------------
     // Handle all options that are being be read by m_Parser.ReadOptions():
     // -----------------------------------------------------------------------

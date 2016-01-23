@@ -22,6 +22,7 @@
 				</Compiler>
 				<ExtraCommands>
 					<Add after="zip -j9 /home/yves/codeblocks-1510/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
+					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
 		</Build>
@@ -75,6 +76,7 @@
 		<Unit filename="clangproxy.h" />
 		<Unit filename="clangtoolbar.cpp" />
 		<Unit filename="clangtoolbar.h" />
+		<Unit filename="persistency.h" />
 		<Unit filename="resources/ccsettings.xrc" />
 		<Unit filename="resources/codecompletion_toolbar.xrc" />
 		<Unit filename="resources/manifest.xml" />

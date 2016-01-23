@@ -99,6 +99,7 @@ private:
     void OnEditorSave( CodeBlocksEvent& event );
     void OnEditorClose( CodeBlocksEvent& event );
     /// Make project-dependent setup
+    void OnProjectOpen( CodeBlocksEvent& event );
     void OnProjectActivate( CodeBlocksEvent& event );
     void OnProjectFileChanged( CodeBlocksEvent& event );
     /// Update project-dependent setup
@@ -169,6 +170,7 @@ private: // Members
 
     ClFilenameDatabase m_FileDatabase;
     ClTokenDatabase m_Database;
+    PersistencyManager* m_pPersistency;
     wxStringVec m_CppKeywords;
     ClangProxy m_Proxy;
     wxImageList m_ImageList;

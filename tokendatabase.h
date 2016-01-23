@@ -32,8 +32,8 @@ struct ClAbstractToken
     ClAbstractToken( const ClAbstractToken& other ) :
         tokenType(other.tokenType), fileId(other.fileId), location(other.location), identifier(other.identifier), displayName( other.displayName.c_str()), scopeName(other.scopeName.c_str()), tokenHash(other.tokenHash) {}
 
-    static void WriteOut( const ClAbstractToken& token,  wxOutputStream& out );
-    static void ReadIn( ClAbstractToken& token, wxInputStream& in );
+    static bool ReadIn( ClAbstractToken& token, wxInputStream& in );
+    static bool WriteOut( const ClAbstractToken& token,  wxOutputStream& out );
 
     ClTokenType tokenType;
     ClFileId fileId;
@@ -44,27 +44,19 @@ struct ClAbstractToken
     unsigned tokenHash;
 };
 
-struct ClFileEntry
-{
-    ClFileEntry() : filename(), revision(0){}
-    ClFileEntry(const wxString& fn) : filename(fn), revision(0) {}
-    wxString filename;
-    uint32_t revision; ///< Update revision. Updated when tokens associated with this file are changed
-};
-
 class ClFilenameDatabase
 {
 public:
     ClFilenameDatabase();
     ~ClFilenameDatabase();
 
-    static void ReadIn( ClFilenameDatabase& tokenDatabase, wxInputStream& in );
-    static void WriteOut( ClFilenameDatabase& db, wxOutputStream& out );
+    static bool ReadIn( ClFilenameDatabase& tokenDatabase, wxInputStream& in );
+    static bool WriteOut( ClFilenameDatabase& db, wxOutputStream& out );
 
     ClFileId GetFilenameId(const wxString& filename);
     wxString GetFilename(ClFileId fId);
 private:
-    ClTreeMap<ClFileEntry>* m_pFileEntries;
+    ClTreeMap<wxString>* m_pFileEntries;
     wxMutex m_Mutex;
 };
 
@@ -78,8 +70,8 @@ public:
     friend void swap( ClTokenDatabase& first, ClTokenDatabase& second );
 
 
-    static void ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in );
-    static void WriteOut( ClTokenDatabase& tokenDatabase, wxOutputStream& out );
+    static bool ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in );
+    static bool WriteOut( ClTokenDatabase& tokenDatabase, wxOutputStream& out );
 
     ClFileId GetFilenameId(const wxString& filename);
     wxString GetFilename(ClFileId fId);
@@ -108,7 +100,7 @@ public:
     /**
      * Updates the data from the argument into the database. This invalidates any token previously present in the database, replacing it by the matching token from the merged-in database.
      */
-    void Update( ClTokenDatabase& other );
+    void Update( const ClTokenDatabase& other );
 private:
     void UpdateToken( const ClTokenId freeTokenId, const ClAbstractToken& token);
 private:

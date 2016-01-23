@@ -186,6 +186,20 @@ int ClTreeMap<int>::Insert(const wxString& key, int value)
     return value;
 }
 
+void ClTreeMap<int>::Remove(const wxString& key, int value)
+{
+    typedef std::multimap<wxString, int>::iterator leafItr;
+    std::pair<leafItr, leafItr> rg = m_Root->leaves.equal_range(key);
+    for (leafItr itr = rg.first; itr != rg.second; ++itr)
+    {
+        if ( itr->second == value )
+        {
+            m_Root->leaves.erase( itr );
+            return;
+        }
+    }
+}
+
 void ClTreeMap<int>::Shrink()
 {
 #ifdef USE_TREE_MAP
