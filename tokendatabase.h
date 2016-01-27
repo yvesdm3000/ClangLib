@@ -8,20 +8,9 @@
 #include <wx/string.h>
 #include <wx/archive.h>
 
-
 template<typename _Tp> class ClTreeMap;
 class wxString;
 typedef int ClFileId;
-
-typedef enum _TokenType
-{
-    ClTokenType_Unknown = 0,
-    ClTokenType_FuncDecl  = 1<<0,
-    ClTokenType_VarDecl   = 1<<1,
-    ClTokenType_ParmDecl  = 1<<2,
-    ClTokenType_ScopeDecl = 1<<3,
-
-}ClTokenType;
 
 struct ClAbstractToken
 {
@@ -75,10 +64,11 @@ public:
 
     ClFileId GetFilenameId(const wxString& filename);
     wxString GetFilename(ClFileId fId);
-    ClTokenId GetTokenId(const wxString& identifier, ClFileId fId, unsigned tokenHash); ///< returns wxNOT_FOUND on failure
+    ClTokenId GetTokenId(const wxString& identifier, ClFileId fId, ClTokenType tokenType, unsigned tokenHash); ///< returns wxNOT_FOUND on failure
     ClTokenId InsertToken(const ClAbstractToken& token); // duplicate tokens are discarded
     ClAbstractToken GetToken(ClTokenId tId);
     ClFilenameDatabase& GetFileDB() { return m_FileDB; }
+    void RemoveToken( const ClTokenId tokenId );
     /**
      * Return a list of tokenId's for the given token identifier
      */
@@ -100,9 +90,9 @@ public:
     /**
      * Updates the data from the argument into the database. This invalidates any token previously present in the database, replacing it by the matching token from the merged-in database.
      */
-    void Update( const ClTokenDatabase& other );
+    void Update( const ClFileId fileId, const ClTokenDatabase& db );
 private:
-    void UpdateToken( const ClTokenId freeTokenId, const ClAbstractToken& token);
+    void UpdateToken( const ClTokenId tokenId, const ClAbstractToken& token);
 private:
     ClFilenameDatabase& m_FileDB;
     ClTreeMap<ClAbstractToken>* m_pTokens;

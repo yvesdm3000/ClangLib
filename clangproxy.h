@@ -118,17 +118,10 @@ public:
     public:
         CreateTranslationUnitJob( wxEventType evtType, int evtId, const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles ) :
             EventJob(CreateTranslationUnitType, evtType, evtId),
-            m_Filename(filename.c_str()),
-            m_Commands(commands.c_str()),
+            m_Filename(filename),
+            m_Commands(commands),
             m_TranslationUnitId(-1),
-            m_UnsavedFiles()
-            {
-            /* deep copy */
-                for( std::map<wxString, wxString>::const_iterator it = unsavedFiles.begin(); it != unsavedFiles.end(); ++it)
-                {
-                    m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
-                }
-            }
+            m_UnsavedFiles(unsavedFiles){}
         ClangJob* Clone() const
         {
             CreateTranslationUnitJob* job = new CreateTranslationUnitJob(*this);
@@ -141,7 +134,7 @@ public:
             {
                 ClTokenDatabase db(clangproxy.m_Database.GetFileDB());
                 clangproxy.CreateTranslationUnit(m_Filename, m_Commands, m_UnsavedFiles, m_TranslationUnitId, db);
-                clangproxy.m_Database.Update(db);
+                clangproxy.m_Database.Update( db.GetFilenameId(m_Filename), db);
             }
             m_UnsavedFiles.clear();
         }
@@ -153,7 +146,14 @@ public:
             m_Filename(other.m_Filename.c_str()),
             m_Commands(other.m_Commands.c_str()),
             m_TranslationUnitId(other.m_TranslationUnitId),
-            m_UnsavedFiles(other.m_UnsavedFiles){}
+            m_UnsavedFiles()
+        {
+            /* deep copy */
+            for( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            {
+                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
+            }
+        }
     public:
         wxString m_Filename;
         wxString m_Commands;
@@ -191,16 +191,11 @@ public:
         ReparseJob( wxEventType evtType, int evtId, int translId, const wxString& compileCommand, const wxString& filename, const std::map<wxString, wxString>& unsavedFiles, bool parents = false )
             : EventJob(ReparseType, evtType, evtId),
               m_TranslId(translId),
-              m_UnsavedFiles(),
-              m_CompileCommand(compileCommand.c_str()),
-              m_Filename(filename.c_str()),
+              m_UnsavedFiles(unsavedFiles),
+              m_CompileCommand(compileCommand),
+              m_Filename(filename),
               m_Parents(parents)
         {
-            /* deep copy */
-            for( std::map<wxString, wxString>::const_iterator it = unsavedFiles.begin(); it != unsavedFiles.end(); ++it)
-            {
-                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
-            }
         }
         ClangJob* Clone() const
         {
@@ -219,6 +214,22 @@ public:
 #endif
         ClTranslUnitId GetTranslationUnitId() { return m_TranslId; }
         const wxString& GetFilename() const { return m_Filename; }
+    private:
+        ReparseJob(const ReparseJob& other )
+            : EventJob(other),
+              m_TranslId(other.m_TranslId),
+              m_UnsavedFiles(),
+              m_CompileCommand(other.m_CompileCommand.c_str()),
+              m_Filename(other.m_Filename.c_str()),
+              m_Parents(other.m_Parents)
+        {
+            /* deep copy */
+            for( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            {
+                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
+            }
+        }
+
     public:
         int m_TranslId;
         std::map<wxString, wxString> m_UnsavedFiles;
@@ -234,7 +245,7 @@ public:
         GetDiagnosticsJob( wxEventType evtType, int evtId, int translId, const wxString& filename ):
             EventJob(GetDiagnosticsType, evtType, evtId),
             m_TranslId(translId),
-            m_Filename( filename.c_str())
+            m_Filename( filename )
         {}
         ClangJob* Clone() const
         {
@@ -254,7 +265,7 @@ public:
         GetDiagnosticsJob( const GetDiagnosticsJob& other ) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
-            m_Filename(other.m_Filename),
+            m_Filename(other.m_Filename.c_str()),
             m_Results(other.m_Results){}
     public:
         int m_TranslId;
@@ -268,7 +279,7 @@ public:
         GetFunctionScopeAtJob( wxEventType evtType, int evtId, int translId, const wxString& filename, const ClTokenPosition& location) :
             EventJob(GetFunctionScopeAtType, evtType, evtId),
             m_TranslId(translId),
-            m_Filename(filename.c_str()),
+            m_Filename(filename),
             m_Location(location){}
         ClangJob* Clone() const
         {
@@ -303,9 +314,9 @@ public:
     public:
         ReindexJob(const wxString& pchFilename, ClFileId fileId, const wxString& compileCommand) :
             ClangJob(ReindexType),
-            m_PchFilename( pchFilename.c_str() ),
+            m_PchFilename( pchFilename ),
             m_FileId(fileId),
-            m_CompileCommand(compileCommand.c_str())
+            m_CompileCommand(compileCommand)
             {}
 
         ClangJob* Clone() const
@@ -315,7 +326,6 @@ public:
         }
         void Execute( ClangProxy& clangproxy )
         {
-            fprintf(stdout, "%s %s\n", __PRETTY_FUNCTION__, (const char*)m_PchFilename.mb_str());
             CXIndex index = clang_createIndex(0, 0);
             ClTranslationUnit tu(0, index);
             ClTokenDatabase db(clangproxy.m_Database.GetFileDB());
@@ -336,14 +346,14 @@ public:
                 tu.Store( m_PchFilename );
 
             clang_disposeIndex( index );
-            clangproxy.m_Database.Update( db );
+            clangproxy.m_Database.Update( m_FileId, db );
         }
     protected:
         ReindexJob(const ReindexJob& other) :
             ClangJob(other),
-            m_PchFilename(other.m_PchFilename),
+            m_PchFilename(other.m_PchFilename.c_str()),
             m_FileId(other.m_FileId),
-            m_CompileCommand(other.m_CompileCommand)
+            m_CompileCommand(other.m_CompileCommand.c_str())
         {}
         wxString m_PchFilename;
         ClFileId m_FileId;
@@ -356,7 +366,7 @@ public:
         ReindexListJob(const std::vector<ClFileId>& fileIds, const wxString& compileCommand) :
             ClangJob(ReindexListType),
             m_FileIds(fileIds),
-            m_CompileCommand(compileCommand.c_str()),
+            m_CompileCommand(compileCommand),
             m_CurrentIndex(0)
             {}
 
@@ -367,7 +377,6 @@ public:
         }
         void Execute( ClangProxy& clangproxy )
         {
-            fprintf(stdout, "%s\n", __PRETTY_FUNCTION__);
             if (m_CurrentIndex >= m_FileIds.size() )
                 return;
             ClFileId fId = m_FileIds[m_CurrentIndex];
@@ -390,7 +399,7 @@ public:
         ReindexListJob(const ReindexListJob& other) :
             ClangJob(other),
             m_FileIds(other.m_FileIds),
-            m_CompileCommand(other.m_CompileCommand),
+            m_CompileCommand(other.m_CompileCommand.c_str()),
             m_CurrentIndex(other.m_CurrentIndex)
         {}
         std::vector<ClFileId> m_FileIds;
@@ -463,13 +472,9 @@ public:
             m_Filename(filename.c_str()),
             m_Location(location),
             m_TranslId(translId),
-            m_UnsavedFiles()
+            m_UnsavedFiles(unsavedFiles),
+            m_pResults(new std::vector<ClToken>())
         {
-            for( std::map<wxString, wxString>::const_iterator it = unsavedFiles.begin(); it != unsavedFiles.end(); ++it)
-            {
-                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
-            }
-            m_pResults = new std::vector<ClToken>();
         }
 
         ClangJob* Clone() const
@@ -502,9 +507,15 @@ public:
             m_Filename(other.m_Filename.c_str()),
             m_Location(other.m_Location),
             m_TranslId(other.m_TranslId),
-            m_UnsavedFiles(other.m_UnsavedFiles),
+            m_UnsavedFiles(),
             m_pResults(other.m_pResults),
-            m_Diagnostics(other.m_Diagnostics) {}
+            m_Diagnostics(other.m_Diagnostics)
+        {
+            for( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            {
+                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
+            }
+        }
         bool m_IsAuto;
         wxString m_Filename;
         ClTokenPosition m_Location;
@@ -521,11 +532,11 @@ public:
         DocumentCCTokenJob( wxEventType evtType, const int evtId, ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, ClTokenId tknId ):
             SyncJob(DocumentCCTokenType, evtType, evtId),
             m_TranslId(translId),
-            m_Filename(filename.c_str()),
+            m_Filename(filename),
             m_Location(location),
-            m_TokenId(tknId)
+            m_TokenId(tknId),
+            m_pResult(new wxString())
         {
-            m_pResult = new wxString();
         }
 
         ClangJob* Clone() const
@@ -547,11 +558,11 @@ public:
         const wxString& GetFilename() { return m_Filename; }
         const ClTokenPosition& GetLocation() { return m_Location; }
         const wxString& GetResult() { return *m_pResult; }
-    protected:
+    private:
         DocumentCCTokenJob( const DocumentCCTokenJob& other ) :
             SyncJob(other),
             m_TranslId(other.m_TranslId),
-            m_Filename(other.m_Filename),
+            m_Filename(other.m_Filename.c_str()),
             m_Location(other.m_Location),
             m_TokenId(other.m_TokenId),
             m_pResult(other.m_pResult) {}
@@ -567,7 +578,7 @@ public:
     public:
         GetTokensAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId ):
             SyncJob(GetTokensAtType, evtType, evtId),
-            m_Filename(filename.c_str()),
+            m_Filename(filename),
             m_Location(location),
             m_TranslId(translId)
         {
@@ -616,7 +627,7 @@ public:
     public:
         GetCallTipsAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr ):
             SyncJob( GetCallTipsAtType, evtType, evtId),
-            m_Filename(filename.c_str()),
+            m_Filename(filename),
             m_Location(location),
             m_TranslId(translId),
             m_TokenStr(tokenStr)
@@ -667,7 +678,7 @@ public:
         GetOccurrencesOfJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, ClTranslUnitId translId ):
             SyncJob( GetOccurrencesOfType, evtType, evtId),
             m_TranslId(translId),
-            m_Filename(filename.c_str()),
+            m_Filename(filename),
             m_Location(location)
         {
             m_pResults = new std::vector< std::pair<int, int> >();
@@ -743,7 +754,7 @@ public:
         SerializeTokenDatabaseJob( const ClTokenDatabase& db, const wxString& filename ) :
             ClangJob(SerializeTokenDatabaseType),
             m_TokenDatabase(db),
-            m_Filename( filename.c_str() )
+            m_Filename( filename )
         {}
         ClangJob* Clone() const
         {
@@ -771,7 +782,7 @@ public:
         LoadTokenDatabaseJob( const ClTokenDatabase& db, const wxString& filename ) :
             ClangJob(SerializeTokenDatabaseType),
             m_TokenDatabase(db),
-            m_Filename( filename.c_str() )
+            m_Filename( filename )
         {}
         ClangJob* Clone() const
         {
@@ -831,8 +842,8 @@ protected: // jobs that are run only on the thread
 
 public:
     wxString GetCCInsertSuffix( ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
-    bool ResolveDeclTokenAt( const ClTranslUnitId translId, wxString& filename, ClTokenPosition& out_location);
-    bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& filename, ClTokenPosition& inout_location);
+    bool ResolveDeclTokenAt( const ClTranslUnitId translId, const wxString& filename, wxString& out_filename, ClTokenPosition& out_location);
+    bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, const wxString& filename, wxString& out_filename, ClTokenPosition& inout_location);
 
     void GetFunctionScopeAt( ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_FunctionName );
     std::vector<std::pair<wxString, wxString> > GetFunctionScopes( ClTranslUnitId, const wxString& filename );

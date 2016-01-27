@@ -73,7 +73,6 @@ void ClangToolbar::OnRelease(IClangPlugin* pClangPlugin)
     ClangPluginComponent::OnRelease(pClangPlugin);
     EditorHooks::UnregisterHook(m_EditorHookId);
     Manager::Get()->RemoveAllEventSinksFor(this);
-
 }
 
 void ClangToolbar::OnEditorActivate(CodeBlocksEvent& event)

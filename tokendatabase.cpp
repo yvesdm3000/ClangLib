@@ -29,10 +29,7 @@ static bool WriteString( wxOutputStream& out, const char* str )
 
     if( str != NULL)
     {
-        //fprintf(stdout, "str='%s'\n", str);
         len = strlen(str); // Need size in amount of bytes
-    //fprintf(stdout, "Writing string '%s' len=%d", buf, len);
-        //fprintf(stdout, "Strlen = %d\n", len);
     }
     if( !WriteInt( out, len ) )
        return false;
@@ -135,12 +132,10 @@ bool ClFilenameDatabase::WriteOut( ClFilenameDatabase& db, wxOutputStream& out )
     int i;
     wxMutexLocker l(db.m_Mutex);
     int cnt = db.m_pFileEntries->GetCount();
-    fprintf( stdout, "Writing %d file entries\n", cnt );
     WriteInt( out, cnt );
     for( i=0; i<cnt; ++i )
     {
         wxString filename = db.m_pFileEntries->GetValue( (ClFileId)i );
-        fprintf(stdout, "Writing filename '%s'\n", (const char*)filename.mb_str());
         if( !WriteString( out, filename.mb_str() ) )
             return false;
     }
@@ -159,7 +154,6 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
         wxString filename;
         if( ! ReadString(in, filename) )
             return false;
-        fprintf( stdout,  "Read filename: '%s'\n", (const char*)filename.mb_str() );
         db.m_pFileEntries->Insert( filename, filename );
     }
     return true;
@@ -178,7 +172,6 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename)
     {
         wxString f = wxString(normFile.c_str());
         ClFileId id = m_pFileEntries->Insert( f, f );
-        //fprintf(stdout,"%s this=%p Storing %s(%p) as %d\n", __PRETTY_FUNCTION__, (void*)this, (const char*)f.mb_str(), (void*)f.c_str(), (int)id );
         return id;
     }
     return id.front();
@@ -253,23 +246,18 @@ bool ClTokenDatabase::ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in 
         int packetType = 0;
         if( !ReadInt(in, packetType) )
             return false;
-        //fprintf( stdout, "type=%d\n", packetType );
         switch(packetType)
         {
         case ClTokenPacketType_filenames:
-            //fprintf( stdout, "Reading filename list\n");
             if( ! ClFilenameDatabase::ReadIn( tokenDatabase.m_FileDB, in ) )
                 return false;
             break;
         case ClTokenPacketType_tokens:
-            //fprintf( stdout, "Reading token list\n");
             int packetCount = 0;
             if( !ReadInt(in, packetCount) )
                 return false;
-            //fprintf( stdout, "count=%d\n", packetCount );
             for (i=0; i<packetCount; ++i)
             {
-                //fprintf( stdout, "Reading token %d", i );
                 ClAbstractToken token;
                 if( ! ClAbstractToken::ReadIn( token, in ) )
                     return false;
@@ -283,7 +271,6 @@ bool ClTokenDatabase::ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in 
             break;
         }
     }
-    fprintf(stdout,"Read %d tokens from disk\n", read_count);
     return true;
 }
 
@@ -302,22 +289,15 @@ bool ClTokenDatabase::WriteOut( ClTokenDatabase& tokenDatabase, wxOutputStream& 
 
     WriteInt( out, ClTokenPacketType_tokens );
     cnt = tokenDatabase.m_pTokens->GetCount();
-    fprintf( stdout, "Writing %d tokens\n", cnt );
 
     WriteInt( out, cnt );
     uint32_t written_count = 0;
     for( i=0; i<cnt; ++i )
     {
         ClAbstractToken tok = tokenDatabase.m_pTokens->GetValue( i );
-        //fprintf( stdout, "Writing token %d (%s / %s) fId=%d\n", i, (const char*)tok.identifier.mb_str(), (const char*)tok.displayName.mb_str(), tok.fileId );
-        //if (tok.revision == tokenDatabase.m_pFileEntries->GetValue( tok.fileId ).revision)
-        {
-            if( !ClAbstractToken::WriteOut( tok, out ) )
-                return false;
-            written_count++;
-        }
+        if( !ClAbstractToken::WriteOut( tok, out ) )
+            return false;
     }
-    fprintf( stdout, "Written %d token entries\n", (int)written_count );
     return true;
 }
 
@@ -342,7 +322,7 @@ ClTokenId ClTokenDatabase::InsertToken(const ClAbstractToken& token)
 {
     wxMutexLocker lock(m_Mutex);
 
-    ClTokenId tId = GetTokenId(token.identifier, token.fileId, token.tokenHash);
+    ClTokenId tId = GetTokenId(token.identifier, token.fileId, token.tokenType, token.tokenHash);
     if (tId == wxNOT_FOUND)
     {
         tId = m_pTokens->Insert(wxString(token.identifier), token);
@@ -352,7 +332,7 @@ ClTokenId ClTokenDatabase::InsertToken(const ClAbstractToken& token)
     return tId;
 }
 
-ClTokenId ClTokenDatabase::GetTokenId(const wxString& identifier, ClFileId fileId, unsigned tokenHash )
+ClTokenId ClTokenDatabase::GetTokenId(const wxString& identifier, ClFileId fileId, ClTokenType tokenType, unsigned tokenHash )
 {
     wxMutexLocker lock( m_Mutex);
     std::vector<int> ids = m_pTokens->GetIdSet(identifier);
@@ -362,7 +342,7 @@ ClTokenId ClTokenDatabase::GetTokenId(const wxString& identifier, ClFileId fileI
         if (m_pTokens->HasValue(*itr))
         {
             ClAbstractToken tok = m_pTokens->GetValue(*itr);
-            if( (tok.tokenHash == tokenHash)&&((tok.fileId == fileId)||(fileId == wxNOT_FOUND)) )
+            if( (tok.tokenHash == tokenHash)&&((tok.tokenType == tokenType)||(tokenType == ClTokenType_Unknown))&&((tok.fileId == fileId)||(fileId == wxNOT_FOUND)) )
                 return *itr;
         }
     }
@@ -414,63 +394,39 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
     m_pFileTokens->Insert(filen, freeTokenId);
 }
 
-void ClTokenDatabase::Update( const ClTokenDatabase& db )
+void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
+{
+    ClAbstractToken oldToken = GetToken( tokenId );
+    wxString key = wxString::Format(wxT("%d"), oldToken.fileId);
+    m_pFileTokens->Remove( key, tokenId );
+    ClAbstractToken t;
+    // We just invalidate it here. Real removal is rather complex
+    UpdateToken( tokenId, t );
+}
+
+void ClTokenDatabase::Update( const ClFileId fileId, const ClTokenDatabase& db )
 {
     int i;
-    std::set<ClFileId> fileIds;
-    std::set<ClTokenId> freeTokenIds;
+    std::vector<ClTokenId> oldTokenIds;
 
     wxMutexLocker lock( m_Mutex);
+    oldTokenIds = GetFileTokens( fileId );
     int cnt = db.m_pTokens->GetCount();
     for (i=0;i<cnt;++i)
     {
         ClAbstractToken tok = db.m_pTokens->GetValue(i);
-        if(tok.fileId == -1)
+        ClTokenId tokId = InsertToken(tok);
+        for( std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end();  ++it)
         {
-            //freeTokenIds.insert(i);
-        }
-        else
-        {
-            fileIds.insert(tok.fileId);
-        }
-    }
-#if 0
-    // Clear old entries
-    for (std::set<ClFileId>::iterator it = fileIds.begin(); it != fileIds.end(); ++it)
-    {
-        wxString key = wxString::Format(wxT("%d"), *it);
-        std::vector<ClTokenId> l = m_pFileTokens->GetIdSet(key);
-        for (std::vector<ClTokenId>::iterator it2 = l.begin(); it2 != l.end(); ++it2)
-        {
-            fprintf(stdout, "Freeing token Id %d due to link with file id %d\n", *it2, *it);
-            freeTokenIds.insert( *it2 );
-            ClAbstractToken& tokenRef = m_pTokens->GetValue(*it2);
-            tokenRef.tokenType = ClTokenType_Unknown;
-            tokenRef.identifier = wxString();
-            tokenRef.displayName = wxString();
-            tokenRef.fileId = -1;
-            tokenRef.scopeName = wxString();
+            if( *it == tokId )
+            {
+                it = oldTokenIds.erase( it );
+                break;
+            }
         }
     }
-#endif
-
-    std::set<ClTokenId>::iterator freeTokenIt = freeTokenIds.begin();
-    for (i=0;i<cnt;++i)
+    for( std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end();  ++it)
     {
-        ClAbstractToken tok = db.m_pTokens->GetValue(i);
-        //fprintf(stdout, "Updating token %s / %s fId=%d\n", (const char*)tok.identifier.mb_str(), (const char*)tok.displayName.mb_str(), tok.fileId);
-        //if( freeTokenIt != freeTokenIds.end())
-        //{
-        //    UpdateToken( *freeTokenIt, tok );
-        //    fprintf(stdout, "Updated token to %d\n", *freeTokenIt);
-        //    ++freeTokenIt;
-        //}
-        //else
-        {
-            if( this->GetTokenMatches( tok.identifier ).size() == 0 )
-                fprintf(stdout,"Updating database with new token: %s\n", (const char*)tok.identifier.mb_str());
-            ClTokenId tokId = InsertToken(tok);
-            //fprintf( stdout, "Insert token %d\n", tokId );
-        }
+        RemoveToken( *it );
     }
 }

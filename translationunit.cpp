@@ -460,6 +460,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 {
     ClTokenType typ = ClTokenType_Unknown;
     CXChildVisitResult ret = CXChildVisit_Break; // should never happen
+
     switch (cursor.kind)
     {
     case CXCursor_StructDecl:
@@ -478,10 +479,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     case CXCursor_EnumConstantDecl:
         ret = CXChildVisit_Continue;
         break;
-    case CXCursor_FunctionDecl:
-        typ = ClTokenType_FuncDecl;
-        ret = CXChildVisit_Continue;
-        break;
     case CXCursor_VarDecl:
         typ = ClTokenType_VarDecl;
         ret = CXChildVisit_Continue;
@@ -494,14 +491,18 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         //case CXCursor_MacroDefinition: // this can crash Clang on Windows
         ret = CXChildVisit_Continue;
         break;
+    case CXCursor_FunctionDecl:
     case CXCursor_CXXMethod:
     case CXCursor_Constructor:
     case CXCursor_Destructor:
     case CXCursor_FunctionTemplate:
         typ = ClTokenType_FuncDecl;
+        if(clang_isCursorDefinition( cursor ))
+        {
+            typ = ClTokenType_FuncDef;
+        }
         ret = CXChildVisit_Continue;
         break;
-
     default:
         return CXChildVisit_Recurse;
     }
@@ -523,10 +524,11 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     {
         wxString displayName;
         wxString scopeName;
-        while( !clang_Cursor_isNull(cursor) )
+        CXCursor parCursor = cursor;
+        while( !clang_Cursor_isNull(parCursor) )
         {
             CXString str;
-            switch( cursor.kind )
+            switch( parCursor.kind )
             {
             case CXCursor_Namespace:
             case CXCursor_StructDecl:
@@ -534,7 +536,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             case CXCursor_ClassTemplate:
             case CXCursor_ClassTemplatePartialSpecialization:
             case CXCursor_CXXMethod:
-                str = clang_getCursorDisplayName(cursor);
+                str = clang_getCursorDisplayName(parCursor);
                 if( displayName.Length() == 0 )
                     displayName = wxString::FromUTF8(clang_getCString(str));
                 else
@@ -550,14 +552,17 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             default:
                 break;
             }
-            cursor = clang_getCursorSemanticParent(cursor);
+            parCursor = clang_getCursorSemanticParent(parCursor);
         }
 
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
-        //fprintf(stdout,"Inserting token '%s' '%s', file='%s' (%d), line=%d, col=%d hash=%x\n", (const char*)identifier.mb_str(), (const char*)displayName.mb_str(), (const char*)filename.mb_str(), fileId, line, col, tokenHash);
         ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, displayName, scopeName, tokenHash);
-        ctx->database->InsertToken(tok);
+        ClTokenId tokId = ctx->database->InsertToken(tok);
+        //if( identifier == wxT("GetPchFilename"))
+        //{
+        //    fprintf(stdout,"Inserted token %d '%s' '%s', file='%s' (%d), line=%d, col=%d hash=%x cursor.kind=%d %d %d\n", (int)tokId, (const char*)identifier.mb_str(), (const char*)displayName.mb_str(), (const char*)filename.mb_str(), fileId, line, col, tokenHash, (int)cursor.kind, (int)clang_getCursorSemanticParent(parCursor).kind, (int)clang_isCursorDefinition( cursor ));
+        //}
         ctx->tokenCount++;
     }
     return ret;

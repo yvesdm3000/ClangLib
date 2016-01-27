@@ -10,23 +10,16 @@ typedef int ClTokenId;
 enum ClTokenCategory
 {
     tcClassFolder,
-    tcClass,            tcClassPrivate,
-    tcClassProtected,   tcClassPublic,
-    tcCtorPrivate,      tcCtorProtected,
-    tcCtorPublic,
-    tcDtorPrivate,      tcDtorProtected,
-    tcDtorPublic,
-    tcFuncPrivate,      tcFuncProtected,
-    tcFuncPublic,
-    tcVarPrivate,       tcVarProtected,
-    tcVarPublic,
+    tcClass, tcClassPrivate, tcClassProtected, tcClassPublic,
+    tcCtorPrivate,      tcCtorProtected, tcCtorPublic,
+    tcDtorPrivate,      tcDtorProtected, tcDtorPublic,
+    tcFuncPrivate,      tcFuncProtected, tcFuncPublic,
+    tcVarPrivate,       tcVarProtected, tcVarPublic,
     tcMacroDef,
-    tcEnum,             tcEnumPrivate,
-    tcEnumProtected,    tcEnumPublic,
+    tcEnum,             tcEnumPrivate, tcEnumProtected,    tcEnumPublic,
     tcEnumerator,
     tcNamespace,
-    tcTypedef,          tcTypedefPrivate,
-    tcTypedefProtected, tcTypedefPublic,
+    tcTypedef,          tcTypedefPrivate, tcTypedefProtected, tcTypedefPublic,
     tcSymbolsFolder,
     tcVarsFolder,
     tcFuncsFolder,
@@ -34,10 +27,9 @@ enum ClTokenCategory
     tcPreprocFolder,
     tcOthersFolder,
     tcTypedefFolder,
-    tcMacroUse,         tcMacroPrivate,
-    tcMacroProtected,   tcMacroPublic,
+    tcMacroUse,         tcMacroPrivate, tcMacroProtected,   tcMacroPublic,
     tcMacroFolder,
-    tcLangKeyword, // added
+    tcLangKeyword,
     tcNone = -1
 };
 
@@ -73,6 +65,20 @@ struct ClDiagnostic
     wxString file;
     wxString message;
 };
+
+typedef enum _TokenType
+{
+    ClTokenType_Unknown = 0,
+    ClTokenType_DeclGroup = 0,
+    ClTokenType_DefGroup  = 1<<9,
+
+    ClTokenType_FuncDecl  = 1 | ClTokenType_DeclGroup,
+    ClTokenType_VarDecl   = 2 | ClTokenType_DeclGroup,
+    ClTokenType_ParmDecl  = 3 | ClTokenType_DeclGroup,
+    ClTokenType_ScopeDecl = 4 | ClTokenType_DeclGroup,
+    ClTokenType_FuncDef   = ClTokenType_FuncDecl | ClTokenType_DefGroup,
+
+}ClTokenType;
 
 class ClangEvent : public wxCommandEvent{
 public:
@@ -154,16 +160,18 @@ public:
 
     /** Request reparsing of a Translation unit */
     virtual void RequestReparse(const ClTranslUnitId id, const wxString& filename) = 0;
-    /** Retrieve unction scope */
+    /** Retrieve function scope */
     virtual std::pair<wxString,wxString>    GetFunctionScopeAt( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location ) = 0;
     virtual ClTokenPosition                 GetFunctionScopeLocation( const ClTranslUnitId id, const wxString& filename, const wxString& scope, const wxString& functioname) = 0;
     virtual void                            GetFunctionScopes( const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes  ) = 0;
+
     /** Occurrences highlighting */
     virtual wxCondError                     GetOccurrencesOf( const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc, unsigned long timeout, std::vector< std::pair<int, int> >& out_occurrences ) = 0;
     /* Code completion */
     virtual wxCondError                     GetCodeCompletionAt( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
     virtual wxString                        GetCodeCompletionTokenDocumentation( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location, ClTokenId tokenId ) = 0;
     virtual wxString                        GetCodeCompletionInsertSuffix( const ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets ) = 0;
+
 };
 
 /* abstract */

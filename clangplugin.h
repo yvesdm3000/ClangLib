@@ -161,6 +161,7 @@ public: // IClangPlugin
 
     const wxImageList& GetImageList(const ClTranslUnitId /*id*/ ) { return m_ImageList; }
     const wxStringVec& GetKeywords( const ClTranslUnitId /*id*/ ) { return m_CppKeywords; }
+
 private: // Members
     std::vector<ClangPluginComponent*> m_ActiveComponentList;
 
