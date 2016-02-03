@@ -25,7 +25,7 @@ public:
 
 struct ClangVisitorContext
 {
-    ClangVisitorContext( ClTokenDatabase* pDatabase ){ database = pDatabase; tokenCount = 0;}
+    ClangVisitorContext( ClTokenDatabase* pDatabase){ database = pDatabase; tokenCount = 0;}
     ClTokenDatabase* database;
     unsigned long long tokenCount;
 };
@@ -232,7 +232,6 @@ void ClTranslationUnit::Parse( const wxString& filename, ClFileId fileId, const 
         {
             std::pair<ClTranslationUnit*, ClTokenDatabase*> visitorData = std::make_pair(this, pDatabase);
             clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
-            //m_FileId = pDatabase->GetFilenameId(filename);
             m_Files.reserve(1024);
             m_Files.push_back(m_FileId);
             std::sort(m_Files.begin(), m_Files.end());
@@ -242,14 +241,13 @@ void ClTranslationUnit::Parse( const wxString& filename, ClFileId fileId, const 
         #else
             std::vector<ClFileId>(m_Files).swap(m_Files);
         #endif
-            //Reparse(0, nullptr); // seems to improve performance for some reason?
             int ret = clang_reparseTranslationUnit(m_ClTranslUnit, clUnsavedFiles.size(),
                             clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0],
                             clang_defaultReparseOptions(m_ClTranslUnit) );
 
             struct ClangVisitorContext ctx(pDatabase);
             unsigned rc = clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
-            fprintf(stdout,"Visit count: %d, rc=%d\n", (int)ctx.tokenCount, (int)rc);
+            //fprintf(stdout,"Visit count: %d, rc=%d\n", (int)ctx.tokenCount, (int)rc);
         //database->Shrink();
         }
     }
@@ -462,6 +460,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 {
     ClTokenType typ = ClTokenType_Unknown;
     CXChildVisitResult ret = CXChildVisit_Break; // should never happen
+
     switch (cursor.kind)
     {
     case CXCursor_StructDecl:
@@ -480,10 +479,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     case CXCursor_EnumConstantDecl:
         ret = CXChildVisit_Continue;
         break;
-    case CXCursor_FunctionDecl:
-        typ = ClTokenType_FuncDecl;
-        ret = CXChildVisit_Continue;
-        break;
     case CXCursor_VarDecl:
         typ = ClTokenType_VarDecl;
         ret = CXChildVisit_Continue;
@@ -496,14 +491,18 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         //case CXCursor_MacroDefinition: // this can crash Clang on Windows
         ret = CXChildVisit_Continue;
         break;
+    case CXCursor_FunctionDecl:
     case CXCursor_CXXMethod:
     case CXCursor_Constructor:
     case CXCursor_Destructor:
     case CXCursor_FunctionTemplate:
         typ = ClTokenType_FuncDecl;
+        if(clang_isCursorDefinition( cursor ))
+        {
+            typ = ClTokenType_FuncDef;
+        }
         ret = CXChildVisit_Continue;
         break;
-
     default:
         return CXChildVisit_Recurse;
     }
@@ -525,10 +524,11 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     {
         wxString displayName;
         wxString scopeName;
-        while( !clang_Cursor_isNull(cursor) )
+        CXCursor parCursor = cursor;
+        while( !clang_Cursor_isNull(parCursor) )
         {
             CXString str;
-            switch( cursor.kind )
+            switch( parCursor.kind )
             {
             case CXCursor_Namespace:
             case CXCursor_StructDecl:
@@ -536,8 +536,8 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             case CXCursor_ClassTemplate:
             case CXCursor_ClassTemplatePartialSpecialization:
             case CXCursor_CXXMethod:
-                str = clang_getCursorDisplayName(cursor);
-                if ( displayName.Length() == 0 )
+                str = clang_getCursorDisplayName(parCursor);
+                if( displayName.Length() == 0 )
                     displayName = wxString::FromUTF8(clang_getCString(str));
                 else
                 {
@@ -552,12 +552,47 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             default:
                 break;
             }
-            cursor = clang_getCursorSemanticParent(cursor);
+            parCursor = clang_getCursorSemanticParent(parCursor);
         }
 
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
-        ctx->database->InsertToken(identifier, ClAbstractToken(typ,ctx->database->GetFilenameId(filename), ClTokenPosition(line, col), displayName, scopeName, tokenHash));
+        ClFileId fileId = ctx->database->GetFilenameId(filename);
+        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, displayName, scopeName, tokenHash);
+        ClTokenId tokId = ctx->database->InsertToken(tok);
+        //if( identifier == wxT("GetPchFilename"))
+        //{
+        //    fprintf(stdout,"Inserted token %d '%s' '%s', file='%s' (%d), line=%d, col=%d hash=%x cursor.kind=%d %d %d\n", (int)tokId, (const char*)identifier.mb_str(), (const char*)displayName.mb_str(), (const char*)filename.mb_str(), fileId, line, col, tokenHash, (int)cursor.kind, (int)clang_getCursorSemanticParent(parCursor).kind, (int)clang_isCursorDefinition( cursor ));
+        //}
         ctx->tokenCount++;
     }
     return ret;
 }
+
+bool ClTranslationUnit::Load( const wxString& filename )
+{
+    CXTranslationUnit oldTU = m_ClTranslUnit;
+    m_ClTranslUnit = clang_createTranslationUnit( m_ClIndex, (const char*)filename.ToUTF8() );
+    if( m_ClTranslUnit == nullptr )
+    {
+        m_ClTranslUnit = oldTU;
+
+        return false;
+    }
+    if (oldTU != nullptr )
+        clang_disposeTranslationUnit( oldTU );
+    if (m_LastCC != nullptr)
+        clang_disposeCodeCompleteResults( m_LastCC );
+    m_LastCC = nullptr;
+    m_Occupied = true;
+
+    return true;
+}
+
+bool ClTranslationUnit::Store( const wxString& filename )
+{
+    if( clang_saveTranslationUnit( m_ClTranslUnit, (const char*)filename.ToUTF8(), CXSaveTranslationUnit_None ) == CXSaveError_None )
+        return true;
+    wxRemoveFile( filename );
+    return false;
+}
+

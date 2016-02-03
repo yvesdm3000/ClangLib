@@ -103,6 +103,7 @@ private:
     void OnEditorSave( CodeBlocksEvent& event );
     void OnEditorClose( CodeBlocksEvent& event );
     /// Make project-dependent setup
+    void OnProjectOpen( CodeBlocksEvent& event );
     void OnProjectActivate( CodeBlocksEvent& event );
     void OnProjectFileChanged( CodeBlocksEvent& event );
     /// Update project-dependent setup
@@ -124,16 +125,6 @@ private:
     // Async
     void OnCreateTranslationUnit( wxCommandEvent& evt );
 
-    /**
-     * Update editor diagnostic mark up
-     *
-     * @param ed The editor to diagnose
-     * @param diagLv Update only the highlights, or highlights and text annotations
-     */
-    //void DiagnoseEd(cbEditor* ed, DiagnosticLevel diagLv);
-    //void OnDiagnoseEd( wxCommandEvent& event );
-
-
     /// Set the clang translation unit (callback)
     void OnClangCreateTUFinished( wxEvent& event );
     /// Update after clang has reparsing done (callback)
@@ -143,21 +134,16 @@ private:
     /// Update after clang has finished a synchronous task
     void OnClangSyncTaskFinished( wxEvent& event );
 
-    /**
-     * Semantically highlight all occurrences of the token under the cursor
-     * within the editor
-     *
-     * @param ed The editor to work in
-     */
-    //void HighlightOccurrences(cbEditor* ed);
-
-
+    void OnCCLogger( CodeBlocksThreadEvent& event );
+    void OnCCDebugLogger( CodeBlocksThreadEvent& event );
 
 private: // Internal utility functions
     // Builds compile command
     int UpdateCompileCommand(cbEditor* ed);
 
     void RequestReparse( int delayMilliseconds = CLANG_REPARSE_DELAY );
+
+    void UpdateTokenDatabase(cbProject* pProject);
 
     bool ActivateComponent( ClangPluginComponent* pComponent );
     bool DeactivateComponent( ClangPluginComponent* pComponent );
@@ -181,6 +167,7 @@ public: // IClangPlugin
 
     const wxImageList& GetImageList(const ClTranslUnitId /*id*/ ) { return m_ImageList; }
     const wxStringVec& GetKeywords( const ClTranslUnitId /*id*/ ) { return m_CppKeywords; }
+
 private: // Members
     std::vector<ClangPluginComponent*> m_ActiveComponentList;
 
@@ -188,7 +175,9 @@ private: // Members
     typedef std::map< wxEventType, EventSinksArray >   EventSinksMap;
     EventSinksMap       m_EventSinks;
 
+    ClFilenameDatabase m_FileDatabase;
     ClTokenDatabase m_Database;
+    PersistencyManager* m_pPersistency;
     wxStringVec m_CppKeywords;
     ClangProxy m_Proxy;
     wxImageList m_ImageList;

@@ -24,7 +24,6 @@
 //#endif // CB_PRECOMP
 
 const int idReparseTimer    = wxNewId();
-const int idDiagnosticTimer = wxNewId();
 const int idHighlightTimer = wxNewId();
 
 #define REPARSE_DELAY 9000
@@ -38,7 +37,6 @@ ClangCodeCompletion::ClangCodeCompletion() :
     m_TranslUnitId(-1),
     m_EditorHookId(-1),
     m_ReparseTimer(this, idReparseTimer),
-    m_DiagnosticTimer(this, idDiagnosticTimer),
     m_CCOutstanding(0),
     m_CCOutstandingLastMessageTime(0),
     m_CCOutstandingPos(-1)
@@ -63,7 +61,6 @@ void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBCCEvent(this, &ClangCodeCompletion::OnEditorActivate));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_CLOSE,     new CBCCEvent(this, &ClangCodeCompletion::OnEditorClose));
 
-    Connect(idDiagnosticTimer, wxEVT_TIMER, wxTimerEventHandler(ClangCodeCompletion::OnTimer));
     Connect(idHighlightTimer,  wxEVT_TIMER, wxTimerEventHandler(ClangCodeCompletion::OnTimer));
 
     typedef cbEventFunctor<ClangCodeCompletion, ClangEvent> ClCCEvent;
@@ -95,9 +92,9 @@ void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
         m_TranslUnitId = id;
         m_CCOutstandingLastMessageTime = 0;
 #ifndef __WXMSW__
-        cbStyledTextCtrl* stc = ed->GetControl();
-        stc->Disconnect( wxEVT_KEY_DOWN, wxKeyEventHandler( ClangCodeCompletion::OnKeyDown ) );
-        stc->Connect( wxID_ANY, wxEVT_KEY_DOWN, wxKeyEventHandler( ClangCodeCompletion::OnKeyDown ), (wxObject*)NULL, this );
+        //cbStyledTextCtrl* stc = ed->GetControl();
+        //stc->Disconnect( wxEVT_KEY_DOWN, wxKeyEventHandler( ClangCodeCompletion::OnKeyDown ) );
+        //stc->Connect( wxID_ANY, wxEVT_KEY_DOWN, wxKeyEventHandler( ClangCodeCompletion::OnKeyDown ), (wxObject*)NULL, this );
 #endif
     }
 }
@@ -145,6 +142,33 @@ void ClangCodeCompletion::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     else if (event.GetEventType() == wxEVT_SCI_KEY)
     {
         //fprintf(stdout,"wxEVT_SCI_KEY\n");
+        if (event.GetKey() == wxSCI_KEY_TAB )
+        {
+            cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+            if (ed)
+            {
+                cbStyledTextCtrl* stc = ed->GetControl();
+                if( !stc->AutoCompActive() )
+                {
+                    int pos = stc->PositionFromLine( stc->GetCurrentLine() );
+                    int maxPos = stc->PositionFromLine( stc->GetCurrentLine() + 1 );
+                    for (std::vector<wxString>::iterator it = m_TabJumpArguments.begin(); it != m_TabJumpArguments.end(); ++it)
+                    {
+                        int argPos = stc->FindText( pos, maxPos, *it );
+                        if( argPos != wxNOT_FOUND )
+                        {
+                            stc->SetSelectionVoid( argPos, argPos + it->Length() - 1 );
+                            wxString value = *it;
+                            it = m_TabJumpArguments.erase( it );
+                            m_TabJumpArguments.push_back( value );
+                            event.SetKey( wxSCI_KEY_ESCAPE );
+                            //stc->EnableTabSmartJump();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
     if (clearIndicator)
     {
@@ -209,7 +233,7 @@ void ClangCodeCompletion::OnKeyDown(wxKeyEvent& event)
                         wxString value = *it;
                         it = m_TabJumpArguments.erase( it );
                         m_TabJumpArguments.push_back( value );
-                        stc->EnableTabSmartJump();
+                        //stc->EnableTabSmartJump();
                         return;
                     }
                 }
@@ -529,7 +553,7 @@ bool ClangCodeCompletion::DoAutocomplete( const cbCodeCompletionPlugin::CCToken&
         if (it->first != it->second)
         {
             m_TabJumpArguments.push_back( suffix.SubString( it->first, it->second ) );
-            stc->EnableTabSmartJump();
+            //stc->EnableTabSmartJump();
         }
     }
     if ( offsetsList.size() > 0 )
