@@ -59,6 +59,7 @@
 			<Add option="-Wall" />
 			<Add option="-std=c++0x" />
 			<Add option="-ansi" />
+			<Add option="-g" />
 			<Add option="$(#CB_RELEASE_TYPE)" />
 			<Add option="`/home/yves/wxWidgets-2.8/bin/wx-config --version=2.8 --cflags`" />
 			<Add option="-I`/home/yves/llvm-3.6/bin/llvm-config --includedir`" />
