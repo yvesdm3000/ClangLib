@@ -737,6 +737,7 @@ void ClangProxy::RemoveTranslationUnit(ClTranslUnitId translUnitId)
         return;
     }
     // Replace with empty one
+
     m_TranslUnits[translUnitId] = ClTranslationUnit(translUnitId, nullptr);
 }
 
