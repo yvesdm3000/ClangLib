@@ -11,7 +11,8 @@
  *
  *  This class is responsible to handle all Code Completion operations of the plugin
  */
-class ClangCodeCompletion : public ClangPluginComponent {
+class ClangCodeCompletion : public ClangPluginComponent
+{
 public:
     ClangCodeCompletion();
     virtual ~ClangCodeCompletion();

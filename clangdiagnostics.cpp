@@ -237,7 +237,8 @@ void ClangDiagnostics::OnDiagnostics( ClangEvent& event )
                     str += wxT('\n');
                 if (!str.Contains(dgItr->message))
                 {
-                    switch(dgItr->severity){
+                    switch(dgItr->severity)
+                    {
                     case sWarning:
                         if (show_warning)
                         {
@@ -272,8 +273,8 @@ void ClangDiagnostics::OnDiagnostics( ClangEvent& event )
         if (dgItr->severity == sError)
             stc->SetIndicatorCurrent(errorIndicator);
         else if (  dgItr != diagnostics.begin()
-                && dgItr->line == (dgItr - 1)->line
-                && dgItr->range.first <= (dgItr - 1)->range.second )
+                   && dgItr->line == (dgItr - 1)->line
+                   && dgItr->range.first <= (dgItr - 1)->range.second )
         {
             continue; // do not overwrite the last indicator
         }

@@ -40,14 +40,14 @@ static bool WriteString( wxOutputStream& out, const char* str )
         len = strlen(str); // Need size in amount of bytes
     }
     if( !WriteInt( out, len ) )
-       return false;
+        return false;
     if (len > 0)
         out.Write( (const void*)str, len );
     return true;
 }
 
 =======
-static bool WriteString( wxOutputStream& out, const char* str )
+    static bool WriteString( wxOutputStream& out, const char* str )
 {
     int len = 0;
 
@@ -56,7 +56,7 @@ static bool WriteString( wxOutputStream& out, const char* str )
         len = strlen(str); // Need size in amount of bytes
     }
     if( !WriteInt( out, len ) )
-       return false;
+        return false;
     if (len > 0)
         out.Write( (const void*)str, len );
     return true;
@@ -72,7 +72,7 @@ static bool ReadInt( wxInputStream& in, int& out_Int )
     }
     in.Read( &val, sizeof(val) );
     out_Int = val;
-<<<<<<< HEAD
+    <<<<<<< HEAD
 
     return true;
 }
@@ -87,9 +87,9 @@ static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
     in.Read( &val, sizeof(val) );
     out_LongLong = val;
 
-=======
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
-    return true;
+    =======
+        >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+        return true;
 }
 
 static bool ReadString( wxInputStream& in, wxString& out_String )
@@ -159,11 +159,11 @@ bool ClAbstractToken::ReadIn( ClAbstractToken& token, wxInputStream& in )
 }
 
 ClFilenameDatabase::ClFilenameDatabase() :
-<<<<<<< HEAD
+    <<<<<<< HEAD
     m_pFileEntries(new ClTreeMap<ClFilenameEntry>())
-=======
-    m_pFileEntries(new ClTreeMap<wxString>())
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+    =======
+        m_pFileEntries(new ClTreeMap<wxString>())
+        >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
 {
 
 }
@@ -181,15 +181,15 @@ bool ClFilenameDatabase::WriteOut( ClFilenameDatabase& db, wxOutputStream& out )
     WriteInt( out, cnt );
     for( i=0; i<cnt; ++i )
     {
-<<<<<<< HEAD
+        <<<<<<< HEAD
         ClFilenameEntry entry = db.m_pFileEntries->GetValue( (ClFileId)i );
         if( !WriteString( out, entry.filename.mb_str() ) )
             return false;
         if( !WriteLongLong( out, entry.timestamp.GetValue().GetValue() ) )
-=======
-        wxString filename = db.m_pFileEntries->GetValue( (ClFileId)i );
+            =======
+                wxString filename = db.m_pFileEntries->GetValue( (ClFileId)i );
         if( !WriteString( out, filename.mb_str() ) )
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+            >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
             return false;
     }
     return true;
@@ -207,14 +207,14 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
         wxString filename;
         if( ! ReadString(in, filename) )
             return false;
-<<<<<<< HEAD
+        <<<<<<< HEAD
         long long ts = 0;
         if( ! ReadLongLong(in, ts) )
             return false;
         db.m_pFileEntries->Insert( filename, ClFilenameEntry(filename, wxDateTime(wxLongLong(ts) ) ) );
-=======
-        db.m_pFileEntries->Insert( filename, filename );
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+        =======
+            db.m_pFileEntries->Insert( filename, filename );
+        >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
     }
     return true;
 }
@@ -231,13 +231,13 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename)
     if (id.empty())
     {
         wxString f = wxString(normFile.c_str());
-<<<<<<< HEAD
+        <<<<<<< HEAD
         wxDateTime ts; // Timestamp updated when file was parsed into the token database.
         ClFilenameEntry entry(f,ts);
         ClFileId id = m_pFileEntries->Insert( f, entry );
-=======
-        ClFileId id = m_pFileEntries->Insert( f, f );
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+        =======
+            ClFileId id = m_pFileEntries->Insert( f, f );
+        >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
         return id;
     }
     return id.front();
@@ -246,19 +246,19 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename)
 <<<<<<< HEAD
 wxString ClFilenameDatabase::GetFilename( const ClFileId fId)
 =======
-wxString ClFilenameDatabase::GetFilename(ClFileId fId)
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+    wxString ClFilenameDatabase::GetFilename(ClFileId fId)
+    >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
 {
     wxMutexLocker lock( m_Mutex);
 
     assert(m_pFileEntries->HasValue(fId));
 
-<<<<<<< HEAD
+    <<<<<<< HEAD
     ClFilenameEntry entry = m_pFileEntries->GetValue(fId);
     const wxChar* val = entry.filename.c_str();
-=======
+    =======
     const wxChar* val = m_pFileEntries->GetValue(fId).c_str();
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+    >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
     if (val == NULL)
         return wxString();
 
@@ -287,12 +287,12 @@ void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDa
 }
 
 =======
->>>>>>> f88033561180e2480f5258499cfcf84334c07d86
-ClTokenDatabase::ClTokenDatabase( ClFilenameDatabase& fileDB) :
-    m_FileDB(fileDB),
-    m_pTokens(new ClTreeMap<ClAbstractToken>()),
-    m_pFileTokens(new ClTreeMap<int>()),
-    m_Mutex(wxMUTEX_RECURSIVE)
+    >>>>>>> f88033561180e2480f5258499cfcf84334c07d86
+    ClTokenDatabase::ClTokenDatabase( ClFilenameDatabase& fileDB) :
+        m_FileDB(fileDB),
+        m_pTokens(new ClTreeMap<ClAbstractToken>()),
+        m_pFileTokens(new ClTreeMap<int>()),
+        m_Mutex(wxMUTEX_RECURSIVE)
 {
 }
 
@@ -520,7 +520,7 @@ void ClTokenDatabase::Update( const ClFileId fileId, const ClTokenDatabase& db )
         wxMutexLocker lock( m_Mutex);
         oldTokenIds = GetFileTokens( fileId );
         int cnt = db.m_pTokens->GetCount();
-        for (i=0;i<cnt;++i)
+        for (i=0; i<cnt; ++i)
         {
             ClAbstractToken tok = db.m_pTokens->GetValue(i);
             ClTokenId tokId = InsertToken(tok);

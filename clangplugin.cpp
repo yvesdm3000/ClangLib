@@ -35,27 +35,27 @@
 
 // let the global debug macro overwrite the local debug macro value
 #if defined(CC_GLOBAL_DEBUG_OUTPUT)
-    #undef CC_CODECOMPLETION_DEBUG_OUTPUT
-    #define CC_CODECOMPLETION_DEBUG_OUTPUT CC_GLOBAL_DEBUG_OUTPUT
+#undef CC_CODECOMPLETION_DEBUG_OUTPUT
+#define CC_CODECOMPLETION_DEBUG_OUTPUT CC_GLOBAL_DEBUG_OUTPUT
 #endif
 
 #if CC_CODECOMPLETION_DEBUG_OUTPUT == 1
-    #define TRACE(format, args...) \
+#define TRACE(format, args...) \
         CCLogger::Get()->DebugLog(F(format, ##args))
-    #define TRACE2(format, args...)
+#define TRACE2(format, args...)
 #elif CC_CODECOMPLETION_DEBUG_OUTPUT == 2
-    #define TRACE(format, args...)                                              \
+#define TRACE(format, args...)                                              \
         do                                                                      \
         {                                                                       \
             if (g_EnableDebugTrace)                                             \
                 CCLogger::Get()->DebugLog(F(format, ##args));                   \
         }                                                                       \
         while (false)
-    #define TRACE2(format, args...) \
+#define TRACE2(format, args...) \
         CCLogger::Get()->DebugLog(F(format, ##args))
 #else
-    #define TRACE(format, args...)
-    #define TRACE2(format, args...)
+#define TRACE(format, args...)
+#define TRACE2(format, args...)
 #endif
 
 
@@ -302,7 +302,9 @@ void ClangPlugin::UpdateComponents()
     {
         if (ActivateComponent( &m_CodeCompletion ))
             activationChanged = true;
-    }else {
+    }
+    else
+    {
         if (DeactivateComponent( &m_CodeCompletion ))
             activationChanged = true;
     }
@@ -310,7 +312,9 @@ void ClangPlugin::UpdateComponents()
     {
         if (ActivateComponent( &m_Diagnostics ))
             activationChanged = true;
-    }else {
+    }
+    else
+    {
         if (DeactivateComponent( &m_Diagnostics ))
             activationChanged = true;
     }
@@ -546,7 +550,7 @@ void ClangPlugin::BuildMenu(wxMenuBar* menuBar)
 }
 
 void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu,
-        const FileTreeData* WXUNUSED(data))
+                                  const FileTreeData* WXUNUSED(data))
 {
     if (type != mtEditorManager)
         return;
@@ -782,7 +786,7 @@ void ClangPlugin::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
     if (ed)
     {
         ed->GotoTokenPosition(loc.line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
-                stc->WordEndPosition(pos, true)));
+                              stc->WordEndPosition(pos, true)));
     }
 }
 
@@ -807,7 +811,7 @@ void ClangPlugin::OnGotoImplementation(wxCommandEvent& WXUNUSED(event))
     if (ed)
     {
         ed->GotoTokenPosition(loc.line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
-                stc->WordEndPosition(pos, true)));
+                              stc->WordEndPosition(pos, true)));
     }
 }
 
@@ -865,7 +869,7 @@ wxString ClangPlugin::GetSourceOf(cbEditor* ed)
     bool isCandidate;
     wxArrayString fileArray;
     wxDir::GetAllFiles(theFile.GetPath(wxPATH_GET_VOLUME), &fileArray,
-            theFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
+                       theFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
     wxFileName currentCandidateFile = FindSourceIn(fileArray, theFile, isCandidate);
     if (isCandidate)
         candidateFile = currentCandidateFile;
@@ -944,7 +948,7 @@ wxString ClangPlugin::GetSourceOf(cbEditor* ed)
 }
 
 wxFileName ClangPlugin::FindSourceIn(const wxArrayString& candidateFilesArray,
-        const wxFileName& activeFile, bool& isCandidate)
+                                     const wxFileName& activeFile, bool& isCandidate)
 {
     bool extStartsWithCapital = wxIsupper(activeFile.GetExt()[0]);
     wxFileName candidateFile;
@@ -965,7 +969,7 @@ wxFileName ClangPlugin::FindSourceIn(const wxArrayString& candidateFilesArray,
 }
 
 bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
-        const wxFileName& activeFile, bool& isCandidate)
+                             const wxFileName& activeFile, bool& isCandidate)
 {
     if (candidateFile.GetName().CmpNoCase(activeFile.GetName()) == 0)
     {
@@ -976,7 +980,7 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
             {
                 wxArrayString fileArray;
                 wxDir::GetAllFiles(candidateFile.GetPath(wxPATH_GET_VOLUME), &fileArray,
-                        candidateFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
+                                   candidateFile.GetName() + wxT(".*"), wxDIR_FILES | wxDIR_HIDDEN);
                 for (size_t i = 0; i < fileArray.GetCount(); ++i)
                     if (wxFileName(fileArray[i]).GetFullName() == activeFile.GetFullName())
                         return false;
@@ -1036,7 +1040,7 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
     CompilerCommandGenerator* gen = comp->GetCommandGenerator(proj);
     if (gen)
         gen->GenerateCommandLine(compileCommand, target, pf, ed->GetFilename(),
-                g_InvalidStr, g_InvalidStr, g_InvalidStr );
+                                 g_InvalidStr, g_InvalidStr, g_InvalidStr );
     delete gen;
 
     wxStringTokenizer tokenizer(compileCommand);

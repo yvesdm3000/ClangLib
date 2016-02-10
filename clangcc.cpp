@@ -55,7 +55,7 @@ void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
 
     ColourManager *pColours = Manager::Get()->GetColourManager();
 
-    pColours->RegisterColour( _("Code completion"), _("Documentation popup scope text") , _("cc_docs_scope_fore"), *wxBLUE );
+    pColours->RegisterColour( _("Code completion"), _("Documentation popup scope text"), _("cc_docs_scope_fore"), *wxBLUE );
 
     typedef cbEventFunctor<ClangCodeCompletion, CodeBlocksEvent> CBCCEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBCCEvent(this, &ClangCodeCompletion::OnEditorActivate));
@@ -331,9 +331,9 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         if ((curChar == wxT(':') // scope operator
                 && stc->GetCharAt(tknEnd - 2) != wxT(':') )
                 || ( curChar == wxT('>') // '->'
-                        && stc->GetCharAt(tknEnd - 2) != wxT('-') )
+                     && stc->GetCharAt(tknEnd - 2) != wxT('-') )
                 || ( wxString(wxT("<\"/")).Find(curChar) != wxNOT_FOUND // #include directive (TODO: enumerate completable include files)
-                        && !stc->IsPreprocessor(style)))
+                     && !stc->IsPreprocessor(style)))
         {
             return tokens;
         }
@@ -493,14 +493,14 @@ bool ClangCodeCompletion::DoAutocomplete( const cbCodeCompletionPlugin::CCToken&
     std::vector<std::pair<int, int> > offsetsList;
     cbStyledTextCtrl* stc = ed->GetControl();
     wxString suffix = m_pClangPlugin->GetCodeCompletionInsertSuffix(GetCurrentTranslationUnitId(), token.id,
-            GetEOLStr(stc->GetEOLMode())
-            + ed->GetLineIndentString(stc->GetCurrentLine()),
-            offsetsList);
+                      GetEOLStr(stc->GetEOLMode())
+                      + ed->GetLineIndentString(stc->GetCurrentLine()),
+                      offsetsList);
     //if (offsetsList.size() == 0)
     //    offsetsList.push_back( std::make_pair<int,int>(0,0) );
     int pos = stc->GetCurrentPos();
     int startPos = std::min(stc->WordStartPosition(pos, true), std::min(stc->GetSelectionStart(),
-            stc->GetSelectionEnd()));
+                            stc->GetSelectionEnd()));
     int moveToPos = startPos + tknText.Length();
     stc->SetTargetStart(startPos);
     int endPos = stc->WordEndPosition(pos, true);
@@ -713,7 +713,7 @@ wxArrayString ClangCodeCompletion::GetLocalIncludeDirs(cbProject* project, const
         // Do not try to operate include directories if the target is not for this platform
 #if 0 //TODO
         if (   !m_CCEnablePlatformCheck
-            || (m_CCEnablePlatformCheck && tgt->SupportsCurrentPlatform()) )
+                || (m_CCEnablePlatformCheck && tgt->SupportsCurrentPlatform()) )
         {
 #endif
             GetAbsolutePath(prjPath, tgt->GetIncludeDirs(), dirs);

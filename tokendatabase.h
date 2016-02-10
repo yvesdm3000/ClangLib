@@ -15,7 +15,7 @@ typedef int ClFileId;
 struct ClAbstractToken
 {
     ClAbstractToken() :
-        tokenType(ClTokenType_Unknown), fileId(-1), location(ClTokenPosition( 0, 0 )), identifier(), displayName(), scopeName(), tokenHash(0){}
+        tokenType(ClTokenType_Unknown), fileId(-1), location(ClTokenPosition( 0, 0 )), identifier(), displayName(), scopeName(), tokenHash(0) {}
     ClAbstractToken( ClTokenType typ, ClFileId fId, ClTokenPosition location, wxString name, wxString displayName, wxString scopeName, unsigned tknHash) :
         tokenType(typ), fileId(fId), location(location), identifier(name), displayName(displayName.c_str()), scopeName(scopeName.c_str()), tokenHash(tknHash) {}
     ClAbstractToken( const ClAbstractToken& other ) :
@@ -80,7 +80,10 @@ public:
     ClTokenId GetTokenId(const wxString& identifier, ClFileId fId, ClTokenType tokenType, unsigned tokenHash); ///< returns wxNOT_FOUND on failure
     ClTokenId InsertToken(const ClAbstractToken& token); // duplicate tokens are discarded
     ClAbstractToken GetToken(const ClTokenId tId);
-    ClFilenameDatabase& GetFileDB() { return m_FileDB; }
+    ClFilenameDatabase& GetFileDB()
+    {
+        return m_FileDB;
+    }
     void RemoveToken( const ClTokenId tokenId );
     /**
      * Return a list of tokenId's for the given token identifier
