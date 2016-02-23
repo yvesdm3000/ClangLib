@@ -24,9 +24,17 @@ public:
 #endif
     ~ClTranslationUnit();
 
+    /** @brief Swap 2 translation units. Function used mostly to make sure there is only 1 class that manages the Translation Unit resource.
+     *
+     * @param first The first ClTranslationUnit
+     * @param second The second ClTranslationUnit
+     * @return friend void
+     *
+     */
     friend void swap( ClTranslationUnit& first, ClTranslationUnit& second )
     {
         using std::swap;
+        assert( first.m_id == second.m_Id );
         swap(first.m_Id, second.m_Id);
         swap(first.m_FileId, second.m_FileId);
         swap(first.m_Files, second.m_Files);
@@ -37,6 +45,12 @@ public:
         swap(first.m_LastPos.column, second.m_LastPos.column);
         swap(first.m_LastParsed, second.m_LastParsed);
     }
+    /** @brief Assignement operator used as move operator to make sure there is only 1 class that manages the Translation Unit resource.
+     *
+     * @param other Source ClTranslationUnit
+     * @return ClTranslationUnit
+     *
+     */
     ClTranslationUnit& operator=(ClTranslationUnit other)
     {
         swap(*this,other);
