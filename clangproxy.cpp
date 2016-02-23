@@ -575,6 +575,12 @@ static void FormatDocumentation(CXComment comment, wxString& doc, const std::vec
 }
 }
 
+/** @brief Call override to perform the Reparse Job.
+ *
+ * @param clangproxy The clangproxy to perform the job on
+ * @return void
+ *
+ */
 void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
 {
     clangproxy.Reparse( m_TranslId, m_CompileCommand, m_UnsavedFiles);
@@ -606,12 +612,15 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
     // Get rid of some copied memory
     m_UnsavedFiles.clear();
 
-    //wxMutexLocker lock(clangproxy.m_Mutex);
-    //AbstractJob* pJob = new AsyncParseJob( &clangproxy, m_TranslId, m_Filename, m_CompileCommand, m_UnsavedFiles, &clangproxy.m_Database, this );
-    //clangproxy.m_pParsingThread->Queue(pJob);
 }
 
-
+/** @brief ClangProxy constructor.
+ *
+ * @param pEvtCallbackHandler Pointer to the event handler where to send completed jobs to
+ * @param database The main tokendatabase to work on.
+ * @param cppKeywords CPP Keywords to use
+ *
+ */
 ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, ClTokenDatabase& database, const std::vector<wxString>& cppKeywords):
     m_Mutex(),
     m_Database(database),
@@ -622,10 +631,10 @@ ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, ClTokenDatabase& data
     m_ClIndex[1] = clang_createIndex(1, 1);
     m_pThread = new BackgroundThread(false);
     m_pThread->SetPriority( 0 );
-    m_pDiagnosticThread = new BackgroundThread(false);
-    m_pDiagnosticThread->SetPriority( 0 );
 }
 
+/** @brief ClangProxy destructor
+ */
 ClangProxy::~ClangProxy()
 {
 #if 0
@@ -642,6 +651,16 @@ ClangProxy::~ClangProxy()
     clang_disposeIndex(m_ClIndex[1]);
 }
 
+/** @brief Create a translation unit
+ *
+ * @param filename The filename to create the translation unit from
+ * @param commands Compile command options to give to Clang as if clang compiles the file
+ * @param unsavedFiles Map of all unsaved files in the editor, with the filename as keyword
+ * @param out_TranslId The translation unit id as a result of this call.
+ * @return void
+ *
+ * This call will choose either a free slot of translation units or free one if all slots are occupied. It then parses the translation unit and when that is successfull, assign it a slot.
+ */
 void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
 {
     if ( filename.Length() == 0 )
@@ -719,7 +738,14 @@ void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString&
     out_TranslId = translId;
 }
 
-void ClangProxy::RemoveTranslationUnit(ClTranslUnitId translUnitId)
+/** @brief Removes a translation unit from memory.
+ *
+ * @param translUnitId ClTranslUnitId
+ * @return void
+ *
+ * In reality it will just reset the translation unit to an empty state.
+ */
+void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
 {
     if (translUnitId < 0)
     {
@@ -734,7 +760,14 @@ void ClangProxy::RemoveTranslationUnit(ClTranslUnitId translUnitId)
     m_TranslUnits[translUnitId] = ClTranslationUnit(translUnitId, nullptr);
 }
 
-ClTranslUnitId ClangProxy::GetTranslationUnitId( ClTranslUnitId CtxTranslUnitId, ClFileId fId)
+/** @brief Find a translation unit id from a file id. In case the file id is part of multiple translation units, it will search the one in the argument first.
+ *
+ * @param CtxTranslUnitId Translation Unit ID to search first, or wxID_ANY if you don't want this
+ * @param fId The file ID to search
+ * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
+ *
+ */
+ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId)
 {
     wxMutexLocker locker(m_Mutex);
 
@@ -759,25 +792,42 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( ClTranslUnitId CtxTranslUnitId,
     {
         if (m_TranslUnits[i].Contains(fId))
         {
-            //std::cout<<"TranslUnits index "<<i<<" has file id "<<fId<<std::endl;
             return i;
         }
     }
 
-    //std::cout<<"file id "<<fId<<" not found in translUnits"<<std::endl;
     return wxNOT_FOUND;
 }
 
-ClTranslUnitId ClangProxy::GetTranslationUnitId( ClTranslUnitId CtxTranslUnitId, const wxString& filename)
+/** @brief Find a translation unit id from a file id. In case the file id is part of multiple translation units, it will search the one in the argument first.
+ *
+ * @param CtxTranslUnitId Translation Unit ID to search first, or wxID_ANY if you don't want this
+ * @param filename The filename to search
+ * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
+ *
+ */
+ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const wxString& filename)
 {
     return GetTranslationUnitId( CtxTranslUnitId, m_Database.GetFilenameId(filename));
 }
 
-void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& filename,
+/** @brief Perform codecompletion
+ *
+ * @param translUnitId The translation unit to use
+ * @param filename In which file that is in the translation unit to where to do code completion
+ * @param location The location of the start of the symbol to do code completion with. This is not the insertion point! (1-based)
+ * @param isAuto (unused for now)
+ * @param unsavedFiles The map of editor contents of all files that are open in the editor. Key is the filename
+ * @param results[out] The returned results of codecompletion
+ * @param diagnostics[out] The returned partial diagnostics results of codecompletion
+ * @return
+ *
+ */
+void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxString& filename,
                                  const ClTokenPosition& location, bool /*isAuto*/,
                                  const std::map<wxString, wxString>& unsavedFiles,
-                                 std::vector<ClToken>& results,
-                                 std::vector<ClDiagnostic>& diagnostics )
+                                 std::vector<ClToken>& out_results,
+                                 std::vector<ClDiagnostic>& out_diagnostics )
 {
     if (translUnitId < 0)
     {
@@ -821,7 +871,7 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
     const int numResults = clResults->NumResults;
     CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt results: %d"), numResults));
 
-    results.reserve(numResults);
+    out_results.reserve(numResults);
     for (int resIdx = 0; resIdx < numResults; ++resIdx)
     {
         const CXCompletionResult& token = clResults->Results[resIdx];
@@ -873,7 +923,7 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
                     type += wxT("...");
                 }
                 CXString completeTxt = clang_getCompletionChunkText(token.CompletionString, chunkIdx);
-                results.push_back(ClToken(wxString::FromUTF8(clang_getCString(completeTxt)) + type,
+                out_results.push_back(ClToken(wxString::FromUTF8(clang_getCString(completeTxt)) + type,
                                           resIdx, clang_getCompletionPriority(token.CompletionString),
                                           ProxyHelper::GetTokenCategory(token.CursorKind)));
                 clang_disposeString(completeTxt);
@@ -888,13 +938,20 @@ void ClangProxy::CodeCompleteAt( ClTranslUnitId translUnitId, const wxString& fi
     for ( diagIdx=0; diagIdx < numDiag; ++diagIdx )
     {
         CXDiagnostic diag = clang_codeCompleteGetDiagnostic( clResults, diagIdx );
-        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, diagnostics );
+        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, out_diagnostics );
     }
 
-    CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)results.size()) );
+    CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)out_results.size()) );
 }
 
-wxString ClangProxy::DocumentCCToken(ClTranslUnitId translUnitId, int tknId)
+/** @brief Document a Code Completion token
+ *
+ * @param translUnitId Translation unit where the token is located
+ * @param tknId The TokenId
+ * @return wxString The documentation or empty string when there is no documentation
+ *
+ */
+wxString ClangProxy::DocumentCCToken( const ClTranslUnitId translUnitId, int tknId )
 {
     if (translUnitId < 0)
     {
@@ -984,7 +1041,19 @@ wxString ClangProxy::DocumentCCToken(ClTranslUnitId translUnitId, int tknId)
            + wxT("</code></font></p>") + descriptor + wxT("</body></html>");
 }
 
-wxString ClangProxy::GetCCInsertSuffix(ClTranslUnitId translUnitId, int tknId, const wxString& newLine, std::vector<std::pair<int, int> >& offsetsList)
+/** @brief Get the Code Completion insert suffix. This is the operation after
+ *  a user has chosen a certain code-completion string and returns the needed
+ *  data to insert the string into the editor.
+ *
+ * @param translUnitId ClTranslUnitId
+ * @param tknId int
+ * @param newLine const wxString&
+ * @param std::vector<std::pair<int
+ * @param offsetsList int> >&
+ * @return wxString
+ *
+ */
+wxString ClangProxy::GetCCInsertSuffix( const ClTranslUnitId translUnitId, int tknId, const wxString& newLine, std::vector<std::pair<int, int> >& offsetsList )
 {
     CCLogger::Get()->DebugLog( F(wxT("GetCCInsertSuffix TU Id=%d tknId=%d"), translUnitId, tknId) );
     if (translUnitId < 0)
@@ -1090,7 +1159,15 @@ wxString ClangProxy::GetCCInsertSuffix(ClTranslUnitId translUnitId, int tknId, c
     return suffix;
 }
 
-void ClangProxy::RefineTokenType(ClTranslUnitId translUnitId, int tknId, int& tknType)
+/** @brief Return the token category of a specific token ID
+ *
+ * @param translUnitId ClTranslUnitId
+ * @param tknId int
+ * @param tknType ClTokenCategory&
+ * @return void
+ *
+ */
+void ClangProxy::RefineTokenType( const ClTranslUnitId translUnitId, int tknId, ClTokenCategory& tknType)
 {
     if (translUnitId < 0)
     {
@@ -1125,9 +1202,19 @@ void ClangProxy::RefineTokenType(ClTranslUnitId translUnitId, int tknId, int& tk
     }
 }
 
-void ClangProxy::GetCallTipsAt( ClTranslUnitId translUnitId, const wxString& filename,
+/** @brief Get call tips in a translation unit + file on a specific location
+ *
+ * @param translUnitId The translation unit id
+ * @param filename The filename
+ * @param location The location of the token
+ * @param tokenStr The string of the token
+ * @param results[out] The list of calltips text
+ * @return
+ *
+ */
+void ClangProxy::GetCallTipsAt( const ClTranslUnitId translUnitId, const wxString& filename,
                                 const ClTokenPosition& location, const wxString& tokenStr,
-                                std::vector<wxStringVec>& results )
+                                std::vector<wxStringVec>& out_results )
 {
     if (translUnitId < 0)
     {
@@ -1279,7 +1366,7 @@ void ClangProxy::GetCallTipsAt( ClTranslUnitId translUnitId, const wxString& fil
             if (uniqueTips.find(composit) != uniqueTips.end())
                 break;
             uniqueTips.insert(composit);
-            results.push_back(entry);
+            out_results.push_back(entry);
             break;
         }
 
@@ -1289,8 +1376,17 @@ void ClangProxy::GetCallTipsAt( ClTranslUnitId translUnitId, const wxString& fil
     }
 }
 
-void ClangProxy::GetTokensAt( ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location,
-                              wxStringVec& results )
+/** @brief Get a list of tokens at a specific location
+ *
+ * @param translUnitId The translation unit ID
+ * @param filename Filename
+ * @param location The location where you want the list of tokens
+ * @param results[out] StringVec that contains the results
+ * @return
+ *
+ */
+void ClangProxy::GetTokensAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location,
+                              wxStringVec& out_results )
 {
     if (translUnitId < 0)
     {
@@ -1390,16 +1486,20 @@ void ClangProxy::GetTokensAt( ClTranslUnitId translUnitId, const wxString& filen
         default:
             break;
         }
-        results.push_back(tknStr);
+        out_results.push_back(tknStr);
     }
 }
 
-/**
- * Get all occurences of the token under the supplied cursor.
+/** @brief Get all occurences of the token under the supplied cursor.
+ *
+ * @param translUnitId The translation unit id
+ * @param filename The filename
+ * @param location The location in the file
+ * @param results[out] The returned results
+ *
  */
-
-void ClangProxy::GetOccurrencesOf(ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location,
-                                  std::vector< std::pair<int, int> >& results)
+void ClangProxy::GetOccurrencesOf( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location,
+                                  std::vector< std::pair<int, int> >& out_results )
 {
     if (translUnitId < 0)
     {
@@ -1414,11 +1514,19 @@ void ClangProxy::GetOccurrencesOf(ClTranslUnitId translUnitId, const wxString& f
     if (clang_Cursor_isNull(token))
         return;
     ProxyHelper::ResolveCursorDecl(token);
-    CXCursorAndRangeVisitor visitor = {&results, ProxyHelper::ReferencesVisitor};
+    CXCursorAndRangeVisitor visitor = {&out_results, ProxyHelper::ReferencesVisitor};
     clang_findReferencesInFile(token, m_TranslUnits[translUnitId].GetFileHandle(filename), visitor);
 }
 
-bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString& filename, ClTokenPosition& inout_location)
+/** @brief Resolve a token declaration.
+ *
+ * @param translUnitId const ClTranslUnitId
+ * @param filename wxString&
+ * @param location[in,out] The position of the token
+ * @return true if the token declaration could be found, false otherwise
+ *
+ */
+bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location)
 {
     if (translUnitId < 0)
     {
@@ -1430,7 +1538,8 @@ bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString
         return false;
     }
     CXCursor token = clang_getNullCursor();
-    token = m_TranslUnits[translUnitId].GetTokenAt(filename, inout_location);
+    out_location = location;
+    token = m_TranslUnits[translUnitId].GetTokenAt(filename, out_location);
     if (clang_Cursor_isNull(token))
     {
         return false;
@@ -1440,16 +1549,16 @@ bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString
     if (token.kind == CXCursor_InclusionDirective)
     {
         file = clang_getIncludedFile(token);
-        inout_location.line = 1;
-        inout_location.column = 1;
+        out_location.line = 1;
+        out_location.column = 1;
     }
     else
     {
         CXSourceLocation loc = clang_getCursorLocation(token);
         unsigned ln, col;
         clang_getSpellingLocation(loc, &file, &ln, &col, nullptr);
-        inout_location.line   = ln;
-        inout_location.column = col;
+        out_location.line   = ln;
+        out_location.column = col;
     }
     CXString str = clang_getFileName(file);
     filename = wxString::FromUTF8(clang_getCString(str));
@@ -1457,7 +1566,16 @@ bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString
     return true;
 }
 
-bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& inout_filename, ClTokenPosition& inout_location)
+/** @brief Resolve the definition of a token.
+ *
+ * @param translUnitId const ClTranslUnitId
+ * @param inout_filename wxString&
+ * @param inout_location ClTokenPosition&
+ * @return bool
+ *
+ * The definition is where a token is actually implemented.
+ */
+bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& location, ClTokenPosition& out_location)
 {
     if (translUnitId < 0 )
         return false;
@@ -1465,7 +1583,8 @@ bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wx
     if (translUnitId >= (int)m_TranslUnits.size() )
         return false;
     CXCursor token = clang_getNullCursor();
-    token = m_TranslUnits[translUnitId].GetTokenAt(inout_filename, inout_location);
+    out_location = location;
+    token = m_TranslUnits[translUnitId].GetTokenAt(inout_filename, out_location);
     if ( !ProxyHelper::ResolveCursorDefinition(token) )
     {
         std::set<ClTranslUnitId> translIdList;
@@ -1512,16 +1631,16 @@ bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wx
     if (token.kind == CXCursor_InclusionDirective)
     {
         file = clang_getIncludedFile(token);
-        inout_location.line = 1;
-        inout_location.column = 1;
+        out_location.line = 1;
+        out_location.column = 1;
     }
     else
     {
         CXSourceLocation loc = clang_getCursorLocation(token);
         unsigned ln, col;
         clang_getSpellingLocation(loc, &file, &ln, &col, nullptr);
-        inout_location.line   = ln;
-        inout_location.column = col;
+        out_location.line   = ln;
+        out_location.column = col;
     }
     CXString str = clang_getFileName(file);
     inout_filename = wxString::FromUTF8(clang_getCString(str));
@@ -1529,7 +1648,17 @@ bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wx
     return true;
 }
 
-void ClangProxy::GetFunctionScopeAt(ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_MethodName )
+/** @brief Get the function scope of a location. When the position is in a body of a function, this will return the class and function name.
+ *
+ * @param translUnitId const ClTranslUnitId
+ * @param filename const wxString&
+ * @param location const ClTokenPosition&
+ * @param out_ClassName wxString&
+ * @param out_MethodName wxString&
+ * @return void
+ *
+ */
+void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_MethodName )
 {
     if (translUnitId < 0)
     {
@@ -1590,7 +1719,15 @@ void ClangProxy::GetFunctionScopeAt(ClTranslUnitId translUnitId, const wxString&
 }
 
 
-void ClangProxy::Reparse( ClTranslUnitId translUnitId, const wxString& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
+/** @brief Reparse a translation unit
+ *
+ * @param translUnitId ID of the translation unit to reparse
+ * @param compileCommand The compile command to be passed to Clang
+ * @param unsavedFiles Map of the contents of all unsaved files open in the IDE
+ * @return void
+ *
+ */
+void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const wxString& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
 {
     if (translUnitId < 0 )
         return;
@@ -1611,7 +1748,13 @@ void ClangProxy::Reparse( ClTranslUnitId translUnitId, const wxString& /*compile
     }
 }
 
-void ClangProxy::UpdateTokenDatabase( ClTranslUnitId translUnitId )
+/** @brief Update the token database with all tokens from the Clang AST in a Translation Unit
+ *
+ * @param translUnitId The ID of the translation unit
+ * @return void
+ *
+ */
+void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
 {
     if (translUnitId < 0 )
         return;
@@ -1632,7 +1775,15 @@ void ClangProxy::UpdateTokenDatabase( ClTranslUnitId translUnitId )
     }
 }
 
-void ClangProxy::GetDiagnostics(ClTranslUnitId translUnitId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics)
+/** @brief Get the diagnostics of a file within a translation unit.
+ *
+ * @param translUnitId Translation unit ID
+ * @param filename Filename within the translation unit
+ * @param diagnostics[out] Returned diagnostics
+ * @return void
+ *
+ */
+void ClangProxy::GetDiagnostics( const ClTranslUnitId translUnitId, const wxString& filename, std::vector<ClDiagnostic>& out_diagnostics)
 {
     if (translUnitId < 0)
     {
@@ -1643,9 +1794,16 @@ void ClangProxy::GetDiagnostics(ClTranslUnitId translUnitId, const wxString& fil
     {
         return;
     }
-    m_TranslUnits[translUnitId].GetDiagnostics(filename, diagnostics);
+    m_TranslUnits[translUnitId].GetDiagnostics(filename, out_diagnostics);
 }
 
+/** @brief Append a job to the clang job queue
+ *
+ * @param job The job to append
+ * @return void
+ *
+ * This will make a clone of the job and push it to the end of the job queue.
+ */
 void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
 {
     if (!m_pThread)

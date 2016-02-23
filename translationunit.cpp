@@ -352,7 +352,15 @@ static void RangeToColumns(CXSourceRange range, unsigned& rgStart, unsigned& rgE
     clang_getSpellingLocation(rgLoc, nullptr, nullptr, &rgEnd, nullptr);
 }
 
-void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& diagnostics )
+/** @brief Expand the diagnostics into the supplied list. This appends the diagnostics to the passed list.
+ *
+ * @param diag CXDiagnostic
+ * @param filename const wxString&
+ * @param inout_diagnostics std::vector<ClDiagnostic>&
+ * @return void
+ *
+ */
+void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& inout_diagnostics )
 {
     if ( diag == nullptr )
     {
@@ -419,7 +427,7 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
         {
             diagText = diagText.Right( diagText.Length() - 7 );
         }
-        ClSeverity sev = sWarning;
+        ClDiagnosticSeverity sev = sWarning;
         switch ( clang_getDiagnosticSeverity(diag))
         {
         case CXDiagnostic_Error:
@@ -434,11 +442,19 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
             sev = sWarning;
             break;
         }
-        diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText ));
+        inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText ));
         clang_disposeString(str);
     }
 }
 
+/** @brief Expand a Clang CXDiagnosticSet into our clanglib vector representation
+ *
+ * @param diagSet The CXDiagnosticSet
+ * @param filename Filename that this diagnostic targets
+ * @param diagnostics[out] The returned diagnostics vector
+ * @return void
+ *
+ */
 void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, std::vector<ClDiagnostic>& diagnostics)
 {
     size_t numDiags = clang_getNumDiagnosticsInSet(diagSet);
@@ -451,6 +467,13 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxStr
     }
 }
 
+/** @brief Calculate a hash from a Clang token
+ *
+ * @param token CXCompletionString
+ * @param identifier wxString&
+ * @return unsigned
+ *
+ */
 unsigned HashToken(CXCompletionString token, wxString& identifier)
 {
     unsigned hVal = 2166136261u;
@@ -471,6 +494,12 @@ unsigned HashToken(CXCompletionString token, wxString& identifier)
     return hVal;
 }
 
+/** @brief Static function used in the Clang AST visitor functions
+ *
+ * @param inclusion_stack
+ * @return void ClInclusionVisitor(CXFile included_file, CXSourceLocation*
+ *
+ */
 static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(inclusion_stack),
                                unsigned WXUNUSED(include_len), CXClientData client_data)
 {
@@ -485,6 +514,12 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
     clang_disposeString(filename);
 }
 
+/** @brief Static function used in the Clang AST visitor functions
+ *
+ * @param parent
+ * @return CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor
+ *
+ */
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(parent), CXClientData client_data)
 {
     ClTokenType typ = ClTokenType_Unknown;

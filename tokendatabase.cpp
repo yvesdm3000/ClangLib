@@ -1,5 +1,9 @@
-/*
+/**
  * Database responsible for resolving tokens between translation units
+ * There is a filename database that manages filename to ID mappings. To
+ * facilitate data updates between multiple token databases, each token
+ * database should have a reference to the same filename database.
+ *
  */
 
 #include "tokendatabase.h"
@@ -18,18 +22,39 @@ enum
     ClTokenPacketType_tokens = 1<<1
 };
 
+/** @brief Write an int to an output stream
+ *
+ * @param out wxOutputStream&
+ * @param val const int
+ * @return bool
+ *
+ */
 static bool WriteInt( wxOutputStream& out, const int val )
 {
     out.Write( (const void*)&val, sizeof(val) );
     return true;
 }
 
-static bool  WriteLongLong( wxOutputStream& out, const long long val )
+/** @brief Write a long long to an outputstream
+ *
+ * @param out wxOutputStream&
+ * @param val const longlong
+ * @return bool
+ *
+ */
+static bool WriteLongLong( wxOutputStream& out, const long long val )
 {
     out.Write( (const void*)&val, sizeof(val) );
     return true;
 }
 
+/** @brief Write a string to an output stream
+ *
+ * @param out wxOutputStream&
+ * @param str const char*
+ * @return bool
+ *
+ */
 static bool WriteString( wxOutputStream& out, const char* str )
 {
     int len = 0;
@@ -45,6 +70,13 @@ static bool WriteString( wxOutputStream& out, const char* str )
     return true;
 }
 
+/** @brief Read an int from an input stream
+ *
+ * @param in wxInputStream&
+ * @param out_Int int&
+ * @return bool
+ *
+ */
 static bool ReadInt( wxInputStream& in, int& out_Int )
 {
     int val = 0;
@@ -58,6 +90,13 @@ static bool ReadInt( wxInputStream& in, int& out_Int )
     return true;
 }
 
+/** @brief Read a long long from an input stream
+ *
+ * @param in wxInputStream&
+ * @param out_LongLong long long&
+ * @return bool
+ *
+ */
 static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
 {
     long long val = 0;
@@ -71,6 +110,13 @@ static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
     return true;
 }
 
+/** @brief Read a string from an input stream
+ *
+ * @param in wxInputStream&
+ * @param out_String wxString&
+ * @return bool
+ *
+ */
 static bool ReadString( wxInputStream& in, wxString& out_String )
 {
     int len;
@@ -87,7 +133,6 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
     }
     char buffer[len + 1];
 
-    //in.Read( wxStringBuffer(buffer, len), len );
     in.Read( buffer, len );
     buffer[len] = '\0';
 
@@ -96,6 +141,13 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
     return true;
 }
 
+/** @brief Write a token to an output stream
+ *
+ * @param token const ClAbstractToken&
+ * @param out wxOutputStream&
+ * @return bool
+ *
+ */
 bool ClAbstractToken::WriteOut( const ClAbstractToken& token,  wxOutputStream& out )
 {
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
@@ -110,6 +162,13 @@ bool ClAbstractToken::WriteOut( const ClAbstractToken& token,  wxOutputStream& o
     return true;
 }
 
+/** @brief Read a token from an input stream
+ *
+ * @param token ClAbstractToken&
+ * @param in wxInputStream&
+ * @return bool
+ *
+ */
 bool ClAbstractToken::ReadIn( ClAbstractToken& token, wxInputStream& in )
 {
     int val = 0;
@@ -137,6 +196,8 @@ bool ClAbstractToken::ReadIn( ClAbstractToken& token, wxInputStream& in )
     return true;
 }
 
+/** @brief Filename database constructor
+ */
 ClFilenameDatabase::ClFilenameDatabase() :
     m_pFileEntries(new ClTreeMap<ClFilenameEntry>())
 {
@@ -147,6 +208,13 @@ ClFilenameDatabase::~ClFilenameDatabase()
     delete m_pFileEntries;
 }
 
+/** @brief Write a filename database to an output stream
+ *
+ * @param db const ClFilenameDatabase&
+ * @param out wxOutputStream&
+ * @return bool
+ *
+ */
 bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream& out )
 {
     int i;
@@ -164,6 +232,13 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
     return true;
 }
 
+/** @brief Read a filename database from an input stream
+ *
+ * @param db ClFilenameDatabase&
+ * @param in wxInputStream&
+ * @return bool
+ *
+ */
 bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
 {
     int i;
@@ -184,6 +259,12 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
     return true;
 }
 
+/** @brief Get a filename id from a filename. Creates a new ID if the filename was not known yet.
+ *
+ * @param filename const wxString&
+ * @return ClFileId
+ *
+ */
 ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
 {
     wxMutexLocker lock(m_Mutex);
@@ -202,6 +283,12 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
     return id.front();
 }
 
+/** @brief Get the filename from its ID
+ *
+ * @param fId const ClFileId
+ * @return wxString
+ *
+ */
 wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
 {
     wxMutexLocker lock( m_Mutex);
@@ -216,6 +303,13 @@ wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
     return wxString(val);
 }
 
+/** @brief Get the timestamp from a filename
+ *
+ * @param fId const ClFileId
+ * @return const wxDateTime
+ *
+ * @note Not a reference returned due to multithreading
+ */
 const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) const
 {
     wxMutexLocker lock( m_Mutex);
@@ -226,6 +320,13 @@ const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) 
     return entry.timestamp;
 }
 
+/** @brief Update the filename timestamp to indicate we have processed this file at this timestamp.
+ *
+ * @param fId const ClFileId
+ * @param timestamp const wxDateTime&
+ * @return void
+ *
+ */
 void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDateTime& timestamp )
 {
     wxMutexLocker lock( m_Mutex);
@@ -244,6 +345,11 @@ ClTokenDatabase::ClTokenDatabase( ClFilenameDatabase& fileDB) :
 {
 }
 
+/** @brief Copy onstructor
+ *
+ * @param other The other ClTokenDatabase
+ *
+ */
 ClTokenDatabase::ClTokenDatabase( const ClTokenDatabase& other) :
     m_FileDB(other.m_FileDB),
     m_pTokens(new ClTreeMap<ClAbstractToken>(*other.m_pTokens)),
@@ -254,16 +360,25 @@ ClTokenDatabase::ClTokenDatabase( const ClTokenDatabase& other) :
 
 }
 
+/** @brief Destructor
+ */
 ClTokenDatabase::~ClTokenDatabase()
 {
     delete m_pTokens;
 }
 
+/** @brief Swap 2 token databases
+ *
+ * @param first ClTokenDatabase&
+ * @param second ClTokenDatabase&
+ * @return void
+ *
+ */
 void swap( ClTokenDatabase& first, ClTokenDatabase& second )
 {
     using std::swap;
 
-    // Let's assume no inverse swap will be performed for now
+    // Let's assume no inverse swap will be performed at the same time for now
     wxMutexLocker l1(first.m_Mutex);
     wxMutexLocker l2(second.m_Mutex);
 
@@ -272,6 +387,13 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
 }
 
 
+/** @brief Read a tokendatabase from disk
+ *
+ * @param tokenDatabase The tokendatabase to read into
+ * @param in The wxInputStream to read from
+ * @return true if the operation succeeded, false otherwise
+ *
+ */
 bool ClTokenDatabase::ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in )
 {
     in.SeekI( 4 ); // Magic number
@@ -321,6 +443,13 @@ bool ClTokenDatabase::ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in 
     return true;
 }
 
+/** @brief Write the database to an output stream
+ *
+ * @param tokenDatabase The database to write
+ * @param out Were to write the database to
+ * @return true if the operation was successful, false otherwise
+ *
+ */
 bool ClTokenDatabase::WriteOut( const ClTokenDatabase& tokenDatabase, wxOutputStream& out )
 {
     int i;
@@ -350,6 +479,9 @@ bool ClTokenDatabase::WriteOut( const ClTokenDatabase& tokenDatabase, wxOutputSt
     return true;
 }
 
+/** @brief Clear the token database
+ *
+ */
 void ClTokenDatabase::Clear()
 {
     wxMutexLocker lock(m_Mutex);
@@ -358,20 +490,46 @@ void ClTokenDatabase::Clear()
     m_pTokens = new ClTreeMap<ClAbstractToken>(),
     m_pFileTokens = new ClTreeMap<int>();
 }
+
+/** @brief Get an ID for a filename. Creates a new ID if the filename was not known yet.
+ *
+ * @param filename Full path to the filename
+ * @return ClFileId
+ *
+ */
 ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename) const
 {
     return m_FileDB.GetFilenameId(filename);
 }
+
+/** @brief Get the filename that is known with an ID
+ *
+ * @param fId The file ID
+ * @return Full path to the file
+ *
+ */
 wxString ClTokenDatabase::GetFilename(ClFileId fId) const
 {
     return m_FileDB.GetFilename(fId);
 }
 
+/** @brief Get the timestamp of the filename entry when the file was last parsed
+ *
+ * @param fId The file id
+ * @return wxDateTime object which represents a timestamp
+ *
+ */
 wxDateTime ClTokenDatabase::GetFilenameTimestamp( const ClFileId fId ) const
 {
     return m_FileDB.GetFilenameTimestamp(fId);
 }
 
+/** @brief Insert or update a token into the token database
+ *
+ * @param token The token to insert/update
+ * @return ClTokenId of the updated token or if the token allready existed the newly inserted token
+ *
+ */
 ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
 {
     wxMutexLocker lock(m_Mutex);
@@ -386,6 +544,15 @@ ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
     return tId;
 }
 
+/** @brief Find a token ID by value
+ *
+ * @param identifier const wxString&
+ * @param fileId ClFileId
+ * @param tokenType ClTokenType
+ * @param tokenHash unsigned
+ * @return ClTokenId
+ *
+ */
 ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId fileId, ClTokenType tokenType, unsigned tokenHash ) const
 {
     wxMutexLocker lock( m_Mutex);
@@ -403,6 +570,13 @@ ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId file
     return wxNOT_FOUND;
 }
 
+/** @brief Get a token with it's ID
+ *
+ * @param tId const ClTokenId
+ * @return ClAbstractToken
+ *
+ * @note No reference returned for multi-threading reasons
+ */
 ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
 {
     wxMutexLocker lock( m_Mutex);
@@ -410,12 +584,24 @@ ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
     return m_pTokens->GetValue(tId);
 }
 
+/** @brief Find the token IDs of all matches of an identifier
+ *
+ * @param identifier const wxString&
+ * @return std::vector<ClTokenId>
+ *
+ */
 std::vector<ClTokenId> ClTokenDatabase::GetTokenMatches(const wxString& identifier) const
 {
     wxMutexLocker lock( m_Mutex);
     return m_pTokens->GetIdSet(identifier);
 }
 
+/** @brief Get all tokens linked to a file ID
+ *
+ * @param fId const ClFileId
+ * @return std::vector<ClTokenId>
+ *
+ */
 std::vector<ClTokenId> ClTokenDatabase::GetFileTokens(const ClFileId fId) const
 {
     wxMutexLocker lock( m_Mutex);
@@ -425,6 +611,11 @@ std::vector<ClTokenId> ClTokenDatabase::GetFileTokens(const ClFileId fId) const
     return tokens;
 }
 
+/** @brief Shrink the database to reclaim some memory
+ *
+ * @return void
+ *
+ */
 void ClTokenDatabase::Shrink()
 {
     wxMutexLocker lock(m_Mutex);
@@ -432,6 +623,12 @@ void ClTokenDatabase::Shrink()
     m_pFileTokens->Shrink();
 }
 
+/** @brief Update a token that was previously cleared
+ *
+ * @param freeTokenId const ClTokenId
+ * @param token const ClAbstractToken&
+ *
+ */
 void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstractToken& token )
 {
     ClAbstractToken tokenRef = m_pTokens->GetValue(freeTokenId);
@@ -448,6 +645,13 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
     m_pFileTokens->Insert(filen, freeTokenId);
 }
 
+/** @brief Remove a token from the token database
+ *
+ * @param tokenId const ClTokenId
+ * @return void
+ *
+ * This will not remove the token, it will only clear it in memory and will later on be reused.
+ */
 void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 {
     ClAbstractToken oldToken = GetToken( tokenId );
@@ -458,8 +662,16 @@ void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
     UpdateToken( tokenId, t );
 }
 
+/** @brief Update the tokendatabase with data from another token database
+ *
+ * @param fileId const ClFileId
+ * @param db const ClTokenDatabase&
+ * @return void
+ *
+ */
 void ClTokenDatabase::Update( const ClFileId fileId, const ClTokenDatabase& db )
 {
+    assert( &db.m_FileDB == &m_FileDB );
     int i;
     std::vector<ClTokenId> oldTokenIds;
     wxString filename = GetFilename(fileId);

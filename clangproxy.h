@@ -22,6 +22,10 @@ typedef int ClFileId;
 class ClangProxy
 {
 public:
+    /** @brief Base class for a Clang job.
+     *
+     *  This class is designed to be subclassed and the Execute() call be overridden.
+     */
     /*abstract */
     class ClangJob : public AbstractJob, public wxObject
     {
@@ -48,10 +52,17 @@ public:
             m_pProxy(NULL)
         {
         }
-        ClangJob( const ClangJob& other ) : AbstractJob(), wxObject()
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         */
+        ClangJob( const ClangJob& other ) :
+            AbstractJob(),
+            wxObject(),
+            m_JobType( other.m_JobType),
+            m_pProxy( other.m_pProxy )
         {
-            m_JobType = other.m_JobType;
-            m_pProxy = other.m_pProxy;
         }
 
     public:
@@ -89,17 +100,40 @@ public:
     class EventJob : public ClangJob
     {
     protected:
-        EventJob(JobType jt, wxEventType evtType, int evtId) :
-            ClangJob(jt), m_EventType(evtType), m_EventId(evtId)
+        /** @brief Constructor
+         *
+         * @param jt JobType from the enum.
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        EventJob(const JobType jt, const wxEventType evtType, const int evtId) :
+            ClangJob(jt),
+            m_EventType(evtType),
+            m_EventId(evtId)
         {
         }
-        EventJob( const EventJob& other ) : ClangJob(other.m_JobType)
-        {
-            m_EventType = other.m_EventType;
-            m_EventId = other.m_EventId;
-        }
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         */
+        EventJob( const EventJob& other ) :
+            ClangJob(other.m_JobType),
+            m_EventType( other.m_EventType ),
+            m_EventId( other.m_EventId )
+        {}
     public:
         // Called on job thread
+        /** @brief Function that is called on the job thread when the job is complete.
+         *
+         * @param clangProxy ClangProxy&
+         * @return virtual void
+         *
+         *  This virtual base function will send a wxEvent with the wxEventType
+         *  and id taken from the constructor and passes the job to the main UI
+         *  event handler. The job will also be destroyed on the main UI.
+         */
         virtual void Completed(ClangProxy& clangProxy)
         {
             if (clangProxy.m_pEventCallbackHandler&&(m_EventType != 0) )
@@ -109,15 +143,21 @@ public:
             }
         }
     private:
-        wxEventType m_EventType;
-        int         m_EventId;
+        const wxEventType m_EventType;
+        const int         m_EventId;
     };
 
     /* final */
     class CreateTranslationUnitJob : public EventJob
     {
     public:
-        CreateTranslationUnitJob( wxEventType evtType, int evtId, const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles ) :
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        CreateTranslationUnitJob( const wxEventType evtType, const int evtId, const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles ) :
             EventJob(CreateTranslationUnitType, evtType, evtId),
             m_Filename(filename),
             m_Commands(commands),
@@ -148,6 +188,12 @@ public:
             return m_Filename;
         }
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         CreateTranslationUnitJob(const CreateTranslationUnitJob& other):
             EventJob(other),
             m_Filename(other.m_Filename.c_str()),
@@ -168,11 +214,19 @@ public:
         std::map<wxString, wxString> m_UnsavedFiles;
     };
 
+    /** @brief Remove a translation unit from memory
+     */
     /* final */
     class RemoveTranslationUnitJob : public EventJob
     {
     public:
-        RemoveTranslationUnitJob( wxEventType evtType, int evtId, int TranslUnitId ) :
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        RemoveTranslationUnitJob( const wxEventType evtType, const int evtId, int TranslUnitId ) :
             EventJob(RemoveTranslationUnitType, evtType, evtId),
             m_TranslUnitId(TranslUnitId) {}
         ClangJob* Clone() const
@@ -185,6 +239,12 @@ public:
             clangproxy.RemoveTranslationUnit(m_TranslUnitId);
         }
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         RemoveTranslationUnitJob(const RemoveTranslationUnitJob& other):
             EventJob(other),
             m_TranslUnitId(other.m_TranslUnitId) {}
@@ -192,10 +252,18 @@ public:
     };
 
     /* final */
+    /** @brief Reparse a translation unit job.
+     */
     class ReparseJob : public EventJob
     {
     public:
-        ReparseJob( wxEventType evtType, int evtId, ClTranslUnitId translId, const wxString& compileCommand, const wxString& filename, const std::map<wxString, wxString>& unsavedFiles, bool parents = false )
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        ReparseJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const wxString& compileCommand, const wxString& filename, const std::map<wxString, wxString>& unsavedFiles, bool parents = false )
             : EventJob(ReparseType, evtType, evtId),
               m_TranslId(translId),
               m_UnsavedFiles(unsavedFiles),
@@ -218,6 +286,12 @@ public:
             return m_Filename;
         }
     private:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         ReparseJob( const ReparseJob& other )
             : EventJob(other),
               m_TranslId(other.m_TranslId),
@@ -241,10 +315,18 @@ public:
     };
 
     /* final */
+    /** @brief Update the tokendatabase with tokens from a translation unit job
+     */
     class UpdateTokenDatabaseJob : public EventJob
     {
     public:
-        UpdateTokenDatabaseJob( wxEventType evtType, int evtId, int translId ) :
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        UpdateTokenDatabaseJob( const wxEventType evtType, const int evtId, int translId ) :
             EventJob(UpdateTokenDatabaseType, evtType, evtId),
             m_TranslId(translId)
         {
@@ -267,10 +349,18 @@ public:
     };
 
     /* final */
+    /** @brief Request diagnostics job.
+     */
     class GetDiagnosticsJob : public EventJob
     {
     public:
-        GetDiagnosticsJob( wxEventType evtType, int evtId, int translId, const wxString& filename ):
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        GetDiagnosticsJob( const wxEventType evtType, const int evtId, int translId, const wxString& filename ):
             EventJob(GetDiagnosticsType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename)
@@ -299,6 +389,12 @@ public:
         }
 
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         GetDiagnosticsJob( const GetDiagnosticsJob& other ) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
@@ -310,10 +406,18 @@ public:
         std::vector<ClDiagnostic> m_Results; // Returned value
     };
 
+    /** @brief Find the function scope of a code location job
+     */
     class GetFunctionScopeAtJob : public EventJob
     {
     public:
-        GetFunctionScopeAtJob( wxEventType evtType, int evtId, int translId, const wxString& filename, const ClTokenPosition& location) :
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        GetFunctionScopeAtJob( const wxEventType evtType, const int evtId, int translId, const wxString& filename, const ClTokenPosition& location) :
             EventJob(GetFunctionScopeAtType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename),
@@ -329,6 +433,12 @@ public:
         }
 
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         GetFunctionScopeAtJob( const GetFunctionScopeAtJob& other ) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
@@ -346,19 +456,28 @@ public:
         wxString m_MethodName;
     };
 
-    /// Job designed to be run synchronous
     /*abstract */
+    /** @brief Base class job designed to be run (partially) synchronous.
+     *
+     *  When the job is posted, the user can wait for completion of this job (with timout).
+     */
     class SyncJob : public EventJob
     {
     protected:
-        SyncJob(JobType jt, wxEventType evtType, int evtId) :
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        SyncJob(JobType jt, const wxEventType evtType, const int evtId) :
             EventJob(jt, evtType, evtId),
             m_bCompleted(false),
             m_pMutex(new wxMutex()),
             m_pCond(new wxCondition(*m_pMutex))
         {
         }
-        SyncJob(JobType jt, wxEventType evtType, int evtId, wxMutex* pMutex, wxCondition* pCond) :
+        SyncJob(JobType jt, const wxEventType evtType, const int evtId, wxMutex* pMutex, wxCondition* pCond) :
             EventJob(jt, evtType, evtId),
             m_bCompleted(false),
             m_pMutex(pMutex),
@@ -403,7 +522,13 @@ public:
     class CodeCompleteAtJob : public SyncJob
     {
     public:
-        CodeCompleteAtJob( wxEventType evtType, const int evtId, const bool isAuto,
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        CodeCompleteAtJob( const wxEventType evtType, const int evtId, const bool isAuto,
                            const wxString& filename, const ClTokenPosition& location,
                            const ClTranslUnitId translId, const std::map<wxString, wxString>& unsavedFiles,
                            bool includeCtors ):
@@ -479,6 +604,12 @@ public:
             return m_Diagnostics;
         }
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         CodeCompleteAtJob( const CodeCompleteAtJob& other ) :
             SyncJob(other),
             m_IsAuto(other.m_IsAuto),
@@ -509,7 +640,13 @@ public:
     class DocumentCCTokenJob : public SyncJob
     {
     public:
-        DocumentCCTokenJob( wxEventType evtType, const int evtId, ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, ClTokenId tknId ):
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        DocumentCCTokenJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, ClTokenId tknId ):
             SyncJob(DocumentCCTokenType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename),
@@ -551,6 +688,12 @@ public:
             return *m_pResult;
         }
     protected:
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         *  Performs a deep copy for multi-threaded use
+         */
         DocumentCCTokenJob( const DocumentCCTokenJob& other ) :
             SyncJob(other),
             m_TranslId(other.m_TranslId),
@@ -568,7 +711,13 @@ public:
     class GetTokensAtJob : public SyncJob
     {
     public:
-        GetTokensAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId ):
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        GetTokensAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId ):
             SyncJob(GetTokensAtType, evtType, evtId),
             m_Filename(filename),
             m_Location(location),
@@ -599,7 +748,7 @@ public:
             return *m_pResults;
         }
     protected:
-        GetTokensAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId,
+        GetTokensAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId,
                         wxMutex* pMutex, wxCondition* pCond,
                         wxStringVec* pResults ):
             SyncJob(GetTokensAtType, evtType, evtId, pMutex, pCond),
@@ -617,7 +766,13 @@ public:
     class GetCallTipsAtJob : public SyncJob
     {
     public:
-        GetCallTipsAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr ):
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        GetCallTipsAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr ):
             SyncJob( GetCallTipsAtType, evtType, evtId),
             m_Filename(filename),
             m_Location(location),
@@ -647,7 +802,7 @@ public:
             return *m_pResults;
         }
     protected:
-        GetCallTipsAtJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr,
+        GetCallTipsAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr,
                           wxMutex* pMutex, wxCondition* pCond,
                           std::vector<wxStringVec>* pResults ):
             SyncJob( GetCallTipsAtType, evtType, evtId, pMutex, pCond),
@@ -667,7 +822,13 @@ public:
     class GetOccurrencesOfJob : public SyncJob
     {
     public:
-        GetOccurrencesOfJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, ClTranslUnitId translId ):
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to use when the job is completed
+         * @param evtId Event ID to use when the job is completed
+         *
+         */
+        GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, ClTranslUnitId translId ):
             SyncJob( GetOccurrencesOfType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename),
@@ -708,7 +869,7 @@ public:
             return *m_pResults;
         }
     protected:
-        GetOccurrencesOfJob( wxEventType evtType, int evtId, const wxString& filename, const ClTokenPosition& location, int translId,
+        GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId,
                              wxMutex* pMutex, wxCondition* pCond,
                              std::vector< std::pair<int, int> >* pResults ):
             SyncJob(GetOccurrencesOfType, evtType, evtId, pMutex, pCond),
@@ -723,15 +884,26 @@ public:
     };
 
     /**
-     * Helper class that manages the lifecycle of the Get/SetEventObject() object when passing threads
+     * @brief Helper class that manages the lifecycle of the Get/SetEventObject() object when passing threads
      */
     class CallbackEvent : public wxEvent
     {
     public:
-        CallbackEvent( wxEventType evtType, int evtId, ClangJob* job ) : wxEvent( evtType, evtId )
+        /** @brief Constructor
+         *
+         * @param evtType wxEventType to indicate that the job is completed
+         * @param evtId Event ID to indicate that the job is completed
+         *
+         */
+        CallbackEvent( const wxEventType evtType, const int evtId, ClangJob* job ) : wxEvent( evtType, evtId )
         {
             SetEventObject(job);
         }
+        /** @brief Copy constructor
+         *
+         * @param other To copy from
+         *
+         */
         CallbackEvent( const CallbackEvent& other ) : wxEvent(other)
         {
             ClangProxy::ClangJob* pJob = static_cast<ClangProxy::ClangJob*>(other.GetEventObject());
@@ -760,39 +932,39 @@ public:
     void AppendPendingJob( ClangProxy::ClangJob& job );
     //void PrependPendingJob( ClangProxy::ClangJob& job );
 
-    ClTranslUnitId GetTranslationUnitId(ClTranslUnitId CtxTranslUnitId, ClFileId fId);
-    ClTranslUnitId GetTranslationUnitId(ClTranslUnitId CtxTranslUnitId, const wxString& filename);
+    ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId);
+    ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const wxString& filename);
 
 protected: // jobs that are run only on the thread
-    void CreateTranslationUnit(const wxString& filename, const wxString& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);
-    void RemoveTranslationUnit(ClTranslUnitId TranslUnitId);
+    void CreateTranslationUnit( const wxString& filename, const wxString& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);
+    void RemoveTranslationUnit( const ClTranslUnitId TranslUnitId );
     /** Reparse translation id
      *
      * @param unsavedFiles reference to the unsaved files data. This function takes the data and this list will be empty after this call
      */
-    void Reparse(         ClTranslUnitId translId, const wxString& compileCommand, const std::map<wxString, wxString>& unsavedFiles);
+    void Reparse(         const ClTranslUnitId translId, const wxString& compileCommand, const std::map<wxString, wxString>& unsavedFiles);
 
     /** Update token database with all tokens from the passed translation unit id
      * @param translId The ID of the intended translation unit
      */
-    void UpdateTokenDatabase( ClTranslUnitId translId );
-    void GetDiagnostics(  ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
-    void CodeCompleteAt(  ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
+    void UpdateTokenDatabase( const ClTranslUnitId translId );
+    void GetDiagnostics(  const ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
+    void CodeCompleteAt(  const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
                           bool isAuto, const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
     wxString DocumentCCToken( ClTranslUnitId translId, int tknId );
-    void GetTokensAt(     ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, std::vector<wxString>& results);
-    void GetCallTipsAt(   ClTranslUnitId translId,const wxString& filename, const ClTokenPosition& location,
+    void GetTokensAt(     const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, std::vector<wxString>& results);
+    void GetCallTipsAt(   const ClTranslUnitId translId,const wxString& filename, const ClTokenPosition& location,
                           const wxString& tokenStr, std::vector<wxStringVec>& results);
-    void GetOccurrencesOf(ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
+    void GetOccurrencesOf(const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
                           std::vector< std::pair<int, int> >& results);
-    void RefineTokenType( ClTranslUnitId translId, int tknId, int& tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
+    void RefineTokenType( const ClTranslUnitId translId, int tknId, ClTokenCategory& out_tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
 
 public:
-    wxString GetCCInsertSuffix( ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
-    bool ResolveDeclTokenAt( const ClTranslUnitId translId, wxString& filename, ClTokenPosition& out_location);
-    bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& filename, ClTokenPosition& inout_location);
+    wxString GetCCInsertSuffix( const  ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
+    bool ResolveDeclTokenAt( const ClTranslUnitId translId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location);
+    bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location);
 
-    void GetFunctionScopeAt( ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_FunctionName );
+    void GetFunctionScopeAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_FunctionName );
     std::vector<std::pair<wxString, wxString> > GetFunctionScopes( ClTranslUnitId, const wxString& filename );
 
 private:
@@ -804,7 +976,6 @@ private:
 private: // Thread
     wxEvtHandler* m_pEventCallbackHandler;
     BackgroundThread* m_pThread;
-    BackgroundThread* m_pDiagnosticThread;
     //BackgroundThread* m_pParsingThread;
 };
 

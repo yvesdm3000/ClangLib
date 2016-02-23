@@ -745,7 +745,7 @@ void ClangPlugin::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
     if (stc->GetLine(line).StartsWith(wxT("#include")))
         column = 3;
     ClTokenPosition loc(line+1, column+1);
-    if ( !m_Proxy.ResolveDeclTokenAt(m_TranslUnitId, filename, loc) )
+    if ( !m_Proxy.ResolveDeclTokenAt(m_TranslUnitId, filename, ClTokenPosition(line+1, column+1), loc) )
     {
         return;
     }
@@ -770,7 +770,7 @@ void ClangPlugin::OnGotoImplementation(wxCommandEvent& WXUNUSED(event))
     if (stc->GetLine(line).StartsWith(wxT("#include")))
         column = 3;
     ClTokenPosition loc(line+1, column+1);
-    if ( !m_Proxy.ResolveDefinitionTokenAt(m_TranslUnitId, filename, loc) )
+    if ( !m_Proxy.ResolveDefinitionTokenAt(m_TranslUnitId, filename, ClTokenPosition(line+1,column+1), loc) )
     {
         return;
     }

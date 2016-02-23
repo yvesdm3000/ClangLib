@@ -7,6 +7,8 @@
 typedef int8_t ClTranslUnitId;
 typedef int ClTokenId;
 
+/** @brief Category of a token to identify what a token represents
+ */
 enum ClTokenCategory
 {
     tcClassFolder,
@@ -41,17 +43,21 @@ enum ClTokenCategory
     tcNone = -1
 };
 
-struct ClToken // TODO: do we want this, or is just using CCToken good enough?
+/** @brief Token structure. Contains a token for code-completion.
+ */
+struct ClToken
 {
-    ClToken(const wxString& nm, int _id, int _weight, int categ) :
+    ClToken(const wxString& nm, int _id, int _weight, ClTokenCategory categ) :
         id(_id), category(categ), weight(_weight), name(nm) {}
 
     int id;
-    int category;
+    ClTokenCategory category;
     int weight;
     wxString name;
 };
 
+/** @brief TokenPosition structure. Contains line and column information. First line is '1'
+ */
 struct ClTokenPosition
 {
     ClTokenPosition(unsigned int ln, unsigned int col)
@@ -71,18 +77,20 @@ struct ClTokenPosition
     unsigned int column;
 };
 
-enum ClDiagnosticLevel { dlMinimal, dlFull };
+/** @brief Level of diagnostic
+ */
+enum ClDiagnosticLevel { dlPartial, dlFull };
 
-enum ClSeverity { sWarning, sError, sNote };
+enum ClDiagnosticSeverity { sWarning, sError, sNote };
 
 struct ClDiagnostic
 {
-    ClDiagnostic(int ln, int rgStart, int rgEnd, ClSeverity level, const wxString& fl, const wxString& msg) :
+    ClDiagnostic(const int ln, const int rgStart, const int rgEnd, const ClDiagnosticSeverity level, const wxString& fl, const wxString& msg) :
         line(ln), range(rgStart, rgEnd), severity(level), file(fl), message(msg) {}
 
     int line;
     std::pair<int, int> range;
-    ClSeverity severity;
+    ClDiagnosticSeverity severity;
     wxString file;
     wxString message;
 };
@@ -101,38 +109,47 @@ typedef enum _TokenType
 
 } ClTokenType;
 
+/** @brief Event used in wxWidgets command event returned by the plugin.
+ */
 class ClangEvent : public wxCommandEvent
 {
 public:
-    ClangEvent( wxEventType evtId, const ClTranslUnitId id, const wxString& filename ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(0,0) {}
-    ClangEvent( wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(pos),
         m_GetOccurrencesResults(occurrences) {}
-    ClangEvent( wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(pos),
         m_GetCodeCompletionResults(completions) {}
-    ClangEvent( wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(loc),
         m_DiagnosticResults(diag) {}
-    ClangEvent( wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const wxString& documentation ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const wxString& documentation ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(loc),
         m_DocumentationResults(documentation) {}
+
+
+    /** @brief Copy constructor
+     *
+     * @param other The other ClangEvent
+     *
+     */
     ClangEvent( const ClangEvent& other) :
         wxCommandEvent(other),
         m_TranslationUnitId(other.m_TranslationUnitId),
@@ -168,18 +185,18 @@ public:
     {
         return m_DiagnosticResults;
     }
-    const wxString GetDocumentationResults()
+    const wxString& GetDocumentationResults()
     {
         return m_DocumentationResults;
     }
 private:
-    ClTranslUnitId m_TranslationUnitId;
-    wxString m_Filename;
-    ClTokenPosition m_Location;
-    std::vector< std::pair<int, int> > m_GetOccurrencesResults;
-    std::vector<ClToken> m_GetCodeCompletionResults;
-    std::vector<ClDiagnostic> m_DiagnosticResults;
-    wxString m_DocumentationResults;
+    const ClTranslUnitId m_TranslationUnitId;
+    const wxString m_Filename;
+    const ClTokenPosition m_Location;
+    const std::vector< std::pair<int, int> > m_GetOccurrencesResults;
+    const std::vector<ClToken> m_GetCodeCompletionResults;
+    const std::vector<ClDiagnostic> m_DiagnosticResults;
+    const wxString m_DocumentationResults;
 };
 
 extern const wxEventType clEVT_TRANSLATIONUNIT_CREATED;
@@ -218,11 +235,15 @@ public:
     virtual wxString                        GetCodeCompletionInsertSuffix( const ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets ) = 0;
 };
 
+/** @brief Base class for ClangPlugin components.
+ *
+ */
 /* abstract */
 class ClangPluginComponent : public wxEvtHandler
 {
-public:
+protected:
     ClangPluginComponent() {}
+public:
     virtual void OnAttach( IClangPlugin *pClangPlugin )
     {
         m_pClangPlugin = pClangPlugin;
