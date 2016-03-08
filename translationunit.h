@@ -45,17 +45,6 @@ public:
         swap(first.m_LastPos.column, second.m_LastPos.column);
         swap(first.m_LastParsed, second.m_LastParsed);
     }
-    /** @brief Assignement operator used as move operator to make sure there is only 1 class that manages the Translation Unit resource.
-     *
-     * @param other Source ClTranslationUnit
-     * @return ClTranslationUnit
-     *
-     */
-    ClTranslationUnit& operator=(ClTranslationUnit other)
-    {
-        swap(*this,other);
-        return *this;
-    }
     bool UsesClangIndex( const CXIndex& idx )
     {
         return idx == m_ClIndex;
