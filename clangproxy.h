@@ -49,7 +49,7 @@ public:
             AbstractJob(),
             wxObject(),
             m_JobType(jt),
-            m_pProxy(NULL)
+            m_pProxy(nullptr)
         {
         }
         /** @brief Copy constructor
@@ -69,11 +69,11 @@ public:
         /// Returns a copy of this job on the heap to make sure the objects lifecycle is guaranteed across threads
         virtual ClangJob* Clone() const = 0;
         // Called on job thread
-        virtual void Execute(ClangProxy& /*clangproxy*/) = 0;
+        virtual void Execute(ClangProxy& WXUNUSED(clangproxy)) = 0;
         // Called on job thread
-        virtual void Completed(ClangProxy& /*clangproxy*/) {}
+        virtual void Completed(ClangProxy& WXUNUSED(clangproxy)) {}
         // Called on job thread
-        void SetProxy( ClangProxy* pProxy )
+        void SetProxy(ClangProxy* pProxy)
         {
             m_pProxy = pProxy;
         }
@@ -84,12 +84,12 @@ public:
     public:
         void operator()()
         {
-            assert( m_pProxy != NULL );
+            assert(m_pProxy != nullptr);
             Execute(*m_pProxy);
             Completed(*m_pProxy);
         }
     protected:
-        JobType    m_JobType;
+        JobType     m_JobType;
         ClangProxy* m_pProxy;
     };
 
@@ -136,10 +136,10 @@ public:
          */
         virtual void Completed(ClangProxy& clangProxy)
         {
-            if (clangProxy.m_pEventCallbackHandler&&(m_EventType != 0) )
+            if (clangProxy.m_pEventCallbackHandler && (m_EventType != 0))
             {
-                ClangProxy::CallbackEvent evt( m_EventType, m_EventId, this);
-                clangProxy.m_pEventCallbackHandler->AddPendingEvent( evt );
+                ClangProxy::CallbackEvent evt(m_EventType, m_EventId, this);
+                clangProxy.m_pEventCallbackHandler->AddPendingEvent(evt);
             }
         }
     private:
@@ -301,7 +301,7 @@ public:
               m_Parents(other.m_Parents)
         {
             /* deep copy */
-            for ( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            for (std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
                 m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
             }
@@ -484,7 +484,7 @@ public:
             m_pCond(pCond) {}
     public:
         // Called on Job thread
-        virtual void Completed( ClangProxy& clangproxy )
+        virtual void Completed(ClangProxy& clangproxy)
         {
             {
                 wxMutexLocker lock(*m_pMutex);
@@ -494,7 +494,7 @@ public:
             EventJob::Completed(clangproxy);
         }
         /// Called on main thread to wait for completion of this job.
-        wxCondError WaitCompletion( unsigned long milliseconds )
+        wxCondError WaitCompletion(unsigned long milliseconds)
         {
             wxMutexLocker lock(*m_pMutex);
             if (m_bCompleted )
@@ -552,7 +552,7 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             std::vector<ClToken> results;
-            clangproxy.CodeCompleteAt( m_TranslId, m_Filename, m_Location, m_IsAuto, m_UnsavedFiles, results, m_Diagnostics);
+            clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Location, m_IsAuto, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {
                 switch (tknIt->category)
@@ -663,7 +663,7 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            wxString str = clangproxy.DocumentCCToken( m_TranslId, m_TokenId );
+            wxString str = clangproxy.DocumentCCToken(m_TranslId, m_TokenId);
             *m_pResult = str;
         }
         virtual void Finalize()
@@ -734,7 +734,7 @@ public:
 
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetTokensAt( m_TranslId, m_Filename, m_Location, *m_pResults);
+            clangproxy.GetTokensAt(m_TranslId, m_Filename, m_Location, *m_pResults);
         }
 
         virtual void Finalize()
@@ -772,7 +772,8 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        GetCallTipsAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr ):
+        GetCallTipsAtJob( const wxEventType evtType, const int evtId, const wxString& filename,
+                          const ClTokenPosition& location, int translId, const wxString& tokenStr ):
             SyncJob( GetCallTipsAtType, evtType, evtId),
             m_Filename(filename),
             m_Location(location),
@@ -805,7 +806,7 @@ public:
         GetCallTipsAtJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId, const wxString& tokenStr,
                           wxMutex* pMutex, wxCondition* pCond,
                           std::vector<wxStringVec>* pResults ):
-            SyncJob( GetCallTipsAtType, evtType, evtId, pMutex, pCond),
+            SyncJob(GetCallTipsAtType, evtType, evtId, pMutex, pCond),
             m_Filename(filename.c_str()),
             m_Location(location),
             m_TranslId(translId),
@@ -828,7 +829,8 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, ClTranslUnitId translId ):
+        GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename,
+                             const ClTokenPosition& location, ClTranslUnitId translId ):
             SyncJob( GetOccurrencesOfType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename),
@@ -843,7 +845,7 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetOccurrencesOf( m_TranslId, m_Filename, m_Location, *m_pResults);
+            clangproxy.GetOccurrencesOf(m_TranslId, m_Filename, m_Location, *m_pResults);
         }
 
         virtual void Finalize()
@@ -918,14 +920,14 @@ public:
         wxEvent* Clone() const
         {
             ClangProxy::ClangJob* pJob = static_cast<ClangProxy::ClangJob*>(GetEventObject());
-            if (pJob )
+            if (pJob)
                 pJob = pJob->Clone();
-            return new CallbackEvent( m_eventType, m_id, pJob );
+            return new CallbackEvent(m_eventType, m_id, pJob);
         }
     };
 
 public:
-    ClangProxy( wxEvtHandler* pEvtHandler, ClTokenDatabase& database, const std::vector<wxString>& cppKeywords);
+    ClangProxy(wxEvtHandler* pEvtHandler, ClTokenDatabase& database, const std::vector<wxString>& cppKeywords);
     ~ClangProxy();
 
     /** Append a job to the end of the queue */

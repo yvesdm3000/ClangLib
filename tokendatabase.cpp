@@ -31,7 +31,7 @@ enum
  */
 static bool WriteInt( wxOutputStream& out, const int val )
 {
-    out.Write( (const void*)&val, sizeof(val) );
+    out.Write((const void*)&val, sizeof(val));
     return true;
 }
 
@@ -44,7 +44,7 @@ static bool WriteInt( wxOutputStream& out, const int val )
  */
 static bool WriteLongLong( wxOutputStream& out, const long long val )
 {
-    out.Write( (const void*)&val, sizeof(val) );
+    out.Write((const void*)&val, sizeof(val));
     return true;
 }
 
@@ -59,14 +59,12 @@ static bool WriteString( wxOutputStream& out, const char* str )
 {
     int len = 0;
 
-    if( str != NULL)
-    {
+    if (str != nullptr)
         len = strlen(str); // Need size in amount of bytes
-    }
-    if( !WriteInt( out, len ) )
+    if (!WriteInt(out, len))
         return false;
     if (len > 0)
-        out.Write( (const void*)str, len );
+        out.Write((const void*)str, len);
     return true;
 }
 
@@ -80,11 +78,9 @@ static bool WriteString( wxOutputStream& out, const char* str )
 static bool ReadInt( wxInputStream& in, int& out_Int )
 {
     int val = 0;
-    if( !in.CanRead() )
-    {
+    if (!in.CanRead())
         return false;
-    }
-    in.Read( &val, sizeof(val) );
+    in.Read(&val, sizeof(val));
     out_Int = val;
 
     return true;
@@ -100,11 +96,9 @@ static bool ReadInt( wxInputStream& in, int& out_Int )
 static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
 {
     long long val = 0;
-    if( !in.CanRead() )
-    {
+    if (!in.CanRead())
         return false;
-    }
-    in.Read( &val, sizeof(val) );
+    in.Read(&val, sizeof(val));
     out_LongLong = val;
 
     return true;
@@ -120,17 +114,15 @@ static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
 static bool ReadString( wxInputStream& in, wxString& out_String )
 {
     int len;
-    if( !ReadInt( in, len ) )
+    if (!ReadInt(in, len))
         return false;
-    if( len == 0 )
+    if (len == 0)
     {
-        out_String = out_String.Truncate( 0 );
+        out_String = out_String.Truncate(0);
         return true;
     }
-    if( !in.CanRead() )
-    {
+    if (!in.CanRead())
         return false;
-    }
     char buffer[len + 1];
 
     in.Read( buffer, len );
@@ -151,14 +143,14 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
 bool ClAbstractToken::WriteOut( const ClAbstractToken& token,  wxOutputStream& out )
 {
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
-    WriteInt( out, token.tokenType );
-    WriteInt( out, token.fileId );
-    WriteInt( out, token.location.line );
-    WriteInt( out, token.location.column );
-    WriteString( out, token.identifier.mb_str() );
-    WriteString( out, token.displayName.mb_str() );
-    WriteString( out, token.scopeName.mb_str() );
-    WriteInt( out, token.tokenHash );
+    WriteInt(out, token.tokenType);
+    WriteInt(out, token.fileId);
+    WriteInt(out, token.location.line);
+    WriteInt(out, token.location.column);
+    WriteString(out, token.identifier.mb_str());
+    WriteString(out, token.displayName.mb_str());
+    WriteString(out, token.scopeName.mb_str());
+    WriteInt(out, token.tokenHash);
     return true;
 }
 
@@ -172,25 +164,25 @@ bool ClAbstractToken::WriteOut( const ClAbstractToken& token,  wxOutputStream& o
 bool ClAbstractToken::ReadIn( ClAbstractToken& token, wxInputStream& in )
 {
     int val = 0;
-    if( !ReadInt( in, val ) )
+    if (!ReadInt(in, val))
         return false;
     token.tokenType = (ClTokenType)val;
-    if( !ReadInt( in, val ) )
+    if (!ReadInt(in, val))
         return false;
     token.fileId = val;
-    if( !ReadInt( in, val ) )
+    if (!ReadInt(in, val))
         return false;
     token.location.line = val;
-    if( !ReadInt( in, val ) )
+    if (!ReadInt(in, val))
         return false;
     token.location.column = val;
-    if( !ReadString( in, token.identifier ) )
+    if (!ReadString(in, token.identifier))
         return false;
-    if( ! ReadString( in, token.displayName ) )
+    if (! ReadString(in, token.displayName))
         return false;
-    if( !ReadString( in, token.scopeName ) )
+    if (!ReadString(in, token.scopeName))
         return false;
-    if( !ReadInt( in, val ) )
+    if (!ReadInt(in, val))
         return false;
     token.tokenHash = val;
     return true;
@@ -220,13 +212,13 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
     int i;
     wxMutexLocker l(db.m_Mutex);
     int cnt = db.m_pFileEntries->GetCount();
-    WriteInt( out, cnt );
-    for ( i=0; i<cnt; ++i )
+    WriteInt(out, cnt);
+    for (i = 0; i < cnt; ++i)
     {
-        ClFilenameEntry entry = db.m_pFileEntries->GetValue( (ClFileId)i );
-        if ( !WriteString( out, entry.filename.mb_str() ) )
+        ClFilenameEntry entry = db.m_pFileEntries->GetValue((ClFileId)i);
+        if (!WriteString(out, entry.filename.mb_str()))
             return false;
-        if ( !WriteLongLong( out, entry.timestamp.GetValue().GetValue() ) )
+        if (!WriteLongLong(out, entry.timestamp.GetValue().GetValue()))
             return false;
     }
     return true;
@@ -244,17 +236,17 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
     int i;
     wxMutexLocker l(db.m_Mutex);
     int packetCount = 0;
-    if( !ReadInt(in, packetCount) )
+    if (!ReadInt(in, packetCount))
         return false;
-    for (i=0; i<packetCount; ++i)
+    for (i = 0; i < packetCount; ++i)
     {
         wxString filename;
-        if( ! ReadString(in, filename) )
+        if (!ReadString(in, filename))
             return false;
         long long ts = 0;
-        if( ! ReadLongLong(in, ts) )
+        if (!ReadLongLong(in, ts))
             return false;
-        db.m_pFileEntries->Insert( filename, ClFilenameEntry(filename, wxDateTime(wxLongLong(ts) ) ) );
+        db.m_pFileEntries->Insert(filename, ClFilenameEntry(filename, wxDateTime(wxLongLong(ts))));
     }
     return true;
 }
@@ -291,14 +283,14 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
  */
 wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
 
     assert(m_pFileEntries->HasValue(fId));
 
     ClFilenameEntry entry = m_pFileEntries->GetValue(fId);
     const wxChar* val = entry.filename.c_str();
-    if (val == NULL)
-        return wxString();
+    if (val == nullptr)
+        return wxEmptyString;
 
     return wxString(val);
 }
@@ -312,7 +304,7 @@ wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
  */
 const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) const
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
 
     assert(m_pFileEntries->HasValue(fId));
 
@@ -329,7 +321,7 @@ const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) 
  */
 void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDateTime& timestamp )
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
 
     assert(m_pFileEntries->HasValue(fId));
 
@@ -337,7 +329,7 @@ void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDa
     entryRef.timestamp = timestamp;
 }
 
-ClTokenDatabase::ClTokenDatabase( ClFilenameDatabase& fileDB) :
+ClTokenDatabase::ClTokenDatabase(ClFilenameDatabase& fileDB) :
         m_FileDB(fileDB),
         m_pTokens(new ClTreeMap<ClAbstractToken>()),
         m_pFileTokens(new ClTreeMap<int>()),
@@ -396,43 +388,43 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
  */
 bool ClTokenDatabase::ReadIn( ClTokenDatabase& tokenDatabase, wxInputStream& in )
 {
-    in.SeekI( 4 ); // Magic number
+    in.SeekI(4); // Magic number
     int version = 0;
-    if( !ReadInt(in, version) )
+    if (!ReadInt(in, version))
         return false;
     int i = 0;
-    if( version != 0x01 )
+    if (version != 0x01)
     {
         return false;
     }
     tokenDatabase.Clear();
     int read_count = 0;
 
-    wxMutexLocker( tokenDatabase.m_Mutex );
-    while( in.CanRead() )
+    wxMutexLocker(tokenDatabase.m_Mutex);
+    while (in.CanRead())
     {
         int packetType = 0;
-        if( !ReadInt(in, packetType) )
+        if (!ReadInt(in, packetType))
             return false;
-        switch(packetType)
+        switch (packetType)
         {
         case ClTokenPacketType_filenames:
-            if( ! ClFilenameDatabase::ReadIn( tokenDatabase.m_FileDB, in ) )
+            if (!ClFilenameDatabase::ReadIn(tokenDatabase.m_FileDB, in))
                 return false;
             break;
         case ClTokenPacketType_tokens:
             int packetCount = 0;
-            if( !ReadInt(in, packetCount) )
+            if (!ReadInt(in, packetCount))
                 return false;
-            for (i=0; i<packetCount; ++i)
+            for (i = 0; i < packetCount; ++i)
             {
                 ClAbstractToken token;
-                if( ! ClAbstractToken::ReadIn( token, in ) )
+                if (!ClAbstractToken::ReadIn(token, in))
                     return false;
-                if( token.fileId != -1 )
+                if (token.fileId != -1)
                 {
                     //ClTokenId tokId =
-                    tokenDatabase.InsertToken( token );
+                    tokenDatabase.InsertToken(token);
                     //fprintf( stdout, " '%s' / '%s' / fId=%d location=%d:%d hash=%d dbEntryId=%d\n", (const char*)token.identifier.mb_str(), (const char*)token.displayName.mbc_str(), token.fileId, token.location.line, token.location.column,  token.tokenHash, tokId );
                     read_count++;
                 }
@@ -454,24 +446,24 @@ bool ClTokenDatabase::WriteOut( const ClTokenDatabase& tokenDatabase, wxOutputSt
 {
     int i;
     int cnt;
-    out.Write( "CbCc", 4 ); // Magic number
-    WriteInt( out, 1 ); // Version number
+    out.Write("CbCc", 4); // Magic number
+    WriteInt(out, 1); // Version number
 
-    WriteInt( out, ClTokenPacketType_filenames );
-    if( !ClFilenameDatabase::WriteOut( tokenDatabase.m_FileDB, out ) )
+    WriteInt(out, ClTokenPacketType_filenames);
+    if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
         return false;
 
-    wxMutexLocker( tokenDatabase.m_Mutex );
+    wxMutexLocker(tokenDatabase.m_Mutex);
 
-    WriteInt( out, ClTokenPacketType_tokens );
+    WriteInt(out, ClTokenPacketType_tokens);
     cnt = tokenDatabase.m_pTokens->GetCount();
 
-    WriteInt( out, cnt );
+    WriteInt(out, cnt);
     uint32_t written_count = 0;
-    for( i=0; i<cnt; ++i )
+    for (i = 0; i < cnt; ++i)
     {
-        ClAbstractToken tok = tokenDatabase.m_pTokens->GetValue( i );
-        if( !ClAbstractToken::WriteOut( tok, out ) )
+        ClAbstractToken tok = tokenDatabase.m_pTokens->GetValue(i);
+        if (!ClAbstractToken::WriteOut(tok, out))
             return false;
         written_count++;
     }
@@ -555,7 +547,7 @@ ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
  */
 ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId fileId, ClTokenType tokenType, unsigned tokenHash ) const
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
     std::vector<int> ids = m_pTokens->GetIdSet(identifier);
     for (std::vector<int>::const_iterator itr = ids.begin();
             itr != ids.end(); ++itr)
@@ -563,8 +555,13 @@ ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId file
         if (m_pTokens->HasValue(*itr))
         {
             ClAbstractToken tok = m_pTokens->GetValue(*itr);
-            if ( (tok.tokenHash == tokenHash)&&((tok.tokenType == tokenType)||(tokenType == ClTokenType_Unknown))&&((tok.fileId == fileId)||(fileId == wxNOT_FOUND)) )
+            if (   (tok.tokenHash == tokenHash)
+                && ((tok.tokenType == tokenType) || (tokenType == ClTokenType_Unknown))
+                && ((tok.fileId == fileId) || (fileId == wxNOT_FOUND)) )
+            {
+
                 return *itr;
+            }
         }
     }
     return wxNOT_FOUND;
@@ -579,8 +576,8 @@ ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId file
  */
 ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
 {
-    wxMutexLocker lock( m_Mutex);
-    assert( m_pTokens->HasValue(tId) );
+    wxMutexLocker lock(m_Mutex);
+    assert(m_pTokens->HasValue(tId));
     return m_pTokens->GetValue(tId);
 }
 
@@ -592,7 +589,7 @@ ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
  */
 std::vector<ClTokenId> ClTokenDatabase::GetTokenMatches(const wxString& identifier) const
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
     return m_pTokens->GetIdSet(identifier);
 }
 
@@ -604,7 +601,7 @@ std::vector<ClTokenId> ClTokenDatabase::GetTokenMatches(const wxString& identifi
  */
 std::vector<ClTokenId> ClTokenDatabase::GetFileTokens(const ClFileId fId) const
 {
-    wxMutexLocker lock( m_Mutex);
+    wxMutexLocker lock(m_Mutex);
     wxString key = wxString::Format(wxT("%d"), fId);
     std::vector<ClTokenId> tokens = m_pFileTokens->GetIdSet(key);
 
@@ -632,8 +629,8 @@ void ClTokenDatabase::Shrink()
 void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstractToken& token )
 {
     ClAbstractToken tokenRef = m_pTokens->GetValue(freeTokenId);
-    m_pTokens->RemoveIdKey( tokenRef.identifier, freeTokenId );
-    assert( (tokenRef.fileId == wxNOT_FOUND)&&"Only an unused token can be updated");
+    m_pTokens->RemoveIdKey(tokenRef.identifier, freeTokenId);
+    assert((tokenRef.fileId == wxNOT_FOUND) && "Only an unused token can be updated");
     tokenRef.displayName = token.displayName;
     tokenRef.fileId = token.fileId;
     tokenRef.identifier = token.identifier;
@@ -654,12 +651,12 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
  */
 void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 {
-    ClAbstractToken oldToken = GetToken( tokenId );
+    ClAbstractToken oldToken = GetToken(tokenId);
     wxString key = wxString::Format(wxT("%d"), oldToken.fileId);
-    m_pFileTokens->Remove( key, tokenId );
+    m_pFileTokens->Remove(key, tokenId);
     ClAbstractToken t;
     // We just invalidate it here. Real removal is rather complex
-    UpdateToken( tokenId, t );
+    UpdateToken(tokenId, t);
 }
 
 /** @brief Update the tokendatabase with data from another token database
@@ -678,23 +675,23 @@ void ClTokenDatabase::Update( const ClFileId fileId, const ClTokenDatabase& db )
     wxFileName fln(filename);
     wxDateTime timestamp = fln.GetModificationTime();
     {
-        wxMutexLocker lock( m_Mutex);
-        oldTokenIds = GetFileTokens( fileId );
+        wxMutexLocker lock(m_Mutex);
+        oldTokenIds = GetFileTokens(fileId);
         int cnt = db.m_pTokens->GetCount();
-        for (i=0; i<cnt; ++i)
+        for (i = 0; i < cnt; ++i)
         {
             ClAbstractToken tok = db.m_pTokens->GetValue(i);
             ClTokenId tokId = InsertToken(tok);
-            for( std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end();  ++it)
+            for(std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end(); ++it)
             {
-                if( *it == tokId )
+                if (*it == tokId)
                 {
-                    it = oldTokenIds.erase( it );
+                    it = oldTokenIds.erase(it);
                     break;
                 }
             }
         }
-        for( std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end();  ++it)
+        for (std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end(); ++it)
         {
             ClAbstractToken tok = db.m_pTokens->GetValue(*it);
             CCLogger::Get()->DebugLog(F(_T("Removing token %s/%s type=%d from database, "), (const char*)tok.displayName.mb_str(), (const char*)filename.mb_str(), (int)tok.tokenType));

@@ -119,31 +119,34 @@ public:
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(0,0) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+                const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(pos),
         m_GetOccurrencesResults(occurrences) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+                const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(pos),
         m_GetCodeCompletionResults(completions) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+                const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(loc),
         m_DiagnosticResults(diag) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, const wxString& documentation ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+                const ClTokenPosition& loc, const wxString& documentation ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
         m_Location(loc),
         m_DocumentationResults(documentation) {}
-
 
     /** @brief Copy constructor
      *
@@ -214,25 +217,32 @@ public:
     virtual ~IClangPlugin() {};
 
     virtual bool IsProviderFor(cbEditor* ed) = 0;
-    virtual ClTranslUnitId GetTranslationUnitId( const wxString& filename ) = 0;
-    virtual const wxImageList& GetImageList( const ClTranslUnitId id ) = 0;
-    virtual const wxStringVec& GetKeywords( const ClTranslUnitId id ) = 0;
+    virtual ClTranslUnitId GetTranslationUnitId(const wxString& filename) = 0;
+    virtual const wxImageList& GetImageList(const ClTranslUnitId id) = 0;
+    virtual const wxStringVec& GetKeywords(const ClTranslUnitId id) = 0;
     /* Events  */
-    virtual void RegisterEventSink( wxEventType, IEventFunctorBase<ClangEvent>* functor) = 0;
+    virtual void RegisterEventSink(wxEventType, IEventFunctorBase<ClangEvent>* functor) = 0;
     virtual void RemoveAllEventSinksFor(void* owner) = 0;
 
     /** Request reparsing of a Translation unit */
     virtual void RequestReparse(const ClTranslUnitId id, const wxString& filename) = 0;
     /** Retrieve unction scope */
-    virtual std::pair<wxString,wxString>    GetFunctionScopeAt( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location ) = 0;
-    virtual ClTokenPosition                 GetFunctionScopeLocation( const ClTranslUnitId id, const wxString& filename, const wxString& scope, const wxString& functioname) = 0;
-    virtual void                            GetFunctionScopes( const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes  ) = 0;
+    virtual std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
+                                                             const ClTokenPosition& location) = 0;
+    virtual ClTokenPosition GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
+                                                     const wxString& scope, const wxString& functioname) = 0;
+    virtual void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
+                                   std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
     /** Occurrences highlighting */
-    virtual wxCondError                     GetOccurrencesOf( const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc, unsigned long timeout, std::vector< std::pair<int, int> >& out_occurrences ) = 0;
+    virtual wxCondError GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc,
+                                         unsigned long timeout, std::vector< std::pair<int, int> >& out_occurrences) = 0;
     /* Code completion */
-    virtual wxCondError                     GetCodeCompletionAt( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc, bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
-    virtual wxString                        GetCodeCompletionTokenDocumentation( const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location, ClTokenId tokenId ) = 0;
-    virtual wxString                        GetCodeCompletionInsertSuffix( const ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets ) = 0;
+    virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
+                                            bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
+    virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,
+                                                         const ClTokenPosition& location, ClTokenId tokenId) = 0;
+    virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
+                                                   std::vector< std::pair<int, int> >& offsets) = 0;
 };
 
 /** @brief Base class for ClangPlugin components.
@@ -248,7 +258,7 @@ public:
     {
         m_pClangPlugin = pClangPlugin;
     }
-    virtual void OnRelease( IClangPlugin */*pClangPlugin*/ )
+    virtual void OnRelease(IClangPlugin* WXUNUSED(pClangPlugin))
     {
         m_pClangPlugin = NULL;
     }
@@ -256,27 +266,28 @@ public:
     {
         return m_pClangPlugin != NULL;
     }
-    virtual bool BuildToolBar(wxToolBar* /*toolBar*/)
+    virtual bool BuildToolBar(wxToolBar* WXUNUSED(toolBar))
     {
         return false;
     }
-    virtual void BuildMenu(wxMenuBar* /*menuBar*/) {}
+    virtual void BuildMenu(wxMenuBar* WXUNUSED(menuBar)) {}
     // Does this plugin handle code completion for the editor ed?
-    virtual cbCodeCompletionPlugin::CCProviderStatus GetProviderStatusFor(cbEditor* /*ed*/)
+    virtual cbCodeCompletionPlugin::CCProviderStatus GetProviderStatusFor(cbEditor* WXUNUSED(ed))
     {
         return cbCodeCompletionPlugin::ccpsInactive;
     }
     // Request code completion
-    virtual std::vector<cbCodeCompletionPlugin::CCToken> GetAutocompList(bool /*isAuto*/, cbEditor* /*ed*/, int& /*tknStart*/, int& /*tknEnd*/)
+    virtual std::vector<cbCodeCompletionPlugin::CCToken> GetAutocompList(bool WXUNUSED(isAuto), cbEditor* WXUNUSED(ed),
+                                                                         int& WXUNUSED(tknStart), int& WXUNUSED(tknEnd))
     {
         return std::vector<cbCodeCompletionPlugin::CCToken>();
     }
-    virtual bool DoAutocomplete( const cbCodeCompletionPlugin::CCToken& /*token*/, cbEditor* /*ed*/)
+    virtual bool DoAutocomplete(const cbCodeCompletionPlugin::CCToken& WXUNUSED(token), cbEditor* WXUNUSED(ed))
     {
         return false;
     }
 
-    virtual wxString GetDocumentation( const cbCodeCompletionPlugin::CCToken& /*token*/ )
+    virtual wxString GetDocumentation(const cbCodeCompletionPlugin::CCToken& WXUNUSED(token))
     {
         return wxEmptyString;
     }

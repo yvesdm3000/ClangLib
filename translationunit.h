@@ -13,8 +13,8 @@ unsigned HashToken(CXCompletionString token, wxString& identifier);
 class ClTranslationUnit
 {
 public:
-    ClTranslationUnit( const ClTranslUnitId id );
-    ClTranslationUnit( const ClTranslUnitId id, CXIndex clIndex );
+    ClTranslationUnit(const ClTranslUnitId id);
+    ClTranslationUnit(const ClTranslUnitId id, CXIndex clIndex);
     // move ctor
 #if __cplusplus >= 201103L
     ClTranslationUnit(ClTranslationUnit&& other);
@@ -87,13 +87,13 @@ public:
     CXCursor GetTokenAt(const wxString& filename, const ClTokenPosition& location);
     void Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
                 const std::map<wxString, wxString>& unsavedFiles );
-    void Reparse( const std::map<wxString, wxString>& unsavedFiles );
-    void UpdateTokenDatabase( ClTokenDatabase* pDatabase );
+    void Reparse(const std::map<wxString, wxString>& unsavedFiles);
+    void UpdateTokenDatabase(ClTokenDatabase* pDatabase);
 
-    void GetDiagnostics( const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
+    void GetDiagnostics(const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const wxString& filename) const;
     void ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
-    void ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& diagnostics );
+    void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
 
 private:
     ClTranslUnitId m_Id;
