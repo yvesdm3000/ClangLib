@@ -267,6 +267,7 @@ static wxString GetActualName(const wxString& name)
 
 std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompList(bool isAuto, cbEditor* ed, int& tknStart, int& tknEnd)
 {
+    CCLogger::Get()->DebugLog( wxT("ClangCodeCompletion::GetAutocompList") );
     std::vector<cbCodeCompletionPlugin::CCToken> tokens;
 
     ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
@@ -396,6 +397,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         tknResults = m_CCOutstandingResults;
     }
     m_CCOutstanding = 0;
+    CCLogger::Get()->DebugLog( wxT("Converting CC results in CCTokens") );
     if (prefix.Length() > 3) // larger context, match the prefix at any point in the token
     {
         for (std::vector<ClToken>::const_iterator tknIt = tknResults.begin();
@@ -459,6 +461,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         // values (higher numbers) to reduce the total number of weights used.
         if (usedWeights.size() > 3)
         {
+            CCLogger::Get()->DebugLog( wxT("Recalculating weights") );
             std::vector<int> weightsVec(usedWeights.begin(), usedWeights.end());
             std::map<int, int> weightCompr;
             weightCompr[weightsVec[0]] = weightsVec[0];
