@@ -700,6 +700,9 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     const int evId = event.GetId();
     if ( evId == idReparseTimer )
     {
+        cbStyledTextCtrl* stc = ed->GetControl();
+        if (stc->AutoCompActive() )
+            return;
         RequestReparse( m_TranslUnitId, ed->GetFilename() );
     }
 }
@@ -1095,6 +1098,7 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     //CCLogger::Get()->Log( wxT("OnEditorHook") );
     if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
     {
+        m_ReparseTimer.Stop();
         const int pos = stc->GetCurrentPos();
         const int line = stc->LineFromPosition(pos);
         if ( (m_LastModifyLine != -1)&&(line != m_LastModifyLine) )
