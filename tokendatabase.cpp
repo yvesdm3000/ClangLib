@@ -659,6 +659,11 @@ void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
     UpdateToken(tokenId, t);
 }
 
+unsigned long ClTokenDatabase::GetTokenCount()
+{
+    return m_pTokens->GetCount();
+}
+
 /** @brief Update the tokendatabase with data from another token database
  *
  * @param fileId const ClFileId

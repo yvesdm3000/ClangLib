@@ -1756,6 +1756,7 @@ void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const wxString& /*c
  */
 void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
 {
+    return;
     if (translUnitId < 0 )
         return;
     ClTranslationUnit tu(translUnitId);
@@ -1768,6 +1769,7 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
     if ( tu.IsValid() )
     {
         tu.UpdateTokenDatabase( &m_Database );
+        CCLogger::Get()->DebugLog( F(wxT("Token count: %d"), m_Database.GetTokenCount() ) );
     }
     {
         wxMutexLocker lock(m_Mutex);

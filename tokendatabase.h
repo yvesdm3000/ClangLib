@@ -109,6 +109,7 @@ public:
      * Updates the data from the argument into the database. This invalidates any token previously present in the database, replacing it by the matching token from the merged-in database.
      */
     void Update(const ClFileId fileId, const ClTokenDatabase& db);
+    unsigned long GetTokenCount();
 private:
     void UpdateToken(const ClTokenId tokenId, const ClAbstractToken& token);
 private:
