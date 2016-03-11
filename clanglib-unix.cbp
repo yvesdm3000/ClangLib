@@ -7,9 +7,8 @@
 		<Option default_target="ClangLib" />
 		<Option compiler="gcc" />
 		<Build>
-			<Target title="ClangLib">
-				<Option output="/home/yves/codeblocks-svn/lib/codeblocks/plugins/libclanglib" prefix_auto="0" extension_auto="1" />
-				<Option working_dir="/home/yves/codeblocks-svn" />
+			<Target title="Release">
+				<Option output="Release/libclanglib" prefix_auto="0" extension_auto="1" />
 				<Option object_output=".objs/plugins/clanglib" />
 				<Option type="3" />
 				<Option compiler="gcc" />
@@ -18,25 +17,35 @@
 				<Option run_host_application_in_terminal="0" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
-					<Add option="$(#CB_RELEASE_TYPE)" />
-					<Add option="`wx-config --cflags`" />
-					<Add option="-I`llvm-config --includedir`" />
-					<Add option="-fmessage-length=0" />
-					<Add option="-fexceptions" />
-					<Add option="-Winvalid-pch" />
-					<Add option="-fPIC" />
-					<Add option="-pthread" />
 					<Add option="-DBUILDING_PLUGIN" />
 					<Add directory="." />
 					<Add directory="../codeblocks-1510/src/include" />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="zip -j9 /home/yves/codeblocks-1510/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
+				</ExtraCommands>
+			</Target>
+			<Target title="Debug">
+				<Option output="Debug/libclanglib" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/plugins/clanglib" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option parameters="--debug-log --multiple-instance -ns -ni -v -p debug" />
+				<Option host_application="./codeblocks" />
+				<Option run_host_application_in_terminal="0" />
+				<Option projectCompilerOptionsRelation="2" />
+				<Compiler>
+					<Add option="-DBUILDING_PLUGIN" />
+					<Add directory="." />
+					<Add directory="../codeblocks-1510/src/include" />
+				</Compiler>
+				<ExtraCommands>
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
 				</ExtraCommands>
 			</Target>
 		</Build>
 		<VirtualTargets>
-			<Add alias="All" targets="ClangLib;" />
+			<Add alias="All" targets="Release;" />
 		</VirtualTargets>
 		<Compiler>
 			<Add option="-O3" />
@@ -55,8 +64,8 @@
 			<Add option="-DcbDEBUG" />
 			<Add option="-DCB_PRECOMP" />
 			<Add option="-DWX_PRECOMP" />
-			<Add directory="../codeblocks_svn/src/include" />
-			<Add directory="../codeblocks_svn/src/sdk/wxscintilla/include" />
+			<Add directory="../codeblocks-16.01.release/src/include" />
+			<Add directory="../codeblocks-16.01.release/src/sdk/wxscintilla/include" />
 		</Compiler>
 		<Linker>
 			<Add option="`wx-config --libs`" />
@@ -64,7 +73,7 @@
 			<Add option="-Wl,--no-undefined" />
 			<Add library="codeblocks" />
 			<Add library="clang" />
-			<Add directory="/home/yves/codeblocks-svn/lib" />
+			<Add directory="/home/ydemuyte/codeblocks-16.01/lib" />
 		</Linker>
 		<Unit filename="README.md">
 			<Option target="&lt;{~None~}&gt;" />
