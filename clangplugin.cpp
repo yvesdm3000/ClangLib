@@ -1016,8 +1016,17 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
     ClangProxy::CreateTranslationUnitJob* pJob = static_cast<ClangProxy::CreateTranslationUnitJob*>(event.GetEventObject());
     if (!pJob)
         return;
-    ClangEvent evt(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFilename());
+    if (m_TranslUnitId == pJob->GetTranslationUnitId())
+    {
+        CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );
+        return;
+    }
+    ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
+    m_Proxy.AppendPendingJob(updateDbJob);
+    ClangEvent evt(clEVT_TRANSLATIONUNIT_CREATED, pJob->GetTranslationUnitId(), pJob->GetFilename());
     ProcessEvent(evt);
+    ClangEvent evt2(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFilename());
+    ProcessEvent(evt2);
     if (pJob->GetFilename() != ed->GetFilename())
         return;
 
@@ -1054,11 +1063,15 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 
     if (!IsProviderFor(ed))
         return;
-    cbStyledTextCtrl* stc = ed->GetControl();
-    //CCLogger::Get()->Log( wxT("OnEditorHook") );
-    if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
+    if (m_ReparseTimer.IsRunning())
     {
         m_ReparseTimer.Stop();
+        RequestReparse();
+        return;
+    }
+    if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
+    {
+        cbStyledTextCtrl* stc = ed->GetControl();
         const int pos = stc->GetCurrentPos();
         const int line = stc->LineFromPosition(pos);
         if ((m_LastModifyLine != -1) && (line != m_LastModifyLine))
@@ -1142,34 +1155,15 @@ std::pair<wxString,wxString> ClangPlugin::GetFunctionScopeAt(const ClTranslUnitI
     return std::make_pair(scope,func);
 }
 
-ClTokenPosition ClangPlugin::GetFunctionScopeLocation(const ClTranslUnitId WXUNUSED(id), const wxString& filename,
-                                                      const wxString& scope, const wxString& functioname)
+void ClangPlugin::GetFunctionScopeLocation(const ClTranslUnitId translUnitId, const wxString& filename,
+                                                      const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Location)
 {
-    ClFileId fId = m_Database.GetFilenameId(filename);
-    std::vector<ClTokenId> tokenIdList = m_Database.GetFileTokens(fId);
-    for (std::vector<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
-    {
-        ClAbstractToken token = m_Database.GetToken(*it);
-        if ((token.scopeName == scope)&&(token.displayName == functioname))
-        {
-            return token.location;
-        }
-    }
-    return ClTokenPosition(0,0);
+    m_Proxy.GetFunctionScopeLocation(translUnitId, filename, scopeName, functionName, out_Location);
 }
 
-void ClangPlugin::GetFunctionScopes(const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes)
+void ClangPlugin::GetFunctionScopes(const ClTranslUnitId translUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes)
 {
-    ClFileId fId = m_Database.GetFilenameId(filename);
-    std::vector<ClTokenId> tokenIdList = m_Database.GetFileTokens(fId);
-    for (std::vector<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
-    {
-        ClAbstractToken token = m_Database.GetToken(*it);
-        if (token.tokenType == ClTokenType_FuncDecl)
-        {
-            out_scopes.push_back(std::make_pair(token.scopeName, token.displayName));
-        }
-    }
+    m_Proxy.GetFunctionScopes( translUnitId, filename, out_scopes );
 }
 
 wxCondError ClangPlugin::GetOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc,

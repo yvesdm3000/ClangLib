@@ -7,8 +7,26 @@
 #include "tokendatabase.h"
 
 #include <map>
+#include <algorithm>
+
 
 unsigned HashToken(CXCompletionString token, wxString& identifier);
+
+struct ClFunctionScope
+{
+    ClFunctionScope( const wxString& l_functionName, const wxString& l_scopeName, const ClTokenPosition& l_startLocation, ClFileId l_fileId) :
+        functionName(l_functionName),
+        scopeName(l_scopeName),
+        startLocation(l_startLocation),
+        fileId(l_fileId)
+    {}
+    wxString functionName;
+    wxString scopeName;
+    ClTokenPosition startLocation;
+    ClFileId fileId;
+};
+
+typedef std::vector<ClFunctionScope> ClFunctionScopeList;
 
 class ClTranslationUnit
 {
@@ -44,14 +62,17 @@ public:
         swap(first.m_LastPos.line, second.m_LastPos.line);
         swap(first.m_LastPos.column, second.m_LastPos.column);
         swap(first.m_LastParsed, second.m_LastParsed);
+        swap(first.m_FunctionScopes, second.m_FunctionScopes);
     }
     bool UsesClangIndex( const CXIndex& idx )
     {
         return idx == m_ClIndex;
     }
 
-    void AddInclude(ClFileId fId);
-    bool Contains(ClFileId fId);
+    bool Contains(ClFileId fId)
+    {
+        return std::binary_search(m_Files.begin(), m_Files.end(), fId);
+    }
     int GetFileId() const
     {
         return m_FileId;
@@ -88,13 +109,16 @@ public:
     void Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
                 const std::map<wxString, wxString>& unsavedFiles );
     void Reparse(const std::map<wxString, wxString>& unsavedFiles);
-    void UpdateTokenDatabase(ClTokenDatabase* pDatabase);
+    void ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_fileList, ClFunctionScopeList& out_functionScopes) const;
 
     void GetDiagnostics(const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const wxString& filename) const;
     void ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
 
+    void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; }
+    void SetFunctionScopes( const ClFunctionScopeList& functionScopes ){ m_FunctionScopes = functionScopes; }
+    void GetFunctionScopes( ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes; }
 private:
     ClTranslUnitId m_Id;
     ClFileId m_FileId; ///< The file that triggered the creation of this TU
@@ -124,6 +148,7 @@ private:
     } m_LastPos;
     bool m_Occupied; // Sentinel flag
     wxDateTime m_LastParsed; // Timestamp when the file was last parsed
+    ClFunctionScopeList m_FunctionScopes;
 };
 
 #endif // TRANSLATION_UNIT_H

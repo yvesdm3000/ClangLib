@@ -185,8 +185,8 @@ public: // IClangPlugin
     void RequestReparse(const ClTranslUnitId id, const wxString& filename);
     std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
                                                      const ClTokenPosition& location);
-    ClTokenPosition GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
-                                             const wxString& scope, const wxString& functioname);
+    void GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
+                                             const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location);
     void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                            std::vector<std::pair<wxString, wxString> >& out_scopes);
     wxCondError GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc,

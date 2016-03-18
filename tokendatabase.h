@@ -15,13 +15,12 @@ typedef int ClFileId;
 struct ClAbstractToken
 {
     ClAbstractToken() :
-        tokenType(ClTokenType_Unknown), fileId(-1), location(ClTokenPosition( 0, 0 )), identifier(), displayName(), scopeName(), tokenHash(0) {}
-    ClAbstractToken(ClTokenType typ, ClFileId fId, ClTokenPosition loc, wxString name, wxString _displayName, wxString _scopeName, unsigned tknHash) :
-        tokenType(typ), fileId(fId), location(loc), identifier(name), displayName(_displayName.c_str()), scopeName(_scopeName.c_str()), tokenHash(tknHash) {}
+        tokenType(ClTokenType_Unknown), fileId(-1), location(ClTokenPosition( 0, 0 )), identifier(), tokenHash(0) {}
+    ClAbstractToken(ClTokenType typ, ClFileId fId, ClTokenPosition loc, wxString name, unsigned tknHash) :
+        tokenType(typ), fileId(fId), location(loc), identifier(name), tokenHash(tknHash) {}
     ClAbstractToken( const ClAbstractToken& other ) :
         tokenType(other.tokenType), fileId(other.fileId), location(other.location),
-        identifier(other.identifier), displayName( other.displayName.c_str()),
-        scopeName(other.scopeName.c_str()), tokenHash(other.tokenHash) {}
+        identifier(other.identifier), tokenHash(other.tokenHash) {}
 
     static bool ReadIn(ClAbstractToken& token, wxInputStream& in);
     static bool WriteOut(const ClAbstractToken& token,  wxOutputStream& out);
@@ -30,8 +29,6 @@ struct ClAbstractToken
     ClFileId fileId;
     ClTokenPosition location;
     wxString identifier;
-    wxString displayName;
-    wxString scopeName;
     unsigned tokenHash;
 };
 

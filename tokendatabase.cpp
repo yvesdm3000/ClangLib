@@ -148,8 +148,6 @@ bool ClAbstractToken::WriteOut( const ClAbstractToken& token,  wxOutputStream& o
     WriteInt(out, token.location.line);
     WriteInt(out, token.location.column);
     WriteString(out, token.identifier.mb_str());
-    WriteString(out, token.displayName.mb_str());
-    WriteString(out, token.scopeName.mb_str());
     WriteInt(out, token.tokenHash);
     return true;
 }
@@ -177,10 +175,6 @@ bool ClAbstractToken::ReadIn( ClAbstractToken& token, wxInputStream& in )
         return false;
     token.location.column = val;
     if (!ReadString(in, token.identifier))
-        return false;
-    if (! ReadString(in, token.displayName))
-        return false;
-    if (!ReadString(in, token.scopeName))
         return false;
     if (!ReadInt(in, val))
         return false;
@@ -631,11 +625,9 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
     ClAbstractToken tokenRef = m_pTokens->GetValue(freeTokenId);
     m_pTokens->RemoveIdKey(tokenRef.identifier, freeTokenId);
     assert((tokenRef.fileId == wxNOT_FOUND) && "Only an unused token can be updated");
-    tokenRef.displayName = token.displayName;
     tokenRef.fileId = token.fileId;
     tokenRef.identifier = token.identifier;
     tokenRef.location = token.location;
-    tokenRef.scopeName = token.scopeName;
     tokenRef.tokenHash = token.tokenHash;
     tokenRef.tokenType = token.tokenType;
     wxString filen = wxString::Format(wxT("%d"), token.fileId);
@@ -699,7 +691,7 @@ void ClTokenDatabase::Update( const ClFileId fileId, const ClTokenDatabase& db )
         for (std::vector<ClTokenId>::iterator it = oldTokenIds.begin(); it != oldTokenIds.end(); ++it)
         {
             ClAbstractToken tok = db.m_pTokens->GetValue(*it);
-            CCLogger::Get()->DebugLog(F(_T("Removing token %s/%s type=%d from database, "), (const char*)tok.displayName.mb_str(), (const char*)filename.mb_str(), (int)tok.tokenType));
+            CCLogger::Get()->DebugLog(F(_T("Removing token in %s type=%d from database, "), (const char*)filename.mb_str(), (int)tok.tokenType));
             RemoveToken( *it );
         }
     }

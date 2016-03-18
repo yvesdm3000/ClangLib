@@ -229,8 +229,8 @@ public:
     /** Retrieve unction scope */
     virtual std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
                                                              const ClTokenPosition& location) = 0;
-    virtual ClTokenPosition GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
-                                                     const wxString& scope, const wxString& functioname) = 0;
+    virtual void GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
+                                                     const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location) = 0;
     virtual void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                                    std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
     /** Occurrences highlighting */

@@ -266,7 +266,8 @@ void ClangToolbar::OnFunction( wxCommandEvent& /*evt*/ )
 
     wxString func = m_Function->GetString(m_Function->GetSelection());
     wxString scope = m_Scope->GetString( m_Scope->GetSelection() );
-    ClTokenPosition tokenPos = m_pClangPlugin->GetFunctionScopeLocation(GetCurrentTranslationUnitId(), ed->GetFilename(), scope, func);
+    ClTokenPosition tokenPos(0,0);
+    m_pClangPlugin->GetFunctionScopeLocation(GetCurrentTranslationUnitId(), ed->GetFilename(), scope, func, tokenPos);
     ed->GetControl()->GotoLine(tokenPos.line-1);
 }
 

@@ -961,13 +961,15 @@ protected: // jobs that are run only on the thread
                           std::vector< std::pair<int, int> >& results);
     void RefineTokenType( const ClTranslUnitId translId, int tknId, ClTokenCategory& out_tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
 
-public:
+public: // Tokens
     wxString GetCCInsertSuffix( const  ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
     bool ResolveDeclTokenAt( const ClTranslUnitId translId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location);
     bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location);
 
+public: // Function scopes
     void GetFunctionScopeAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_FunctionName );
-    std::vector<std::pair<wxString, wxString> > GetFunctionScopes( ClTranslUnitId, const wxString& filename );
+    void GetFunctionScopes( const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_Scopes  );
+    void GetFunctionScopeLocation( const ClTranslUnitId id, const wxString& filename, const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Location);
 
 private:
     mutable wxMutex m_Mutex;

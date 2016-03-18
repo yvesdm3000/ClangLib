@@ -1658,66 +1658,116 @@ bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wx
  * @return void
  *
  */
-void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location, wxString &out_ClassName, wxString &out_MethodName )
+void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location, wxString &out_ScopeName, wxString &out_MethodName )
 {
+    ClFileId fileId = m_Database.GetFilenameId(filename);
     if (translUnitId < 0)
     {
-        out_ClassName = wxT("");
+        out_ScopeName = wxT("");
         out_MethodName = wxT("");
         return;
     }
-    wxMutexLocker lock(m_Mutex);
-    if (translUnitId >= (int)m_TranslUnits.size())
+    ClFunctionScopeList functionScopes;
     {
-        out_ClassName = wxT("");
-        out_MethodName = wxT("");
-        return;
-    }
-    CXCursor cursor = m_TranslUnits[translUnitId].GetTokenAt(filename, location);
-    if (clang_Cursor_isNull(cursor))
-    {
-        cursor = clang_getCursorSemanticParent(cursor);
-    }
-
-    wxString className;
-    wxString methodName;
-    CXString str;
-    while ( !clang_Cursor_isNull(cursor) )
-    {
-        switch ( cursor.kind )
+        wxMutexLocker lock(m_Mutex);
+        if (translUnitId >= (int)m_TranslUnits.size())
         {
-        case CXCursor_TypeRef:
-            str = clang_getCursorDisplayName(cursor);
-            methodName = wxString::FromUTF8(clang_getCString(str));
-            clang_disposeString(str);
-            //cursor = clang_getCursorLexicalParent(cursor);
-            //cursor = clang_getCursorReferenced(cursor);
-            cursor = clang_getCursorDefinition(cursor);
-            continue;
-        case CXCursor_StructDecl:
-        case CXCursor_ClassDecl:
-        case CXCursor_ClassTemplate:
-        case CXCursor_ClassTemplatePartialSpecialization:
-            str = clang_getCursorDisplayName(cursor);
-            className = wxString::FromUTF8(clang_getCString(str));
-            clang_disposeString(str);
-            break;
-        case CXCursor_CXXMethod:
-            str = clang_getCursorDisplayName(cursor);
-            methodName = wxString::FromUTF8(clang_getCString(str));
-            clang_disposeString(str);
-            break;
-        default:
-            break;
+            out_ScopeName = wxT("");
+            out_MethodName = wxT("");
+            return;
         }
-        cursor = clang_getCursorSemanticParent(cursor);
-        //if (clang_Cursor_isNull(cursor))
-        //    break;
+        m_TranslUnits[translUnitId].GetFunctionScopes( functionScopes );
     }
-    out_ClassName = className;
-    out_MethodName = methodName;
+    ClFunctionScopeList::const_iterator candidate = functionScopes.end();
+    for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it)
+    {
+        if (it->fileId == fileId)
+        {
+            if (it->startLocation.line <= location.line)
+            {
+                candidate = it;
+            }
+            else if (candidate != functionScopes.end())
+            {
+                break;
+            }
+        }
+    }
+    if (candidate != functionScopes.end())
+    {
+        out_ScopeName = candidate->scopeName;
+        out_MethodName = candidate->functionName;
+        return;
+    }
+    out_ScopeName = wxT("");
+    out_MethodName = wxT("");
 }
 
+
+/** \brief Get the location of a function scope
+ *
+ * \param id First translation unit to find the function scope in
+ * \param fId File id where the function scope is defined
+ * \param scopeName Name of the scope where the function is defined in
+ * \param functionName Name of the function
+ * \param out_Location[out] The returned position where the function is declared. Will be (0,0) when the function declaration is not found.
+ * \return void
+ *
+ */
+void ClangProxy::GetFunctionScopeLocation( const ClTranslUnitId translUnitId, const wxString& filename, const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Location)
+{
+    CCLogger::Get()->DebugLog(F(_T("GetFunctionScopeLocation %d"), translUnitId));
+    ClFileId fId = m_Database.GetFilenameId( filename );
+    if (translUnitId < 0 )
+    {
+        out_Location = ClTokenPosition(0,0);
+        return;
+    }
+    ClFunctionScopeList functionScopes;
+    {
+        wxMutexLocker lock(m_Mutex);
+        if (translUnitId >= (int)m_TranslUnits.size())
+        {
+            out_Location = ClTokenPosition(0,0);
+            return;
+        }
+        m_TranslUnits[translUnitId].GetFunctionScopes(functionScopes);
+    }
+    for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
+    {
+        if( (it->fileId == fId )&&(it->functionName == functionName)&&(it->scopeName == scopeName))
+        {
+            out_Location = it->startLocation;
+            return;
+        }
+    }
+    out_Location = ClTokenPosition(0,0);
+}
+
+void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_Scopes  )
+{
+    if (translUnitId < 0 )
+    {
+        return;
+    }
+    ClFunctionScopeList functionScopes;
+    {
+        wxMutexLocker lock(m_Mutex);
+        if (translUnitId >= (int)m_TranslUnits.size())
+        {
+            return;
+        }
+        m_TranslUnits[translUnitId].GetFunctionScopes(functionScopes);
+    }
+    ClFileId fId = m_Database.GetFilenameId( filename );
+    for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
+    {
+        if( it->fileId == fId)
+        {
+            out_Scopes.push_back( std::make_pair<wxString,wxString>(it->scopeName, it->functionName) );
+        }
+    }
+}
 
 /** @brief Reparse a translation unit
  *
@@ -1756,7 +1806,6 @@ void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const wxString& /*c
  */
 void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
 {
-    return;
     if (translUnitId < 0 )
         return;
     ClTranslationUnit tu(translUnitId);
@@ -1768,8 +1817,14 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
     }
     if ( tu.IsValid() )
     {
-        tu.UpdateTokenDatabase( &m_Database );
-        CCLogger::Get()->DebugLog( F(wxT("Token count: %d"), m_Database.GetTokenCount() ) );
+        std::vector<ClFileId> seenFiles;
+        ClFunctionScopeList functionScopes;
+        tu.ProcessAllTokens( m_Database, seenFiles, functionScopes );
+        tu.SetFiles(seenFiles);
+        tu.SetFunctionScopes(functionScopes);
+        CCLogger::Get()->DebugLog( F(wxT("Total token count: %d, function scopes for TU %d: %d"), (int)m_Database.GetTokenCount(), (int)translUnitId, (int)functionScopes.size() ) );
+    } else {
+        CCLogger::Get()->DebugLog( F(_T("UpdateTokenDatabase: Translation unit is not valid!")) );
     }
     {
         wxMutexLocker lock(m_Mutex);

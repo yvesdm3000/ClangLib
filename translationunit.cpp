@@ -34,6 +34,7 @@ struct ClangVisitorContext
     }
     ClTokenDatabase* database;
     unsigned long long tokenCount;
+    std::vector<ClFunctionScope> functionScopes;
 };
 
 static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion_stack,
@@ -110,19 +111,6 @@ std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
     }
     str<<"]";
     return str;
-}
-
-void ClTranslationUnit::AddInclude(ClFileId fId)
-{
-    m_Files.push_back(fId);
-    //std::cout<<"Added include file id "<<fId<<" to "<<m_Files<<std::endl;
-}
-
-bool ClTranslationUnit::Contains(ClFileId fId)
-{
-    //std::cout<<"Checking file id "<<fId<<" in "<<m_Files<<std::endl;
-    //return std::binary_search(m_Files.begin(), m_Files.begin() + std::min(fId + 1, m_Files.size()), fId);
-    return std::binary_search(m_Files.begin(), m_Files.end(), fId);
 }
 
 CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complete_filename, const ClTokenPosition& complete_location,
@@ -306,26 +294,31 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d finished"), (int)m_Id));
 }
 
-void ClTranslationUnit::UpdateTokenDatabase(ClTokenDatabase* pDatabase)
+void ClTranslationUnit::ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& fileList, ClFunctionScopeList& out_functionScopes) const
 {
     if (m_ClTranslUnit == nullptr)
         return;
-    std::pair<ClTranslationUnit*, ClTokenDatabase*> visitorData = std::make_pair(this, pDatabase);
+    std::pair<std::vector<ClFileId>*, ClTokenDatabase*> visitorData = std::make_pair(&fileList, &database);
     clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
-    //m_FileId = pDatabase->GetFilenameId(filename);
-    m_Files.reserve(1024);
-    m_Files.push_back(m_FileId);
-    std::sort(m_Files.begin(), m_Files.end());
-    std::unique(m_Files.begin(), m_Files.end());
+    //m_Files.reserve(1024);
+    //m_Files.push_back(m_FileId);
+    //std::sort(m_Files.begin(), m_Files.end());
+    //std::unique(m_Files.begin(), m_Files.end());
+    fileList.push_back( m_FileId );
+    std::sort(fileList.begin(), fileList.end());
+    std::unique(fileList.begin(), fileList.end());
 #if __cplusplus >= 201103L
-    m_Files.shrink_to_fit();
+    //m_Files.shrink_to_fit();
+    fileList.schrink_to_fit();
 #else
-    std::vector<ClFileId>(m_Files).swap(m_Files);
+    //std::vector<ClFileId>(m_Files).swap(m_Files);
+    std::vector<ClFileId>(fileList).swap(fileList);
 #endif
-    struct ClangVisitorContext ctx(pDatabase);
+    struct ClangVisitorContext ctx(&database);
     //unsigned rc =
     clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
-    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed"), (int)m_Id, (int)ctx.tokenCount));
+    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed, %d function scopes"), (int)m_Id, (int)ctx.tokenCount, (int)ctx.functionScopes.size()));
+    out_functionScopes = ctx.functionScopes;
 }
 
 void ClTranslationUnit::GetDiagnostics(const wxString& filename,  std::vector<ClDiagnostic>& diagnostics)
@@ -503,9 +496,10 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
     wxFileName inclFile(wxString::FromUTF8(clang_getCString(filename)));
     if (inclFile.MakeAbsolute())
     {
-        std::pair<ClTranslationUnit*, ClTokenDatabase*>* clTranslUnit
-            = static_cast<std::pair<ClTranslationUnit*, ClTokenDatabase*>*>(client_data);
-        clTranslUnit->first->AddInclude(clTranslUnit->second->GetFilenameId(inclFile.GetFullPath()));
+        std::pair<std::vector<ClFileId>*, ClTokenDatabase*>* data = static_cast<std::pair<std::vector<ClFileId>*, ClTokenDatabase*>*>(client_data);
+        ClFileId fileId = data->second->GetFilenameId( inclFile.GetFullPath() );
+        data->first->push_back( fileId );
+        //clTranslUnit->first->AddInclude(clTranslUnit->second->GetFilenameId(inclFile.GetFullPath()));
     }
     clang_disposeString(filename);
 }
@@ -611,9 +605,13 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         }
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
-        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, displayName, scopeName, tokenHash);
+        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, tokenHash);
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
+        if (displayName.Length() > 0)
+        {
+            ctx->functionScopes.push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col), fileId) );
+        }
     }
     return ret;
 }
