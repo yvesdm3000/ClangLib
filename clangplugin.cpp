@@ -927,9 +927,17 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
     return false;
 }
 #endif
-// Don't call this function from within the scope of:
-//      ClangPlugin::OnEditorHook
-//      ClangPlugin::OnTimer
+
+/** \brief Update the cached compile command from CodeBlocks and ClangLib settings
+ * Don't call this function from within the scope of:
+ *      ClangPlugin::OnEditorHook
+ *      ClangPlugin::OnTimer
+ *
+ * \param ed cbEditor*
+ * \return 0 when the compile command has not changed or if another updateCompileCommand is busy (reentry)
+ * \return not 0 when the compile command has changed
+ *
+ */
 int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 {
     wxString compileCommand;
@@ -996,16 +1004,46 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
     }
     compileCommand += GetCompilerInclDirs(comp->GetID());
 
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
+
+    if (cfg->ReadBool( _T("/cmdoption_wnoattributes") ))
+        compileCommand += wxT(" -Wno-attributes ");
+    else
+        compileCommand += wxT(" -Wattributes ");
+
+    if (cfg->ReadBool( _T("/cmdoption_wextratokens") ))
+        compileCommand += wxT(" -Wextra-tokens ");
+    else
+        compileCommand += wxT(" -Wno-extra-tokens ");
+
+    if (cfg->ReadBool( _T("/cmdoption_fparseallcomments") ))
+        compileCommand += wxT(" -fparse-all-comments ");
+
+    wxString extraOptions = cfg->Read(_T("/cmdoption_extra"));
+    if (extraOptions.length() > 0)
+    {
+        extraOptions.Replace( wxT("\r"), wxT(" ") );
+        extraOptions.Replace( wxT("\n"), wxT(" ") );
+        extraOptions.Replace( wxT("\t"), wxT(" ") );
+        compileCommand += wxT(" ") + extraOptions;
+    }
+
     m_UpdateCompileCommand--;
 
     if (compileCommand != m_CompileCommand)
     {
+        CCLogger::Get()->DebugLog( F(_T("New compile command arguments: %s"), compileCommand.c_str()) );
         m_CompileCommand = compileCommand;
         return 1;
     }
     return 0;
 }
 
+/** \brief Event handler called when the Clang thread has finished creating a Translation Unit
+ *
+ * \param event wxEvent&
+ *
+ */
 void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 {
     CCLogger::Get()->DebugLog( wxT("OnClangCreateTUFinished") );

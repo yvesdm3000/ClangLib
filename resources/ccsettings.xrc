@@ -262,7 +262,7 @@
 								</object>
 								<object class="sizeritem">
 									<object class="wxStaticBoxSizer">
-										<label>Options</label>
+										<label>Display options</label>
 										<orient>wxVERTICAL</orient>
 										<object class="sizeritem">
 											<object class="wxCheckBox" name="chkInlineDiagnostics">
@@ -290,6 +290,28 @@
 												<label>Show notes</label>
 											</object>
 											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+									</object>
+									<flag>wxALL|wxEXPAND</flag>
+									<border>8</border>
+								</object>
+								<object class="sizeritem">
+									<object class="wxStaticBoxSizer">
+										<label>Warning options</label>
+										<orient>wxVERTICAL</orient>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkClangOptionNoAttributes">
+												<label>Don't warn on unknown __attribute__ usage [-Wno-attributes]</label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkClangOptionExtraTokens">
+												<label>Warn about excess tokens at the end of a preprocessor directive [-Wextra-tokens]</label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
 											<border>5</border>
 										</object>
 									</object>
@@ -572,7 +594,7 @@
 					</object>
 -->
 					<object class="notebookpage">
-						<object class="wxPanel" name="ID_PANEL1">
+						<object class="wxPanel" name="tabDocumentation">
 							<pos>402,16</pos>
 							<object class="wxBoxSizer">
 								<orient>wxVERTICAL</orient>
@@ -657,6 +679,46 @@
 							</object>
 						</object>
 						<label>Documentation</label>
+					</object>
+					<object class="notebookpage">
+						<object class="wxPanel" name="tabAdvanced">
+							<pos>402,16</pos>
+							<object class="wxBoxSizer">
+								<orient>wxVERTICAL</orient>
+								<object class="sizeritem">
+									<object class="wxCheckBox" name="chkClangOptionParseAllComments">
+										<label>Parse all comments as documentation, not only DoxyGen-style [-fparse-all-comments]</label>
+									</object>
+									<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+									<border>5</border>
+								</object>
+								<object class="sizeritem">
+									<object class="wxFlexGridSizer">
+										<cols>2</cols>
+										<vgap>8</vgap>
+										<hgap>8</hgap>
+										<object class="sizeritem">
+											<object class="wxStaticText" name="ID_STATICTEXT13">
+												<label>Extra options to pass to Clang:</label>
+											</object>
+											<flag>wxALL|wxTOP</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxTextCtrl" name="txtClangExtraOptions">
+												<size>200,50d</size>
+												<style>wxTE_MULTILINE</style>
+												<flag>wxALL|wxEXPAND</flag>
+												<option>1</option>
+											</object>
+											<flag>wxALL|wxEXPAND</flag>
+											<border>5</border>
+										</object>
+									</object>
+								</object>
+							</object>
+						</object>
+						<label>Advanced</label>
 					</object>
 				</object>
 				<flag>wxLEFT|wxEXPAND</flag>

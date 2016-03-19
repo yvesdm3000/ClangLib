@@ -610,6 +610,12 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         ctx->tokenCount++;
         if (displayName.Length() > 0)
         {
+            if (ctx->functionScopes.size() > 0)
+            {
+                // Save some memory
+                if (ctx->functionScopes.back().scopeName.IsSameAs( scopeName ) )
+                    scopeName = ctx->functionScopes.back().scopeName;
+            }
             ctx->functionScopes.push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col), fileId) );
         }
     }

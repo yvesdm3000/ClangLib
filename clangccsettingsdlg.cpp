@@ -120,10 +120,14 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
 
     // Page "Diagnostics"
     XRCCTRL(*this, "chkDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics"),   true));
-    XRCCTRL(*this, "chkInlineDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_inline"),   true));
-    XRCCTRL(*this, "chkDiagnosticWarnings",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_warnings"),   true));
-    XRCCTRL(*this, "chkDiagnosticErrors",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_errors"),   true));
-    XRCCTRL(*this, "chkDiagnosticNotes",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_notes"),   false));
+    XRCCTRL(*this, "chkInlineDiagnostics",      wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_inline"),   true));
+    XRCCTRL(*this, "chkDiagnosticWarnings",     wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_warnings"),   true));
+    XRCCTRL(*this, "chkDiagnosticErrors",       wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_errors"),   true));
+    XRCCTRL(*this, "chkDiagnosticNotes",        wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_notes"),   false));
+
+    XRCCTRL(*this, "chkClangOptionNoAttributes",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wnoattributes"),   false));
+    XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wextratokens"),   false));
+
 
     // Page "C / C++ parser"
     // NOTE (Morten#1#): Keep this in sync with files in the XRC file (settings.xrc) and nativeparser.cpp
@@ -174,6 +178,11 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     XRCCTRL(*this, "btnDocBgColor",         wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_back")));
     XRCCTRL(*this, "btnDocTextColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_fore")));
     XRCCTRL(*this, "btnDocLinkColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_link")));
+
+    // Page "Advanced"
+
+    XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_fparseallcomments"),   false));
+    XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->SetValue(cfg->Read(_T("/cmdoption_extra"),   wxEmptyString ));
 
 //    m_Parser.ParseBuffer(g_SampleClasses, true);
 //    m_Parser.BuildTree(*XRCCTRL(*this, "treeClasses", wxTreeCtrl));
@@ -237,11 +246,30 @@ void ClangSettingsDlg::OnApply()
     //cfg->Write(_T("/browser_tree_members"),     (bool) XRCCTRL(*this, "chkTreeMembers", wxCheckBox)->GetValue());
     //cfg->Write(_T("/scope_filter"),             (bool) XRCCTRL(*this, "chkScopeFilter", wxCheckBox)->GetValue());
 
+    // Page "Diagnostics"
+    cfg->Write(_T("/diagnostics"),              (bool) XRCCTRL(*this, "chkDiagnostics",        wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_inline"),  (bool) XRCCTRL(*this, "chkInlineDiagnostics",  wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_warnings"),(bool) XRCCTRL(*this, "chkDiagnosticWarnings", wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_errors"),  (bool) XRCCTRL(*this, "chkDiagnosticErrors",   wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_show_notes"),   (bool) XRCCTRL(*this, "chkDiagnosticNotes",    wxCheckBox)->GetValue());
+
+    cfg->Write(_T("/cmdoption_wnoattributes"),  (bool) XRCCTRL(*this, "chkClangOptionNoAttributes", wxCheckBox)->GetValue());
+    cfg->Write(_T("/cmdoption_wextratokens"),   (bool) XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->GetValue());
+
     // Page "Documentation"
     //cfg->Write(_T("/use_documentation_helper"), (bool) XRCCTRL(*this, "chkDocumentation", wxCheckBox)->GetValue());
     cfg->Write(_T("/documentation_helper_background_color"), (wxColour) XRCCTRL(*this, "btnDocBgColor",   wxButton)->GetBackgroundColour());
     cfg->Write(_T("/documentation_helper_text_color"),       (wxColour) XRCCTRL(*this, "btnDocTextColor", wxButton)->GetBackgroundColour());
     cfg->Write(_T("/documentation_helper_link_color"),       (wxColour) XRCCTRL(*this, "btnDocLinkColor", wxButton)->GetBackgroundColour());
+
+
+
+    // Page "Advanced"
+
+    cfg->Write(_T("/cmdoption_fparseallcomments"),   (bool) XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->GetValue());
+    cfg->Write(_T("/cmdoption_extra"),               XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->GetValue());
+
+
     // -----------------------------------------------------------------------
     // Handle all options that are being be read by m_Parser.ReadOptions():
     // -----------------------------------------------------------------------
