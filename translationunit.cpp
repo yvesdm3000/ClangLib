@@ -34,7 +34,7 @@ struct ClangVisitorContext
     }
     ClTokenDatabase* database;
     unsigned long long tokenCount;
-    std::vector<ClFunctionScope> functionScopes;
+    ClFunctionScopeMap functionScopes;
 };
 
 static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion_stack,
@@ -205,6 +205,7 @@ void ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
     m_FileId = fileId;
     m_Files.push_back( fileId );
     m_LastParsed = wxDateTime::Now();
+    m_FunctionScopes.clear();
 
     if (filename.length() != 0)
     {
@@ -294,25 +295,25 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d finished"), (int)m_Id));
 }
 
-void ClTranslationUnit::ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& fileList, ClFunctionScopeList& out_functionScopes) const
+void ClTranslationUnit::ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_includeFileList, ClFunctionScopeMap& out_functionScopes) const
 {
     if (m_ClTranslUnit == nullptr)
         return;
-    std::pair<std::vector<ClFileId>*, ClTokenDatabase*> visitorData = std::make_pair(&fileList, &database);
+    std::pair<std::vector<ClFileId>*, ClTokenDatabase*> visitorData = std::make_pair(&out_includeFileList, &database);
     clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
     //m_Files.reserve(1024);
     //m_Files.push_back(m_FileId);
     //std::sort(m_Files.begin(), m_Files.end());
     //std::unique(m_Files.begin(), m_Files.end());
-    fileList.push_back( m_FileId );
-    std::sort(fileList.begin(), fileList.end());
-    std::unique(fileList.begin(), fileList.end());
+    out_includeFileList.push_back( m_FileId );
+    std::sort(out_includeFileList.begin(), out_includeFileList.end());
+    std::unique(out_includeFileList.begin(), out_includeFileList.end());
 #if __cplusplus >= 201103L
     //m_Files.shrink_to_fit();
     fileList.schrink_to_fit();
 #else
     //std::vector<ClFileId>(m_Files).swap(m_Files);
-    std::vector<ClFileId>(fileList).swap(fileList);
+    std::vector<ClFileId>(out_includeFileList).swap(out_includeFileList);
 #endif
     struct ClangVisitorContext ctx(&database);
     //unsigned rc =
@@ -454,6 +455,12 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxStr
         //ExpandDiagnosticSet(clang_getChildDiagnostics(diag), diagnostics);
         clang_disposeDiagnostic(diag);
     }
+}
+
+void ClTranslationUnit::UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList &functionScopes )
+{
+    m_FunctionScopes.erase(fileId);
+    m_FunctionScopes.insert(std::make_pair(fileId, functionScopes));
 }
 
 /** @brief Calculate a hash from a Clang token
@@ -610,13 +617,19 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         ctx->tokenCount++;
         if (displayName.Length() > 0)
         {
-            if (ctx->functionScopes.size() > 0)
+            if (ctx->functionScopes[fileId].size() > 0)
             {
                 // Save some memory
-                if (ctx->functionScopes.back().scopeName.IsSameAs( scopeName ) )
-                    scopeName = ctx->functionScopes.back().scopeName;
+                if (ctx->functionScopes[fileId].back().scopeName.IsSameAs( scopeName ) )
+                {
+                    scopeName = ctx->functionScopes[fileId].back().scopeName;
+                    if (ctx->functionScopes[fileId].back().functionName.IsSameAs( displayName ))
+                    {
+                        return ret; // Duplicate...
+                    }
+                }
             }
-            ctx->functionScopes.push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col), fileId) );
+            ctx->functionScopes[fileId].push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col)) );
         }
     }
     return ret;

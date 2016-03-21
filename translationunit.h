@@ -14,19 +14,18 @@ unsigned HashToken(CXCompletionString token, wxString& identifier);
 
 struct ClFunctionScope
 {
-    ClFunctionScope( const wxString& l_functionName, const wxString& l_scopeName, const ClTokenPosition& l_startLocation, ClFileId l_fileId) :
+    ClFunctionScope( const wxString& l_functionName, const wxString& l_scopeName, const ClTokenPosition& l_startLocation) :
         functionName(l_functionName),
         scopeName(l_scopeName),
-        startLocation(l_startLocation),
-        fileId(l_fileId)
+        startLocation(l_startLocation)
     {}
     wxString functionName;
     wxString scopeName;
     ClTokenPosition startLocation;
-    ClFileId fileId;
 };
 
 typedef std::vector<ClFunctionScope> ClFunctionScopeList;
+typedef std::map<ClFileId, ClFunctionScopeList> ClFunctionScopeMap;
 
 class ClTranslationUnit
 {
@@ -109,7 +108,7 @@ public:
     void Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
                 const std::map<wxString, wxString>& unsavedFiles );
     void Reparse(const std::map<wxString, wxString>& unsavedFiles);
-    void ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_fileList, ClFunctionScopeList& out_functionScopes) const;
+    void ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_includeFileList, ClFunctionScopeMap& out_functionScopes) const;
 
     void GetDiagnostics(const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const wxString& filename) const;
@@ -117,8 +116,8 @@ public:
     void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
 
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; }
-    void SetFunctionScopes( const ClFunctionScopeList& functionScopes ){ m_FunctionScopes = functionScopes; }
-    void GetFunctionScopes( ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes; }
+    void UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList& functionScopes );
+    void GetFunctionScopes( const ClFileId fileId, ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes[fileId]; }
 private:
     ClTranslUnitId m_Id;
     ClFileId m_FileId; ///< The file that triggered the creation of this TU
@@ -148,7 +147,7 @@ private:
     } m_LastPos;
     bool m_Occupied; // Sentinel flag
     wxDateTime m_LastParsed; // Timestamp when the file was last parsed
-    ClFunctionScopeList m_FunctionScopes;
+    ClFunctionScopeMap m_FunctionScopes;
 };
 
 #endif // TRANSLATION_UNIT_H

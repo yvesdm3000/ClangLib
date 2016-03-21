@@ -1676,21 +1676,18 @@ void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wx
             out_MethodName = wxT("");
             return;
         }
-        m_TranslUnits[translUnitId].GetFunctionScopes( functionScopes );
+        m_TranslUnits[translUnitId].GetFunctionScopes( fileId, functionScopes );
     }
     ClFunctionScopeList::const_iterator candidate = functionScopes.end();
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it)
     {
-        if (it->fileId == fileId)
+        if (it->startLocation.line <= location.line)
         {
-            if (it->startLocation.line <= location.line)
-            {
-                candidate = it;
-            }
-            else if (candidate != functionScopes.end())
-            {
-                break;
-            }
+            candidate = it;
+        }
+        else if (candidate != functionScopes.end())
+        {
+            break;
         }
     }
     if (candidate != functionScopes.end())
@@ -1731,11 +1728,11 @@ void ClangProxy::GetFunctionScopeLocation( const ClTranslUnitId translUnitId, co
             out_Location = ClTokenPosition(0,0);
             return;
         }
-        m_TranslUnits[translUnitId].GetFunctionScopes(functionScopes);
+        m_TranslUnits[translUnitId].GetFunctionScopes(fId, functionScopes);
     }
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
     {
-        if( (it->fileId == fId )&&(it->functionName == functionName)&&(it->scopeName == scopeName))
+        if( (it->functionName == functionName)&&(it->scopeName == scopeName))
         {
             out_Location = it->startLocation;
             return;
@@ -1750,6 +1747,7 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
     {
         return;
     }
+    ClFileId fId = m_Database.GetFilenameId( filename );
     ClFunctionScopeList functionScopes;
     {
         wxMutexLocker lock(m_Mutex);
@@ -1757,15 +1755,11 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
         {
             return;
         }
-        m_TranslUnits[translUnitId].GetFunctionScopes(functionScopes);
+        m_TranslUnits[translUnitId].GetFunctionScopes(fId,functionScopes);
     }
-    ClFileId fId = m_Database.GetFilenameId( filename );
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
     {
-        if( it->fileId == fId)
-        {
-            out_Scopes.push_back( std::make_pair<wxString,wxString>(it->scopeName, it->functionName) );
-        }
+        out_Scopes.push_back( std::make_pair<wxString,wxString>(it->scopeName, it->functionName) );
     }
 }
 
@@ -1815,14 +1809,16 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
             return;
         swap(m_TranslUnits[translUnitId], tu);
     }
+
     if ( tu.IsValid() )
     {
-        std::vector<ClFileId> seenFiles;
-        ClFunctionScopeList functionScopes;
-        tu.ProcessAllTokens( m_Database, seenFiles, functionScopes );
-        tu.SetFiles(seenFiles);
-        tu.SetFunctionScopes(functionScopes);
-        CCLogger::Get()->DebugLog( F(wxT("Total token count: %d, function scopes for TU %d: %d"), (int)m_Database.GetTokenCount(), (int)translUnitId, (int)functionScopes.size() ) );
+        std::vector<ClFileId> includeFiles;
+        ClFunctionScopeMap functionScopes;
+        tu.ProcessAllTokens( m_Database, includeFiles, functionScopes );
+        tu.SetFiles(includeFiles);
+        for (ClFunctionScopeMap::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it)
+            tu.UpdateFunctionScopes(it->first, it->second);
+        CCLogger::Get()->DebugLog( F(wxT("Total token count: %d, function scopes for TU %d: %d, files: %d"), (int)m_Database.GetTokenCount(), (int)translUnitId, (int)functionScopes.size(), (int)includeFiles.size() ) );
     } else {
         CCLogger::Get()->DebugLog( F(_T("UpdateTokenDatabase: Translation unit is not valid!")) );
     }
