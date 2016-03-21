@@ -29,7 +29,7 @@ public:
      *
      * @param ed The editor to work in
      */
-    void HighlightOccurrences(cbEditor* ed);
+    void BeginHighlightOccurrences(cbEditor* ed);
 
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
@@ -42,6 +42,7 @@ public: // Code::Blocks events
 public: // Clang events
     void OnTranslationUnitCreated(ClangEvent& event);
     void OnCodeCompleteFinished(ClangEvent& event);
+    void OnGetOccurrencesFinished(ClangEvent& event);
 
 private:
     /** Perform auto completion for #include filenames */
@@ -81,7 +82,7 @@ private:
     ClTranslUnitId m_TranslUnitId;
     int m_EditorHookId;
 
-    wxTimer m_HightlightTimer;
+    wxTimer m_HighlightTimer;
 
     unsigned int m_CCOutstanding;
     long m_CCOutstandingLastMessageTime;

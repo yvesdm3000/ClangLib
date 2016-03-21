@@ -820,7 +820,7 @@ public:
     };
 
     /* final */
-    class GetOccurrencesOfJob : public SyncJob
+    class GetOccurrencesOfJob : public EventJob
     {
     public:
         /** @brief Constructor
@@ -831,12 +831,11 @@ public:
          */
         GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename,
                              const ClTokenPosition& location, ClTranslUnitId translId ):
-            SyncJob( GetOccurrencesOfType, evtType, evtId),
+            EventJob( GetOccurrencesOfType, evtType, evtId),
             m_TranslId(translId),
             m_Filename(filename),
             m_Location(location)
         {
-            m_pResults = new std::vector< std::pair<int, int> >();
         }
         ClangJob* Clone() const
         {
@@ -845,13 +844,7 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetOccurrencesOf(m_TranslId, m_Filename, m_Location, *m_pResults);
-        }
-
-        virtual void Finalize()
-        {
-            SyncJob::Finalize();
-            delete m_pResults;
+            clangproxy.GetOccurrencesOf(m_TranslId, m_Filename, m_Location, m_Results);
         }
 
         ClTranslUnitId GetTranslationUnitId() const
@@ -868,21 +861,19 @@ public:
         }
         const std::vector< std::pair<int, int> >& GetResults() const
         {
-            return *m_pResults;
+            return m_Results;
         }
     protected:
-        GetOccurrencesOfJob( const wxEventType evtType, const int evtId, const wxString& filename, const ClTokenPosition& location, int translId,
-                             wxMutex* pMutex, wxCondition* pCond,
-                             std::vector< std::pair<int, int> >* pResults ):
-            SyncJob(GetOccurrencesOfType, evtType, evtId, pMutex, pCond),
-            m_TranslId(translId),
-            m_Filename(filename.c_str()),
-            m_Location(location),
-            m_pResults(pResults) {}
+        GetOccurrencesOfJob( const GetOccurrencesOfJob& other) :
+            EventJob(other),
+            m_TranslId(other.m_TranslId),
+            m_Filename(other.m_Filename.c_str()),
+            m_Location(other.m_Location),
+            m_Results(other.m_Results){}
         ClTranslUnitId m_TranslId;
         wxString m_Filename;
         ClTokenPosition m_Location;
-        std::vector< std::pair<int, int> >* m_pResults;
+        std::vector< std::pair<int, int> > m_Results;
     };
 
     /**

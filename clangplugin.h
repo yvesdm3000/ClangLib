@@ -155,14 +155,8 @@ private:
     /// Update after clang has finished a synchronous task
     void OnClangSyncTaskFinished(wxEvent& event);
 
-    /**
-     * Semantically highlight all occurrences of the token under the cursor
-     * within the editor
-     *
-     * @param ed The editor to work in
-     */
-    //void HighlightOccurrences(cbEditor* ed);
-
+    /// Update after clang has finished building the occurrences list
+    void OnClangGetOccurrencesFinished(wxEvent& event);
 
 
 private: // Internal utility functions
@@ -189,8 +183,7 @@ public: // IClangPlugin
                                              const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location);
     void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                            std::vector<std::pair<wxString, wxString> >& out_scopes);
-    wxCondError GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc,
-                                 unsigned long timeout, std::vector< std::pair<int, int> >& out_occurrences);
+    void GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc);
     wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
                                     bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults);
     wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,

@@ -170,9 +170,9 @@ void ClangPlugin::OnAttach()
     Connect(idClangCreateTU,               cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangCreateTUFinished),        nullptr, this);
     Connect(idClangReparse,                cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangReparseFinished),         nullptr, this);
     Connect(idClangGetDiagnostics,         cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangGetDiagnosticsFinished),  nullptr, this);
+    Connect(idClangGetOccurrencesTask,     cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangGetOccurrencesFinished),  nullptr, this);
     Connect(idClangSyncTask,               cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     Connect(idClangCodeCompleteTask,       cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
-    Connect(idClangGetOccurrencesTask,     cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     Connect(idClangGetCCDocumentationTask, cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 
@@ -1122,11 +1122,19 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 void ClangPlugin::OnClangGetDiagnosticsFinished( wxEvent& event )
 {
     event.Skip();
-    CCLogger::Get()->DebugLog(F(wxT("OnClangGetDiagnosticsFinished")));
 
     ClangProxy::GetDiagnosticsJob* pJob = static_cast<ClangProxy::GetDiagnosticsJob*>(event.GetEventObject());
 
     ClangEvent evt(clEVT_DIAGNOSTICS_UPDATED, pJob->GetTranslationUnitId(), pJob->GetFilename(), ClTokenPosition(0,0), pJob->GetResults());
+    ProcessEvent(evt);
+}
+
+void ClangPlugin::OnClangGetOccurrencesFinished(wxEvent& event)
+{
+    event.Skip();
+
+    ClangProxy::GetOccurrencesOfJob* pOCJob = dynamic_cast<ClangProxy::GetOccurrencesOfJob*>(event.GetEventObject());
+    ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pOCJob->GetTranslationUnitId(), pOCJob->GetFilename(), pOCJob->GetLocation(), pOCJob->GetResults());
     ProcessEvent(evt);
 }
 
@@ -1145,12 +1153,6 @@ void ClangPlugin::OnClangSyncTaskFinished(wxEvent& event)
         //    ClangEvent evt2(clEVT_DIAGNOSTICS_UPDATED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetDiagnostics());
         //    ProcessEvent(evt2);
         //}
-    }
-    else if (event.GetId() == idClangGetOccurrencesTask)
-    {
-        ClangProxy::GetOccurrencesOfJob* pOCJob = dynamic_cast<ClangProxy::GetOccurrencesOfJob*>(pJob);
-        ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pOCJob->GetTranslationUnitId(), pOCJob->GetFilename(), pOCJob->GetLocation(), pOCJob->GetResults());
-        ProcessEvent(evt);
     }
     else if (event.GetId() == idClangGetCCDocumentationTask)
     {
@@ -1204,17 +1206,10 @@ void ClangPlugin::GetFunctionScopes(const ClTranslUnitId translUnitId, const wxS
     m_Proxy.GetFunctionScopes( translUnitId, filename, out_scopes );
 }
 
-wxCondError ClangPlugin::GetOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc,
-                                          unsigned long timeout, std::vector< std::pair<int, int> >& out_occurrences)
+void ClangPlugin::GetOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc)
 {
-    std::vector< std::pair<int, int> > occurrences;
-    ClangProxy::GetOccurrencesOfJob job(cbEVT_CLANG_SYNCTASK_FINISHED, idClangGetOccurrencesTask, filename, loc, translUnitId);
+    ClangProxy::GetOccurrencesOfJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangGetOccurrencesTask, filename, loc, translUnitId);
     m_Proxy.AppendPendingJob(job);
-    wxCondError err = job.WaitCompletion(timeout);
-    if (err == wxCOND_TIMEOUT)
-        return err;
-    out_occurrences = job.GetResults();
-    return err;
 }
 
 wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc,

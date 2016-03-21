@@ -26,7 +26,7 @@
 
 const int idHighlightTimer = wxNewId();
 
-#define HIGHTLIGHT_DELAY 1700
+#define HIGHLIGHT_DELAY 700
 
 const wxString ClangCodeCompletion::SettingName = _T("/code_completion");
 
@@ -34,6 +34,7 @@ ClangCodeCompletion::ClangCodeCompletion() :
     ClangPluginComponent(),
     m_TranslUnitId(-1),
     m_EditorHookId(-1),
+    m_HighlightTimer(this, idHighlightTimer),
     m_CCOutstanding(0),
     m_CCOutstandingLastMessageTime(0),
     m_CCOutstandingTokenStart(-1),
@@ -64,6 +65,7 @@ void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
     typedef cbEventFunctor<ClangCodeCompletion, ClangEvent> ClCCEvent;
     pClangPlugin->RegisterEventSink(clEVT_TRANSLATIONUNIT_CREATED,  new ClCCEvent(this, &ClangCodeCompletion::OnTranslationUnitCreated));
     pClangPlugin->RegisterEventSink(clEVT_GETCODECOMPLETE_FINISHED, new ClCCEvent(this, &ClangCodeCompletion::OnCodeCompleteFinished));
+    pClangPlugin->RegisterEventSink(clEVT_GETOCCURRENCES_FINISHED, new ClCCEvent(this, &ClangCodeCompletion::OnGetOccurrencesFinished));
 
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangCodeCompletion>(this, &ClangCodeCompletion::OnEditorHook));
 }
@@ -123,6 +125,7 @@ void ClangCodeCompletion::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     if (!IsAttached())
         return;
     bool clearIndicator = false;
+
     //if (!m_pClangPlugin->IsProviderFor(ed))
     //    return;
     cbStyledTextCtrl* stc = ed->GetControl();
@@ -137,10 +140,10 @@ void ClangCodeCompletion::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     {
         if (event.GetUpdated() & wxSCI_UPDATE_SELECTION)
         {
-            m_HightlightTimer.Stop();
-            m_HightlightTimer.Start(HIGHTLIGHT_DELAY, wxTIMER_ONE_SHOT);
+            m_HighlightTimer.Stop();
+            m_HighlightTimer.Start(HIGHLIGHT_DELAY, wxTIMER_ONE_SHOT);
+            clearIndicator = true;
         }
-        clearIndicator = true;
     }
     else if (event.GetEventType() == wxEVT_SCI_CHANGE)
     {
@@ -168,14 +171,13 @@ void ClangCodeCompletion::OnTimer(wxTimerEvent& event)
         return;
 
     if (evId == idHighlightTimer)
-        HighlightOccurrences(ed);
+        BeginHighlightOccurrences(ed);
     else
         event.Skip();
 }
 
 void ClangCodeCompletion::OnKeyDown(wxKeyEvent& event)
 {
-    //fprintf(stdout,"OnKeyDown");
     if (event.GetKeyCode() == WXK_TAB)
     {
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
@@ -196,6 +198,7 @@ void ClangCodeCompletion::OnKeyDown(wxKeyEvent& event)
                         it = m_TabJumpArguments.erase(it);
                         m_TabJumpArguments.push_back(value);
                         stc->EnableTabSmartJump();
+
                         return;
                     }
                 }
@@ -381,7 +384,6 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         tknResults = m_CCOutstandingResults;
     }
     m_CCOutstanding = 0;
-    CCLogger::Get()->DebugLog( wxT("Converting CC results in CCTokens") );
     if (prefix.Length() > 3) // larger context, match the prefix at any point in the token
     {
         for (std::vector<ClToken>::const_iterator tknIt = tknResults.begin();
@@ -575,9 +577,10 @@ wxString ClangCodeCompletion::GetDocumentation(const cbCodeCompletionPlugin::CCT
     return wxEmptyString;
 }
 
-void ClangCodeCompletion::HighlightOccurrences(cbEditor* ed)
+void ClangCodeCompletion::BeginHighlightOccurrences(cbEditor* ed)
 {
     ClTranslUnitId translId = GetCurrentTranslationUnitId();
+
     cbStyledTextCtrl* stc = ed->GetControl();
     int pos = stc->GetCurrentPos();
     const wxChar ch = stc->GetCharAt(pos);
@@ -587,7 +590,6 @@ void ClangCodeCompletion::HighlightOccurrences(cbEditor* ed)
     {
         --pos;
     }
-
     // chosen a high value for indicator, hoping not to interfere with the indicators used by some lexers
     // if they get updated from deprecated old style indicators someday.
     const int theIndicator = 16;
@@ -600,24 +602,10 @@ void ClangCodeCompletion::HighlightOccurrences(cbEditor* ed)
     if (stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
         return;
 
-    // TODO: use independent key
-    wxColour highlightColour(Manager::Get()->GetColourManager()->GetColour(wxT("editor_highlight_occurrence")));
-
-    stc->IndicatorSetStyle(theIndicator, wxSCI_INDIC_HIGHLIGHT);
-    stc->IndicatorSetForeground(theIndicator, highlightColour);
-    stc->IndicatorSetUnder(theIndicator, true);
-
     const int line = stc->LineFromPosition(pos);
     ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
 
-    std::vector< std::pair<int, int> > occurrences;
-    m_pClangPlugin->GetOccurrencesOf( translId,  ed->GetFilename(), loc, 100, occurrences );
-
-    for (std::vector< std::pair<int, int> >::const_iterator tkn = occurrences.begin();
-         tkn != occurrences.end(); ++tkn)
-    {
-        stc->IndicatorFillRange(tkn->first, tkn->second);
-    }
+    m_pClangPlugin->GetOccurrencesOf( translId,  ed->GetFilename(), loc );
 }
 
 void ClangCodeCompletion::OnTranslationUnitCreated( ClangEvent& event )
@@ -631,7 +619,6 @@ void ClangCodeCompletion::OnTranslationUnitCreated( ClangEvent& event )
 
 void ClangCodeCompletion::OnCodeCompleteFinished(ClangEvent& event)
 {
-    //CCLogger::Get()->DebugLog( wxT("OnCodeCompleteFinished") );
     if (event.GetTranslationUnitId() != m_TranslUnitId)
         return;
 
@@ -658,6 +645,60 @@ void ClangCodeCompletion::OnCodeCompleteFinished(ClangEvent& event)
         m_CCOutstanding--;
     }
 }
+
+void ClangCodeCompletion::OnGetOccurrencesFinished(ClangEvent& event)
+{
+    if (event.GetTranslationUnitId() != m_TranslUnitId)
+    {
+        CCLogger::Get()->DebugLog( _T("Translation unit has switched") );
+        return;
+    }
+
+    EditorManager* edMgr = Manager::Get()->GetEditorManager();
+    cbEditor* ed = edMgr->GetBuiltinActiveEditor();
+    if (!ed)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    int pos = stc->GetCurrentPos();
+    const wxChar ch = stc->GetCharAt(pos);
+    if (   pos > 0
+        && (wxIsspace(ch) || (ch != wxT('_') && wxIspunct(ch)))
+        && !wxIsspace(stc->GetCharAt(pos - 1)) )
+    {
+        --pos;
+    }
+    const int line = stc->LineFromPosition(pos);
+    ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
+
+    if (event.GetLocation() != loc)
+    {
+        CCLogger::Get()->DebugLog( wxT("Location has changed since last GetOccurrences request") );
+        return; // Location has changed since the request
+    }
+
+    // chosen a high value for indicator, hoping not to interfere with the indicators used by some lexers
+    // if they get updated from deprecated old style indicators someday.
+    const int theIndicator = 16;
+    stc->SetIndicatorCurrent(theIndicator);
+
+    // Set Styling:
+    // clear all style indications set in a previous run (is also done once after text gets unselected)
+    stc->IndicatorClearRange(0, stc->GetLength());
+    // TODO: use independent key
+    wxColour highlightColour(Manager::Get()->GetColourManager()->GetColour(wxT("editor_highlight_occurrence")));
+    stc->IndicatorSetStyle(theIndicator, wxSCI_INDIC_HIGHLIGHT);
+    stc->IndicatorSetForeground(theIndicator, highlightColour);
+    stc->IndicatorSetUnder(theIndicator, true);
+
+    const std::vector< std::pair<int, int> >& occurrences = event.GetOccurrencesResults();
+
+    for (std::vector< std::pair<int, int> >::const_iterator tkn = occurrences.begin();
+         tkn != occurrences.end(); ++tkn)
+    {
+        stc->IndicatorFillRange(tkn->first, tkn->second);
+    }
+}
+
 // Sorting in GetLocalIncludeDirs()
 static int CompareStringLen(const wxString& first, const wxString& second)
 {
