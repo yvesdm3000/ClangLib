@@ -1046,6 +1046,7 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
  */
 void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 {
+    event.Skip();
     CCLogger::Get()->DebugLog( wxT("OnClangCreateTUFinished") );
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
@@ -1074,6 +1075,7 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 
 void ClangPlugin::OnClangReparseFinished( wxEvent& event )
 {
+    event.Skip();
     CCLogger::Get()->DebugLog(wxT("OnClangReparseFinished"));
     ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
     if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
@@ -1089,6 +1091,7 @@ void ClangPlugin::OnClangReparseFinished( wxEvent& event )
 
 void ClangPlugin::OnClangUpdateTokenDatabaseFinished(wxEvent& event)
 {
+    event.Skip();
     ClangProxy::UpdateTokenDatabaseJob* pJob = static_cast<ClangProxy::UpdateTokenDatabaseJob*>(event.GetEventObject());
 
     ClangEvent evt(clEVT_TOKENDATABASE_UPDATED, pJob->GetTranslationUnitId(), wxEmptyString);
