@@ -273,7 +273,7 @@ static wxString Escape(const wxString& text)
     for (wxString::const_iterator itr = text.begin();
             itr != text.end(); ++itr)
     {
-        switch (*itr)
+        switch (wxChar(*itr))
         {
         case wxT('&'):
             html += wxT("&amp;");
@@ -315,8 +315,8 @@ static wxString SyntaxHl(const wxString& code, const std::vector<wxString>& cppK
     const int codeLen = code.Length();
     for (int enRg = 0; enRg <= codeLen; ++enRg)
     {
-        wxChar ch = (enRg < codeLen ? code[enRg] : wxT('\0'));
-        wxChar nextCh = (enRg < codeLen - 1 ? code[enRg + 1] : wxT('\0'));
+        wxChar ch = (enRg < codeLen ? wxChar(code[enRg]) : wxT('\0'));
+        wxChar nextCh = (enRg < codeLen - 1 ? wxChar(code[enRg + 1]) : wxT('\0'));
         switch (style)
         {
         default:
