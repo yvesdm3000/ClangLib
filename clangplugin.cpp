@@ -77,8 +77,7 @@ ClangPlugin::ClangPlugin() :
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND),
     m_UpdateCompileCommand(0),
-    m_ReparseNeeded(0),
-    m_LastModifyLine(-1)
+    m_ReparseNeeded(0)
 {
     CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger);
     if (!Manager::LoadResource(wxT("clanglib.zip")))
@@ -1076,7 +1075,7 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 void ClangPlugin::OnClangReparseFinished( wxEvent& event )
 {
     event.Skip();
-    CCLogger::Get()->DebugLog(wxT("OnClangReparseFinished"));
+    CCLogger::Get()->DebugLog( F(_T("OnClangReparseFinished reparseNeeded=%d"), m_ReparseNeeded));
     ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
     if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
     {
@@ -1104,7 +1103,7 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 
     if (!IsProviderFor(ed))
         return;
-    if (m_ReparseTimer.IsRunning())
+    if (m_ReparseTimer.IsRunning()&&(m_ReparseNeeded > 0))
     {
         m_ReparseTimer.Stop();
         RequestReparse();
@@ -1112,12 +1111,7 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     }
     if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
     {
-        cbStyledTextCtrl* stc = ed->GetControl();
-        const int pos = stc->GetCurrentPos();
-        const int line = stc->LineFromPosition(pos);
-        if ((m_LastModifyLine != -1) && (line != m_LastModifyLine))
-            RequestReparse();
-        m_LastModifyLine = line;
+        RequestReparse();
     }
 }
 
@@ -1211,6 +1205,10 @@ void ClangPlugin::GetFunctionScopes(const ClTranslUnitId translUnitId, const wxS
 
 void ClangPlugin::GetOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc)
 {
+    if ((translUnitId == m_TranslUnitId)&&(m_ReparseNeeded > 0))
+    {
+        RequestReparse( translUnitId, filename );
+    }
     ClangProxy::GetOccurrencesOfJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangGetOccurrencesTask, filename, loc, translUnitId);
     m_Proxy.AppendPendingJob(job);
 }
@@ -1269,7 +1267,11 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const wxStri
         return;
     }
     if (translUnitId == m_TranslUnitId)
+    {
         m_ReparseNeeded = 0;
+        // RequestReparse can also be called from other contexts than reparse timer, so at this point, the timer should not fire anymore since something was faster than the timer
+        m_ReparseTimer.Stop();
+    }
 
     std::map<wxString, wxString> unsavedFiles;
     for (int i = 0; i < edMgr->GetEditorsCount(); ++i)

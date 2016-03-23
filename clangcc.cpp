@@ -133,6 +133,7 @@ void ClangCodeCompletion::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     {
         if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
         {
+            m_HighlightTimer.Stop();
             clearIndicator = true;
         }
     }

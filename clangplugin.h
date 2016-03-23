@@ -222,7 +222,6 @@ private: // Members
     wxString m_CompileCommand;
     int m_UpdateCompileCommand;
     int m_ReparseNeeded;
-    int m_LastModifyLine;
 
     ClangCodeCompletion m_CodeCompletion;
     ClangDiagnostics m_Diagnostics;
