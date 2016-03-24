@@ -56,6 +56,93 @@
 											<border>20</border>
 										</object>
 										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkDocumentation">
+												<label>Parse documentation</label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
+
+										<object class="sizeritem">
+											<object class="wxStaticBoxSizer">
+												<label>Documentation options</label>
+												<orient>wxVERTICAL</orient>
+												<object class="sizeritem">
+													<object class="wxCheckBox" name="chkClangOptionParseAllComments">
+														<label>Parse all comments as documentation, not only DoxyGen-style [-fparse-all-comments]</label>
+													</object>
+													<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+													<border>5</border>
+												</object>
+												<object class="sizeritem">
+													<object class="wxFlexGridSizer">
+														<cols>2</cols>
+														<rows>3</rows>
+														<hgap>20</hgap>
+														<object class="sizeritem">
+															<object class="wxStaticText" name="ID_STATICTEXT10">
+																<label>Background color</label>
+															</object>
+															<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+														<object class="sizeritem">
+															<object class="wxButton" name="btnDocBgColor">
+																<size>40,18</size>
+																<bg>wxSYS_COLOUR_INFOBK</bg>
+																<style>wxBU_EXACTFIT</style>
+															</object>
+															<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+														<object class="sizeritem">
+															<object class="wxStaticText" name="ID_STATICTEXT11">
+																<label>Text color</label>
+															</object>
+															<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+														<object class="sizeritem">
+															<object class="wxButton" name="btnDocTextColor">
+																<size>40,18</size>
+																<bg>wxSYS_COLOUR_INFOTEXT</bg>
+																<style>wxBU_EXACTFIT</style>
+															</object>
+															<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+														<object class="sizeritem">
+															<object class="wxStaticText" name="ID_STATICTEXT12">
+																<label>Link color</label>
+															</object>
+															<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+														<object class="sizeritem">
+															<object class="wxButton" name="btnDocLinkColor">
+																<size>40,18</size>
+																<bg>wxSYS_COLOUR_HIGHLIGHT</bg>
+																<style>wxBU_EXACTFIT</style>
+															</object>
+															<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
+															<border>5</border>
+															<option>1</option>
+														</object>
+													</object>
+													<flag>wxLEFT|wxALIGN_LEFT</flag>
+													<border>5</border>
+												</object>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+											<border>8</border>
+										</object>
+
+										<object class="sizeritem">
 											<object class="wxCheckBox" name="chkAddDoxgenComment">
 												<label>Add doxgen comment, when implementing the function method</label>
 											</object>
@@ -594,104 +681,26 @@
 					</object>
 -->
 					<object class="notebookpage">
-						<object class="wxPanel" name="tabDocumentation">
+						<object class="wxPanel" name="tabSemantic">
 							<pos>402,16</pos>
 							<object class="wxBoxSizer">
 								<orient>wxVERTICAL</orient>
 								<object class="sizeritem">
-									<object class="wxCheckBox" name="chkDocumentation">
-										<label>Parse documentation</label>
+									<object class="wxCheckBox" name="chkOccurrenceHighlight">
+										<label>Enable occurrences highlight</label>
 									</object>
 									<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
 									<border>8</border>
 								</object>
-								<object class="sizeritem">
-									<object class="wxStaticBoxSizer">
-										<label>Options</label>
-										<orient>wxVERTICAL</orient>
-										<object class="sizeritem">
-											<object class="wxFlexGridSizer">
-												<cols>2</cols>
-												<rows>3</rows>
-												<hgap>20</hgap>
-												<object class="sizeritem">
-													<object class="wxStaticText" name="ID_STATICTEXT10">
-														<label>Background color</label>
-													</object>
-													<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-												<object class="sizeritem">
-													<object class="wxButton" name="btnDocBgColor">
-														<size>40,18</size>
-														<bg>wxSYS_COLOUR_INFOBK</bg>
-														<style>wxBU_EXACTFIT</style>
-													</object>
-													<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-												<object class="sizeritem">
-													<object class="wxStaticText" name="ID_STATICTEXT11">
-														<label>Text color</label>
-													</object>
-													<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-												<object class="sizeritem">
-													<object class="wxButton" name="btnDocTextColor">
-														<size>40,18</size>
-														<bg>wxSYS_COLOUR_INFOTEXT</bg>
-														<style>wxBU_EXACTFIT</style>
-													</object>
-													<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-												<object class="sizeritem">
-													<object class="wxStaticText" name="ID_STATICTEXT12">
-														<label>Link color</label>
-													</object>
-													<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-												<object class="sizeritem">
-													<object class="wxButton" name="btnDocLinkColor">
-														<size>40,18</size>
-														<bg>wxSYS_COLOUR_HIGHLIGHT</bg>
-														<style>wxBU_EXACTFIT</style>
-													</object>
-													<flag>wxTOP|wxALIGN_CENTER_VERTICAL</flag>
-													<border>5</border>
-													<option>1</option>
-												</object>
-											</object>
-											<flag>wxLEFT|wxALIGN_LEFT</flag>
-											<border>5</border>
-										</object>
-									</object>
-									<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
-									<border>8</border>
-								</object>
 							</object>
 						</object>
-						<label>Documentation</label>
+						<label>Semantic highlight</label>
 					</object>
 					<object class="notebookpage">
 						<object class="wxPanel" name="tabAdvanced">
 							<pos>402,16</pos>
 							<object class="wxBoxSizer">
 								<orient>wxVERTICAL</orient>
-								<object class="sizeritem">
-									<object class="wxCheckBox" name="chkClangOptionParseAllComments">
-										<label>Parse all comments as documentation, not only DoxyGen-style [-fparse-all-comments]</label>
-									</object>
-									<flag>wxTOP|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
-									<border>5</border>
-								</object>
 								<object class="sizeritem">
 									<object class="wxFlexGridSizer">
 										<cols>2</cols>

@@ -248,29 +248,36 @@ bool ClangPlugin::DeactivateComponent(ClangPluginComponent* pComponent)
 
 void ClangPlugin::UpdateComponents()
 {
-    bool activationChanged = false;
+    bool reloadEditor = false;
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     if (cfg->ReadBool(ClangCodeCompletion::SettingName, true))
     {
         if (ActivateComponent(&m_CodeCompletion))
-            activationChanged = true;
+            reloadEditor = true;
     }
     else
     {
         if (DeactivateComponent(&m_CodeCompletion))
-            activationChanged = true;
+            reloadEditor = true;
     }
     if (cfg->ReadBool(ClangDiagnostics::SettingName, true))
     {
         if (ActivateComponent(&m_Diagnostics))
-            activationChanged = true;
+            reloadEditor = true;
     }
     else
     {
         if (DeactivateComponent(&m_Diagnostics))
-            activationChanged = true;
+            reloadEditor = true;
     }
-    if (activationChanged)
+
+    for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
+    {
+        if ((*it)->ConfigurationChanged())
+            reloadEditor = true;
+    }
+
+    if (reloadEditor)
         Manager::Get()->GetEditorManager()->SetActiveEditor(Manager::Get()->GetEditorManager()->GetActiveEditor());
 }
 

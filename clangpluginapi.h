@@ -244,6 +244,7 @@ public:
                                                          const ClTokenPosition& location, ClTokenId tokenId) = 0;
     virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                                    std::vector< std::pair<int, int> >& offsets) = 0;
+
 };
 
 /** @brief Base class for ClangPlugin components.
@@ -263,10 +264,11 @@ public:
     {
         m_pClangPlugin = NULL;
     }
-    virtual bool IsAttached()
+    bool IsAttached() const
     {
         return m_pClangPlugin != NULL;
     }
+    virtual bool ConfigurationChanged(){ return false; }
     virtual bool BuildToolBar(wxToolBar* WXUNUSED(toolBar))
     {
         return false;

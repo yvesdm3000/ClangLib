@@ -34,6 +34,7 @@ ClangCodeCompletion::ClangCodeCompletion() :
     ClangPluginComponent(),
     m_TranslUnitId(-1),
     m_EditorHookId(-1),
+    m_bShowOccurrences(false),
     m_HighlightTimer(this, idHighlightTimer),
     m_CCOutstanding(0),
     m_CCOutstandingLastMessageTime(0),
@@ -60,24 +61,50 @@ void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBCCEvent(this, &ClangCodeCompletion::OnEditorActivate));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_CLOSE,     new CBCCEvent(this, &ClangCodeCompletion::OnEditorClose));
 
-    Connect(idHighlightTimer, wxEVT_TIMER, wxTimerEventHandler(ClangCodeCompletion::OnTimer));
+
 
     typedef cbEventFunctor<ClangCodeCompletion, ClangEvent> ClCCEvent;
     pClangPlugin->RegisterEventSink(clEVT_TRANSLATIONUNIT_CREATED,  new ClCCEvent(this, &ClangCodeCompletion::OnTranslationUnitCreated));
     pClangPlugin->RegisterEventSink(clEVT_GETCODECOMPLETE_FINISHED, new ClCCEvent(this, &ClangCodeCompletion::OnCodeCompleteFinished));
     pClangPlugin->RegisterEventSink(clEVT_GETOCCURRENCES_FINISHED, new ClCCEvent(this, &ClangCodeCompletion::OnGetOccurrencesFinished));
 
-    m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangCodeCompletion>(this, &ClangCodeCompletion::OnEditorHook));
+    ConfigurationChanged();
 }
 
 void ClangCodeCompletion::OnRelease(IClangPlugin* pClangPlugin)
 {
     pClangPlugin->RemoveAllEventSinksFor(this);
-    Disconnect(idHighlightTimer);
-    EditorHooks::UnregisterHook(m_EditorHookId);
+    if (m_bShowOccurrences)
+    {
+        Disconnect(idHighlightTimer);
+        EditorHooks::UnregisterHook(m_EditorHookId);
+    }
     Manager::Get()->RemoveAllEventSinksFor(this);
 
     ClangPluginComponent::OnRelease(pClangPlugin);
+}
+
+bool ClangCodeCompletion::ConfigurationChanged()
+{
+    bool bReloadEditor = false;
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    bool bShowOccurrences  = cfg->ReadBool(wxT("/occurrence_highlight"),   true);
+    if (bShowOccurrences != m_bShowOccurrences)
+    {
+        if (bShowOccurrences)
+        {
+            Connect(idHighlightTimer, wxEVT_TIMER, wxTimerEventHandler(ClangCodeCompletion::OnTimer));
+            m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangCodeCompletion>(this, &ClangCodeCompletion::OnEditorHook));
+        }
+        else
+        {
+            Disconnect(idHighlightTimer);
+            EditorHooks::UnregisterHook(m_EditorHookId);
+            bReloadEditor = true;
+        }
+        m_bShowOccurrences = bShowOccurrences;
+    }
+    return bReloadEditor;
 }
 
 void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
@@ -105,6 +132,9 @@ void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
         const int imgCount = m_pClangPlugin->GetImageList(id).GetImageCount();
         for (int i = 0; i < imgCount; ++i)
             stc->RegisterImage(i, m_pClangPlugin->GetImageList(id).GetBitmap(i));
+        const int theIndicator = 16;
+        stc->SetIndicatorCurrent(theIndicator);
+        stc->IndicatorClearRange(0, stc->GetLength());
     }
 }
 
@@ -123,6 +153,8 @@ void ClangCodeCompletion::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 {
     event.Skip();
     if (!IsAttached())
+        return;
+    if (!m_bShowOccurrences)
         return;
     bool clearIndicator = false;
 
