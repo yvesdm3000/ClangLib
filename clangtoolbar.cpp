@@ -20,6 +20,8 @@
 #include <wx/dir.h>
 #include <wx/tokenzr.h>
 #include <wx/choice.h>
+#include <wx/toolbar.h>
+#include <wx/xrc/xmlres.h>
 #endif // CB_PRECOMP
 
 
