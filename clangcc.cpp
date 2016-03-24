@@ -601,6 +601,11 @@ bool ClangCodeCompletion::DoAutocomplete( const cbCodeCompletionPlugin::CCToken&
 
 wxString ClangCodeCompletion::GetDocumentation(const cbCodeCompletionPlugin::CCToken &token)
 {
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+
+    if (!cfg->ReadBool( wxT("/documentation_helper"), true ))
+        return wxEmptyString;
+
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
     cbEditor* ed = edMgr->GetBuiltinActiveEditor();
     if (ed)
