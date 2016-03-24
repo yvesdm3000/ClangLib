@@ -108,6 +108,14 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     XRCCTRL(*this, "txtFillupChars",        wxTextCtrl)->SetValue(cfg->Read(_T("/fillup_chars"),             wxEmptyString));
     XRCCTRL(*this, "sldCCDelay",            wxSlider)->SetValue(cfg->ReadInt(_T("/cc_delay"),                300) / 100);
     UpdateCCDelayLabel();
+
+    XRCCTRL(*this, "chkDocumentation", wxCheckBox)->SetValue(cfg->ReadBool(_T("/documentation_helper"), true));
+    ColourManager *colours = Manager::Get()->GetColourManager();
+    XRCCTRL(*this, "btnDocBgColor",         wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_back")));
+    XRCCTRL(*this, "btnDocTextColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_fore")));
+    XRCCTRL(*this, "btnDocLinkColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_link")));
+
+    XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_fparseallcomments"),   false));
     //XRCCTRL(*this, "chkKL_1",               wxCheckBox)->SetValue(cfg->ReadBool(_T("/lexer_keywords_set1"),  true));
     //XRCCTRL(*this, "chkKL_2",               wxCheckBox)->SetValue(cfg->ReadBool(_T("/lexer_keywords_set2"),  true));
     //XRCCTRL(*this, "chkKL_3",               wxCheckBox)->SetValue(cfg->ReadBool(_T("/lexer_keywords_set3"),  false));
@@ -174,14 +182,11 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     // Page Documentation
     //CCTRL(*this, "chkDocumentation",      wxCheckBox)->SetValue(m_Documentation->IsEnabled());
 #endif
-    ColourManager *colours = Manager::Get()->GetColourManager();
-    XRCCTRL(*this, "btnDocBgColor",         wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_back")));
-    XRCCTRL(*this, "btnDocTextColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_fore")));
-    XRCCTRL(*this, "btnDocLinkColor",       wxButton)->SetBackgroundColour(colours->GetColour(wxT("cc_docs_link")));
+    // Page "Semantic"
+    XRCCTRL(*this, "chkOccurrenceHighlight",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/occurrence_highlight"),   true));
 
     // Page "Advanced"
 
-    XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_fparseallcomments"),   false));
     XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->SetValue(cfg->Read(_T("/cmdoption_extra"),   wxEmptyString ));
 
 //    m_Parser.ParseBuffer(g_SampleClasses, true);
@@ -212,6 +217,14 @@ void ClangSettingsDlg::OnApply()
     cfg->Write(_T("/max_matches"),          (int)  XRCCTRL(*this, "spnMaxMatches",         wxSpinCtrl)->GetValue());
     cfg->Write(_T("/fillup_chars"),                XRCCTRL(*this, "txtFillupChars",        wxTextCtrl)->GetValue());
     cfg->Write(_T("/cc_delay"),             (int)  XRCCTRL(*this, "sldCCDelay",            wxSlider)->GetValue() * 100);
+
+    cfg->Write(_T("/documentation_helper"), (bool) XRCCTRL(*this, "chkDocumentation", wxCheckBox)->GetValue());
+    cfg->Write(_T("/documentation_helper_background_color"), (wxColour) XRCCTRL(*this, "btnDocBgColor",   wxButton)->GetBackgroundColour());
+    cfg->Write(_T("/documentation_helper_text_color"),       (wxColour) XRCCTRL(*this, "btnDocTextColor", wxButton)->GetBackgroundColour());
+    cfg->Write(_T("/documentation_helper_link_color"),       (wxColour) XRCCTRL(*this, "btnDocLinkColor", wxButton)->GetBackgroundColour());
+
+    cfg->Write(_T("/cmdoption_fparseallcomments"),   (bool) XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->GetValue());
+
     //cfg->Write(_T("/lexer_keywords_set1"),  (bool) XRCCTRL(*this, "chkKL_1",               wxCheckBox)->GetValue());
     //cfg->Write(_T("/lexer_keywords_set2"),  (bool) XRCCTRL(*this, "chkKL_2",               wxCheckBox)->GetValue());
     //cfg->Write(_T("/lexer_keywords_set3"),  (bool) XRCCTRL(*this, "chkKL_3",               wxCheckBox)->GetValue());
@@ -256,17 +269,13 @@ void ClangSettingsDlg::OnApply()
     cfg->Write(_T("/cmdoption_wnoattributes"),  (bool) XRCCTRL(*this, "chkClangOptionNoAttributes", wxCheckBox)->GetValue());
     cfg->Write(_T("/cmdoption_wextratokens"),   (bool) XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->GetValue());
 
-    // Page "Documentation"
-    //cfg->Write(_T("/use_documentation_helper"), (bool) XRCCTRL(*this, "chkDocumentation", wxCheckBox)->GetValue());
-    cfg->Write(_T("/documentation_helper_background_color"), (wxColour) XRCCTRL(*this, "btnDocBgColor",   wxButton)->GetBackgroundColour());
-    cfg->Write(_T("/documentation_helper_text_color"),       (wxColour) XRCCTRL(*this, "btnDocTextColor", wxButton)->GetBackgroundColour());
-    cfg->Write(_T("/documentation_helper_link_color"),       (wxColour) XRCCTRL(*this, "btnDocLinkColor", wxButton)->GetBackgroundColour());
+    // Page "Semantic"
 
+    cfg->Write(_T("/occurrence_highlight"),              (bool) XRCCTRL(*this, "chkOccurrenceHighlight",        wxCheckBox)->GetValue());
 
 
     // Page "Advanced"
 
-    cfg->Write(_T("/cmdoption_fparseallcomments"),   (bool) XRCCTRL(*this, "chkClangOptionParseAllComments", wxCheckBox)->GetValue());
     cfg->Write(_T("/cmdoption_extra"),               XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->GetValue());
 
 

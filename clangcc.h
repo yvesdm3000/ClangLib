@@ -77,11 +77,13 @@ protected: // Code completion for #include
      */
     void GetAbsolutePath(const wxString& basePath, const wxArrayString& targets, wxArrayString& dirs);
 
+    bool ConfigurationChanged();
 
 private:
     ClTranslUnitId m_TranslUnitId;
     int m_EditorHookId;
 
+    bool m_bShowOccurrences;
     wxTimer m_HighlightTimer;
 
     unsigned int m_CCOutstanding;
