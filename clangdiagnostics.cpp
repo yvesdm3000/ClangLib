@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <wx/dir.h>
+#include <wx/menu.h>
 #endif // CB_PRECOMP
 
 #include <cbstyledtextctrl.h>
