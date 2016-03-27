@@ -11,6 +11,7 @@
 #include "clangtoolbar.h"
 #include "clangcc.h"
 #include "clangdiagnostics.h"
+#include "clangrefactoring.h"
 
 // milliseconds
 #define CLANG_REPARSE_DELAY 10000
@@ -225,6 +226,7 @@ private: // Members
 
     ClangCodeCompletion m_CodeCompletion;
     ClangDiagnostics m_Diagnostics;
+    ClangRefactoring m_Refactoring;
     ClangToolbar m_Toolbar;
 };
 
