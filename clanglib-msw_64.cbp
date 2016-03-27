@@ -132,10 +132,12 @@
 		<Unit filename="clangpluginapi.h" />
 		<Unit filename="clangproxy.cpp" />
 		<Unit filename="clangproxy.h" />
+		<Unit filename="clangrefactoring.cpp" />
+		<Unit filename="clangrefactoring.h" />
 		<Unit filename="clangtoolbar.cpp" />
 		<Unit filename="clangtoolbar.h" />
 		<Unit filename="resources/ccsettings.xrc" />
-		<Unit filename="resources/codecompletion_toolbar.xrc" />
+		<Unit filename="resources/clangcodecompletion_toolbar.xrc" />
 		<Unit filename="resources/manifest.xml" />
 		<Unit filename="tokendatabase.cpp" />
 		<Unit filename="tokendatabase.h" />

@@ -33,16 +33,12 @@ public:
 
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
-    void OnEditorClose(CodeBlocksEvent& event);
-    void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
-    void OnTimer(wxTimerEvent& event);
     void OnKeyDown(wxKeyEvent& event);
     void OnCompleteCode(CodeBlocksEvent& event);
 
 public: // Clang events
     void OnTranslationUnitCreated(ClangEvent& event);
     void OnCodeCompleteFinished(ClangEvent& event);
-    void OnGetOccurrencesFinished(ClangEvent& event);
 
 private:
     /** Perform auto completion for #include filenames */
@@ -77,14 +73,8 @@ protected: // Code completion for #include
      */
     void GetAbsolutePath(const wxString& basePath, const wxArrayString& targets, wxArrayString& dirs);
 
-    bool ConfigurationChanged();
-
 private:
     ClTranslUnitId m_TranslUnitId;
-    int m_EditorHookId;
-
-    bool m_bShowOccurrences;
-    wxTimer m_HighlightTimer;
 
     unsigned int m_CCOutstanding;
     long m_CCOutstandingLastMessageTime;

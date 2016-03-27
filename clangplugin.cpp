@@ -179,6 +179,8 @@ void ClangPlugin::OnAttach()
         ActivateComponent(&m_CodeCompletion);
     if (cfg->ReadBool(ClangDiagnostics::SettingName, true))
         ActivateComponent(&m_Diagnostics);
+    if (cfg->ReadBool(ClangRefactoring::SettingName, true))
+        ActivateComponent(&m_Refactoring);
 }
 
 /**
@@ -268,6 +270,16 @@ void ClangPlugin::UpdateComponents()
     else
     {
         if (DeactivateComponent(&m_Diagnostics))
+            reloadEditor = true;
+    }
+    if (cfg->ReadBool(ClangRefactoring::SettingName, true))
+    {
+        if (ActivateComponent(&m_Refactoring))
+            reloadEditor = true;
+    }
+    else
+    {
+        if (DeactivateComponent(&m_Refactoring))
             reloadEditor = true;
     }
 
