@@ -27,6 +27,8 @@ const int idGotoNextDiagnostic = wxNewId();
 const int idGotoPrevDiagnostic = wxNewId();
 const wxString ClangDiagnostics::SettingName = _T("/diagnostics");
 
+#define FIXIT_MARKER 5
+
 ClangDiagnostics::ClangDiagnostics() :
     m_TranslUnitId(-1),
     m_Diagnostics(),
@@ -51,6 +53,7 @@ void ClangDiagnostics::OnAttach( IClangPlugin* pClangPlugin )
     Manager::Get()->GetColourManager()->RegisterColour(wxT("Diagnostics"), wxT("Annotation warning text"),       wxT("diagnostics_popup_warntext"), wxColour(  0,   0, 255));
     Manager::Get()->GetColourManager()->RegisterColour(wxT("Diagnostics"), wxT("Annotation error background"),   wxT("diagnostics_popup_errbg"),    wxColour(255, 255, 255));
     Manager::Get()->GetColourManager()->RegisterColour(wxT("Diagnostics"), wxT("Annotation error text"),         wxT("diagnostics_popup_errtext"),  wxColour(255,   0,   0));
+    Manager::Get()->GetColourManager()->RegisterColour(wxT("Diagnostics"), wxT("Marker fixit background"),       wxT("diagnostics_marker_fixitbg"), wxColour(0,     0, 255));
 
     typedef cbEventFunctor<ClangDiagnostics, CodeBlocksEvent> CBCCEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBCCEvent(this, &ClangDiagnostics::OnEditorActivate));
@@ -162,10 +165,15 @@ void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
 
         m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId(fn);
         cbStyledTextCtrl* stc = ed->GetControl();
+
         stc->StyleSetBackground(51, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_popup_warnbg")));
         stc->StyleSetForeground(51, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_popup_warntext")));
         stc->StyleSetBackground(52, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_popup_errbg")));
         stc->StyleSetForeground(52, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_popup_errtext")));
+
+        stc->MarkerDefine( FIXIT_MARKER, wxSCI_MARK_CIRCLE );
+        stc->MarkerSetBackground( FIXIT_MARKER, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_marker_fixitbg")));
+
     }
     m_Diagnostics.clear();
 }
@@ -179,18 +187,61 @@ void ClangDiagnostics::OnEditorClose(CodeBlocksEvent& event)
     m_TranslUnitId = -1;
 }
 
+void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
+{
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    if (!cfg->ReadBool(wxT("/diagnostics_enable_fixits"),   true) )
+        return;
+
+    cbStyledTextCtrl* stc = ed->GetControl();
+
+    int line = stc->LineFromPosition( event.GetPosition() );
+    CCLogger::Get()->DebugLog( F(_T("Margin clicked: %d"), line ) );
+    if ((stc->MarkerGet( line )&(1<<FIXIT_MARKER)) != 0x00 )
+    {
+        for (std::vector<ClDiagnostic>::const_iterator dgItr = m_Diagnostics.begin(); dgItr != m_Diagnostics.end(); ++dgItr )
+        {
+            if (dgItr->line == line + 1)
+            {
+                if (dgItr->fixitList.size() > 0)
+                {
+                    for (std::vector<ClDiagnosticFixit>::const_iterator it = dgItr->fixitList.begin(); it != dgItr->fixitList.end(); ++it)
+                    {
+                        int offsetCorrection = 0;
+                        CCLogger::Get()->DebugLog( F(_T("Perform fix-it at %d,%d"), (int)it->range.first, (int)it->range.second) );
+                        int beginPos = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
+                        int endPos   = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
+                        stc->Replace( beginPos, endPos, it->text );
+                        offsetCorrection += it->text.length() - (endPos - beginPos);
+                    }
+                    stc->MarkerDelete( line, FIXIT_MARKER );
+                    m_pClangPlugin->RequestReparse( m_TranslUnitId, ed->GetFilename() );
+                    return;
+                }
+            }
+        }
+    }
+}
+
 void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
 {
     event.Skip();
     if (!IsAttached())
         return;
-
-    ClDiagnosticLevel diagLv = dlFull; // TODO
-    bool update = false;
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
     cbEditor* ed = edMgr->GetBuiltinActiveEditor();
     if (!ed)
         return;
+
+    if (event.GetStartedTime() < ed->GetLastModificationTime())
+    {
+        CCLogger::Get()->DebugLog( wxT("OnDiagnostics: Document modified since last check") );
+        return;
+    }
+
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    ClDiagnosticLevel diagLv = dlFull; // TODO
+    bool update = false;
 
     if (event.GetTranslationUnitId() != GetCurrentTranslationUnitId())
     {
@@ -233,9 +284,13 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
     {
         int line = event.GetLocation().line-1;
         stc->AnnotationClearLine(line);
+        stc->MarkerDelete( line, FIXIT_MARKER );
     }
     else
+    {
         stc->AnnotationClearAll();
+        stc->MarkerDeleteAll( FIXIT_MARKER );
+    }
 
     int lastLine = 0;
     for (std::vector<ClDiagnostic>::const_iterator dgItr = diagnostics.begin();
@@ -308,6 +363,9 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
         else
             stc->SetIndicatorCurrent(warningIndicator);
         stc->IndicatorFillRange(pos, range);
+        if (cfg->ReadBool(wxT("/diagnostics_enable_fixits"),   true) )
+            if (dgItr->fixitList.size() > 0)
+                stc->MarkerAdd( dgItr->line - 1, FIXIT_MARKER );
         lastLine = dgItr->line - 1;
     }
     if (diagLv == dlFull)

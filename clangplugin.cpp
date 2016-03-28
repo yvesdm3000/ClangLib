@@ -1082,8 +1082,10 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
     ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
     m_Proxy.AppendPendingJob(updateDbJob);
     ClangEvent evt(clEVT_TRANSLATIONUNIT_CREATED, pJob->GetTranslationUnitId(), pJob->GetFilename());
+    evt.SetStartedTime( pJob->GetTimestamp() );
     ProcessEvent(evt);
     ClangEvent evt2(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFilename());
+    evt2.SetStartedTime( pJob->GetTimestamp() );
     ProcessEvent(evt2);
     if (pJob->GetFilename() != ed->GetFilename())
         return;
@@ -1105,6 +1107,7 @@ void ClangPlugin::OnClangReparseFinished( wxEvent& event )
     ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
     m_Proxy.AppendPendingJob(updateDbJob);
     ClangEvent evt(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFilename());
+    evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
 
@@ -1114,6 +1117,7 @@ void ClangPlugin::OnClangUpdateTokenDatabaseFinished(wxEvent& event)
     ClangProxy::UpdateTokenDatabaseJob* pJob = static_cast<ClangProxy::UpdateTokenDatabaseJob*>(event.GetEventObject());
 
     ClangEvent evt(clEVT_TOKENDATABASE_UPDATED, pJob->GetTranslationUnitId(), wxEmptyString);
+    evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
 
@@ -1123,6 +1127,11 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 
     if (!IsProviderFor(ed))
         return;
+    if (event.GetEventType() == wxEVT_SCI_MARGINCLICK)
+    {
+        m_Diagnostics.OnMarginClicked(ed, event);
+        return;
+    }
     if (m_ReparseTimer.IsRunning()&&(m_ReparseNeeded > 0))
     {
         m_ReparseTimer.Stop();
@@ -1143,6 +1152,7 @@ void ClangPlugin::OnClangGetDiagnosticsFinished( wxEvent& event )
     ClangProxy::GetDiagnosticsJob* pJob = static_cast<ClangProxy::GetDiagnosticsJob*>(event.GetEventObject());
 
     ClangEvent evt(clEVT_DIAGNOSTICS_UPDATED, pJob->GetTranslationUnitId(), pJob->GetFilename(), ClTokenPosition(0,0), pJob->GetResults());
+    evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
 
@@ -1150,8 +1160,9 @@ void ClangPlugin::OnClangGetOccurrencesFinished(wxEvent& event)
 {
     event.Skip();
 
-    ClangProxy::GetOccurrencesOfJob* pOCJob = dynamic_cast<ClangProxy::GetOccurrencesOfJob*>(event.GetEventObject());
-    ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pOCJob->GetTranslationUnitId(), pOCJob->GetFilename(), pOCJob->GetLocation(), pOCJob->GetResults());
+    ClangProxy::GetOccurrencesOfJob* pJob = dynamic_cast<ClangProxy::GetOccurrencesOfJob*>(event.GetEventObject());
+    ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFilename(), pJob->GetLocation(), pJob->GetResults());
+    evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
 
@@ -1164,18 +1175,15 @@ void ClangPlugin::OnClangSyncTaskFinished(wxEvent& event)
     {
         ClangProxy::CodeCompleteAtJob* pCCJob = dynamic_cast<ClangProxy::CodeCompleteAtJob*>(pJob);
         ClangEvent evt( clEVT_GETCODECOMPLETE_FINISHED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetResults());
+        evt.SetStartedTime(pJob->GetTimestamp());
         ProcessEvent(evt);
-        //if ( HasEventSink(clEVT_DIAGNOSTICS_UPDATED) )
-        //{
-        //    ClangEvent evt2(clEVT_DIAGNOSTICS_UPDATED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetDiagnostics());
-        //    ProcessEvent(evt2);
-        //}
     }
     else if (event.GetId() == idClangGetCCDocumentationTask)
     {
-        ClangProxy::DocumentCCTokenJob* pCCDocJob = dynamic_cast<ClangProxy::DocumentCCTokenJob*>(pJob);
-        ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pCCDocJob->GetTranslationUnitId(), pCCDocJob->GetFilename(), pCCDocJob->GetLocation(), pCCDocJob->GetResult());
-        ProcessEvent(evt);
+        //ClangProxy::DocumentCCTokenJob* pCCDocJob = dynamic_cast<ClangProxy::DocumentCCTokenJob*>(pJob);
+        //ClangEvent evt( clEVT_GETOCCURRENCES_FINISHED, pCCDocJob->GetTranslationUnitId(), pCCDocJob->GetFilename(), pCCDocJob->GetLocation(), pCCDocJob->GetResult());
+        //evt.SetStartedTime(pJob->GetTimestamp());
+        //ProcessEvent(evt);
     }
 
     pJob->Finalize();
@@ -1256,7 +1264,7 @@ wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, 
     return wxCOND_NO_ERROR;
 }
 
-wxString ClangPlugin::GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location, ClTokenId tokenId)
+wxString ClangPlugin::GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location, const ClTokenId tokenId)
 {
     if (id < 0)
         return wxEmptyString;
@@ -1304,7 +1312,7 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const wxStri
     m_Proxy.AppendPendingJob(job);
 }
 
-void ClangPlugin::RegisterEventSink(wxEventType eventType, IEventFunctorBase<ClangEvent>* functor)
+void ClangPlugin::RegisterEventSink(const wxEventType eventType, IEventFunctorBase<ClangEvent>* functor)
 {
     m_EventSinks[eventType].push_back(functor);
 }

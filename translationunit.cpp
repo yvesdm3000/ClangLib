@@ -409,6 +409,7 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
             rgStart = rgEnd = column;
         str = clang_formatDiagnostic(diag, 0);
         wxString diagText = wxString::FromUTF8(clang_getCString(str));
+        clang_disposeString(str);
         if (diagText.StartsWith(wxT("warning: ")) )
         {
             diagText = diagText.Right( diagText.Length() - 9 );
@@ -432,8 +433,20 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
             sev = sWarning;
             break;
         }
-        inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText ));
-        clang_disposeString(str);
+        std::vector<ClDiagnosticFixit> fixitList;
+        unsigned numFixIts = clang_getDiagnosticNumFixIts( diag );
+        for (unsigned fixIdx = 0; fixIdx < numFixIts; ++fixIdx)
+        {
+            CXSourceRange sourceRange;
+            str = clang_getDiagnosticFixIt( diag, fixIdx, &sourceRange );
+            unsigned fixitStart = rgStart;
+            unsigned fixitEnd = rgEnd;
+            RangeToColumns(sourceRange, fixitStart, fixitEnd);
+            wxString text = wxString::FromUTF8( clang_getCString(str) );
+            clang_disposeString(str);
+            fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd) );
+        }
+        inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText, fixitList ));
     }
 }
 

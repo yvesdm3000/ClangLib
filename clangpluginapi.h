@@ -83,16 +83,26 @@ enum ClDiagnosticLevel { dlPartial, dlFull };
 
 enum ClDiagnosticSeverity { sWarning, sError, sNote };
 
+struct ClDiagnosticFixit
+{
+    ClDiagnosticFixit(const wxString& txt, const unsigned rgStart, const unsigned rgEnd) :
+        text(txt), range(rgStart,rgEnd){}
+
+    wxString text;
+    std::pair<unsigned,unsigned> range;
+};
+
 struct ClDiagnostic
 {
-    ClDiagnostic(const int ln, const int rgStart, const int rgEnd, const ClDiagnosticSeverity level, const wxString& fl, const wxString& msg) :
-        line(ln), range(rgStart, rgEnd), severity(level), file(fl), message(msg) {}
+    ClDiagnostic(const int ln, const unsigned rgStart, const unsigned rgEnd, const ClDiagnosticSeverity level, const wxString& fl, const wxString& msg, const std::vector<ClDiagnosticFixit> fixitL) :
+        line(ln), range(rgStart, rgEnd), severity(level), file(fl), message(msg), fixitList(fixitL) {}
 
     int line;
-    std::pair<int, int> range;
+    std::pair<unsigned, unsigned> range;
     ClDiagnosticSeverity severity;
     wxString file;
     wxString message;
+    std::vector<ClDiagnosticFixit> fixitList;
 };
 
 typedef enum _TokenType
@@ -192,7 +202,16 @@ public:
     {
         return m_DocumentationResults;
     }
+    void SetStartedTime( const wxDateTime& tm )
+    {
+        m_StartedTime = tm;
+    }
+    const wxDateTime& GetStartedTime()
+    {
+        return m_StartedTime;
+    }
 private:
+    wxDateTime m_StartedTime;
     const ClTranslUnitId m_TranslationUnitId;
     const wxString m_Filename;
     const ClTokenPosition m_Location;
@@ -221,7 +240,7 @@ public:
     virtual const wxImageList& GetImageList(const ClTranslUnitId id) = 0;
     virtual const wxStringVec& GetKeywords(const ClTranslUnitId id) = 0;
     /* Events  */
-    virtual void RegisterEventSink(wxEventType, IEventFunctorBase<ClangEvent>* functor) = 0;
+    virtual void RegisterEventSink(const wxEventType, IEventFunctorBase<ClangEvent>* functor) = 0;
     virtual void RemoveAllEventSinksFor(void* owner) = 0;
 
     /** Request reparsing of a Translation unit */
@@ -241,10 +260,9 @@ public:
     virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
                                             bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
     virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,
-                                                         const ClTokenPosition& location, ClTokenId tokenId) = 0;
+                                                         const ClTokenPosition& location, const ClTokenId tokenId) = 0;
     virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                                    std::vector< std::pair<int, int> >& offsets) = 0;
-
 };
 
 /** @brief Base class for ClangPlugin components.

@@ -127,13 +127,14 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     //XRCCTRL(*this, "chkKL_9",               wxCheckBox)->SetValue(cfg->ReadBool(_T("/lexer_keywords_set9"),  false));
 
     // Page "Diagnostics"
-    XRCCTRL(*this, "chkDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics"),   true));
+    XRCCTRL(*this, "chkDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics"),               true));
     XRCCTRL(*this, "chkInlineDiagnostics",      wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_inline"),   true));
-    XRCCTRL(*this, "chkDiagnosticWarnings",     wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_warnings"),   true));
+    XRCCTRL(*this, "chkDiagnosticWarnings",     wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_warnings"), true));
     XRCCTRL(*this, "chkDiagnosticErrors",       wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_errors"),   true));
     XRCCTRL(*this, "chkDiagnosticNotes",        wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_notes"),   false));
+    XRCCTRL(*this, "chkDiagnosticFixits",       wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_enable_fixits"), true));
 
-    XRCCTRL(*this, "chkClangOptionNoAttributes",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wnoattributes"),   false));
+    XRCCTRL(*this, "chkClangOptionNoAttributes",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wnoattributes"),  false));
     XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wextratokens"),   false));
 
 
@@ -265,6 +266,7 @@ void ClangSettingsDlg::OnApply()
     cfg->Write(_T("/diagnostics_show_warnings"),(bool) XRCCTRL(*this, "chkDiagnosticWarnings", wxCheckBox)->GetValue());
     cfg->Write(_T("/diagnostics_show_errors"),  (bool) XRCCTRL(*this, "chkDiagnosticErrors",   wxCheckBox)->GetValue());
     cfg->Write(_T("/diagnostics_show_notes"),   (bool) XRCCTRL(*this, "chkDiagnosticNotes",    wxCheckBox)->GetValue());
+    cfg->Write(_T("/diagnostics_enable_fixits"),(bool) XRCCTRL(*this, "chkDiagnosticFixits",   wxCheckBox)->GetValue());
 
     cfg->Write(_T("/cmdoption_wnoattributes"),  (bool) XRCCTRL(*this, "chkClangOptionNoAttributes", wxCheckBox)->GetValue());
     cfg->Write(_T("/cmdoption_wextratokens"),   (bool) XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->GetValue());
