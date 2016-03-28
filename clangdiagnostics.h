@@ -33,6 +33,7 @@ public: // Clang events
 
 public:
     ClTranslUnitId GetCurrentTranslationUnitId();
+    void OnMarginClicked(cbEditor* ed, wxScintillaEvent& event );
 
 private:
     ClTranslUnitId m_TranslUnitId;

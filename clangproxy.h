@@ -49,7 +49,8 @@ public:
             AbstractJob(),
             wxObject(),
             m_JobType(jt),
-            m_pProxy(nullptr)
+            m_pProxy(nullptr),
+            m_Timestamp( wxDateTime::Now() )
         {
         }
         /** @brief Copy constructor
@@ -61,7 +62,8 @@ public:
             AbstractJob(),
             wxObject(),
             m_JobType( other.m_JobType),
-            m_pProxy( other.m_pProxy )
+            m_pProxy( other.m_pProxy ),
+            m_Timestamp( other.m_Timestamp)
         {
         }
 
@@ -81,6 +83,10 @@ public:
         {
             return m_JobType;
         }
+        const wxDateTime& GetTimestamp() const
+        {
+            return m_Timestamp;
+        }
     public:
         void operator()()
         {
@@ -91,6 +97,7 @@ public:
     protected:
         JobType     m_JobType;
         ClangProxy* m_pProxy;
+        wxDateTime  m_Timestamp;
     };
 
     /**
