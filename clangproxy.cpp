@@ -10,6 +10,7 @@
 
 #ifndef CB_PRECOMP
 #include <algorithm>
+#include <wx/wxscintilla.h>
 #endif // CB_PRECOMP
 
 #include <set>
