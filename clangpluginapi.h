@@ -254,7 +254,7 @@ public:
                                    std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
     /** Occurrences highlighting
      *  Performs an asynchronous request for occurences highlight. Will send an event with */
-    virtual void GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc) = 0;
+    virtual void RequestOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc) = 0;
 
     /** Code completion */
     virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
