@@ -184,7 +184,7 @@ public: // IClangPlugin
                                              const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location);
     void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                            std::vector<std::pair<wxString, wxString> >& out_scopes);
-    void GetOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc);
+    void RequestOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc);
     wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
                                     bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults);
     wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,

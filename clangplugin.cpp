@@ -1231,7 +1231,7 @@ void ClangPlugin::GetFunctionScopes(const ClTranslUnitId translUnitId, const wxS
     m_Proxy.GetFunctionScopes( translUnitId, filename, out_scopes );
 }
 
-void ClangPlugin::GetOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc)
+void ClangPlugin::RequestOccurrencesOf(const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& loc)
 {
     if ((translUnitId == m_TranslUnitId)&&(m_ReparseNeeded > 0))
     {
