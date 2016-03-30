@@ -970,7 +970,7 @@ wxString ClangProxy::DocumentCCToken( const ClTranslUnitId translUnitId, int tkn
         const CXCompletionResult* token = m_TranslUnits[translUnitId].GetCCResult(tknId);
         if (!token)
             return wxEmptyString;
-
+        CCLogger::Get()->DebugLog( F(_T("getdocumentation: ccresult cursor kind: %d"), (int)token->CursorKind));
         int upperBound = clang_getNumCompletionChunks(token->CompletionString);
         if (token->CursorKind == CXCursor_Namespace)
             doc = wxT("namespace ");
