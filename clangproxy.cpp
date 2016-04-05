@@ -758,7 +758,8 @@ void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
         return;
     }
     // Replace with empty one
-    m_TranslUnits[translUnitId] = ClTranslationUnit(translUnitId, nullptr);
+    ClTranslationUnit emptyTU(translUnitId, nullptr);
+    swap( m_TranslUnits[translUnitId], emptyTU );
 }
 
 /** @brief Find a translation unit id from a file id. In case the file id is part of multiple translation units, it will search the one in the argument first.
@@ -1760,7 +1761,7 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
     }
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
     {
-        out_Scopes.push_back( std::make_pair<wxString,wxString>(it->scopeName, it->functionName) );
+        out_Scopes.push_back( std::make_pair(it->scopeName, it->functionName) );
     }
 }
 

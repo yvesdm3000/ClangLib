@@ -58,7 +58,6 @@
 		<Compiler>
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-std=c++0x" />
 			<Add option="-ansi" />
 			<Add option="-fPIC" />
 			<Add option="$(#CB_RELEASE_TYPE)" />
@@ -69,6 +68,7 @@
 			<Add option="-Winvalid-pch" />
 			<Add option="-pthread" />
 			<Add option="`pkg-config --cflags codeblocks`" />
+			<Add option="-std=c++11" />
 			<Add option="-DcbDEBUG" />
 		</Compiler>
 		<Linker>

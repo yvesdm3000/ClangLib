@@ -310,7 +310,7 @@ void ClTranslationUnit::ProcessAllTokens(ClTokenDatabase& database, std::vector<
     std::unique(out_includeFileList.begin(), out_includeFileList.end());
 #if __cplusplus >= 201103L
     //m_Files.shrink_to_fit();
-    fileList.schrink_to_fit();
+    out_includeFileList.shrink_to_fit();
 #else
     //std::vector<ClFileId>(m_Files).swap(m_Files);
     std::vector<ClFileId>(out_includeFileList).swap(out_includeFileList);

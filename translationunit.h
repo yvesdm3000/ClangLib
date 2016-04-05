@@ -51,7 +51,7 @@ public:
     friend void swap( ClTranslationUnit& first, ClTranslationUnit& second )
     {
         using std::swap;
-        assert( first.m_id == second.m_Id );
+        assert( first.m_Id == second.m_Id );
         swap(first.m_Id, second.m_Id);
         swap(first.m_FileId, second.m_FileId);
         swap(first.m_Files, second.m_Files);
