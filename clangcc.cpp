@@ -243,13 +243,13 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
     //CCLogger::Get()->DebugLog( F(wxT("GetAutoCompList m_CCOutstanding=%d m_CCOutstandingTokenStart=%d"), m_CCOutstanding, m_CCOutstandingTokenStart ) );
 
     int CCOutstanding = m_CCOutstanding;
-    if (isAuto)
-        CCOutstanding = 0;
     if ((CCOutstanding > 0) && (m_CCOutstandingTokenStart == tknStart) && m_CCOutstandingResults.empty())
     {
         CCLogger::Get()->DebugLog(wxT("CC request allready requested"));
         return tokens;
     }
+    if (isAuto)
+        CCOutstanding = 0;
     if (m_CCOutstandingTokenStart != tknStart)
     {
         m_CCOutstandingResults.clear();
