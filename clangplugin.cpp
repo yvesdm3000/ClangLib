@@ -1279,7 +1279,7 @@ wxString ClangPlugin::GetCodeCompletionTokenDocumentation(const ClTranslUnitId i
 
 wxString ClangPlugin::GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine, std::vector< std::pair<int, int> >& offsets)
 {
-    return m_Proxy.GetCCInsertSuffix(translId, tknId, newLine, offsets);
+    return m_Proxy.GetCCInsertSuffix(translId, tknId, false, newLine, offsets);
 }
 
 void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const wxString& filename)

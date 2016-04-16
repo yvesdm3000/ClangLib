@@ -835,7 +835,7 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxStri
     {
         return;
     }
-    CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt %d,%d"), location.line, location.column));
+    //CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt %d,%d"), location.line, location.column));
     std::vector<CXUnsavedFile> clUnsavedFiles;
     std::vector<wxCharBuffer> clFileBuffer;
     for (std::map<wxString, wxString>::const_iterator fileIt = unsavedFiles.begin();
@@ -943,7 +943,7 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxStri
         m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, out_diagnostics );
     }
 
-    CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)out_results.size()) );
+    //CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)out_results.size()) );
 }
 
 /** @brief Document a Code Completion token
@@ -1055,7 +1055,7 @@ wxString ClangProxy::DocumentCCToken( const ClTranslUnitId translUnitId, int tkn
  * @return wxString
  *
  */
-wxString ClangProxy::GetCCInsertSuffix( const ClTranslUnitId translUnitId, int tknId, const wxString& newLine, std::vector<std::pair<int, int> >& offsetsList )
+wxString ClangProxy::GetCCInsertSuffix( const ClTranslUnitId translUnitId, int tknId, bool isDecl, const wxString& newLine, std::vector<std::pair<int, int> >& offsetsList )
 {
     CCLogger::Get()->DebugLog( F(wxT("GetCCInsertSuffix TU Id=%d tknId=%d"), translUnitId, tknId) );
     if (translUnitId < 0)
@@ -1089,7 +1089,9 @@ wxString ClangProxy::GetCCInsertSuffix( const ClTranslUnitId translUnitId, int t
             if (state == store)
             {
                 CXString str = clang_getCompletionChunkText(clCompStr, i);
-                const wxString& param = wxT("/*! ") + wxString::FromUTF8(clang_getCString(str)) + wxT(" !*/");
+                wxString param = wxString::FromUTF8(clang_getCString(str));
+                if (!isDecl)
+                    param = wxT("/*! ") + wxString::FromUTF8(clang_getCString(str)) + wxT(" !*/");
                 offsetsList.push_back(std::make_pair(suffix.Length(), suffix.Length() + param.Length()));
                 suffix += param;
                 clang_disposeString(str);
