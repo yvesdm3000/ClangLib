@@ -137,6 +137,7 @@ void ClangCodeCompletion::OnCompleteCode(CodeBlocksEvent &event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
         return;
+    m_CCOutstanding = 0;
     //wxString filename = ed->GetFilename();
     //m_pClangPlugin->RequestReparse( m_TranslUnitId, filename );
 }
@@ -253,9 +254,6 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
     if (m_CCOutstandingTokenStart != tknStart)
     {
         m_CCOutstandingResults.clear();
-    }
-    if ((CCOutstanding > 0) && (m_CCOutstandingTokenStart != tknStart))
-    {
         CCOutstanding = 0;
     }
 
@@ -378,7 +376,6 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         // values (higher numbers) to reduce the total number of weights used.
         if (usedWeights.size() > 3)
         {
-            CCLogger::Get()->DebugLog( wxT("Recalculating weights") );
             std::vector<int> weightsVec(usedWeights.begin(), usedWeights.end());
             std::map<int, int> weightCompr;
             weightCompr[weightsVec[0]] = weightsVec[0];
