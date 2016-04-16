@@ -351,6 +351,8 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
                 pos = stc->WordStartPosition(pos, true);
                 range = stc->WordEndPosition(pos, true) - pos;
             }
+            if (range == 0)
+                range = 1;
         }
         if (dgItr->severity == sError)
             stc->SetIndicatorCurrent(errorIndicator);
@@ -392,3 +394,4 @@ void ClangDiagnostics::OnIdle(wxIdleEvent& WXUNUSED(event))
 {
     //fprintf(stdout,"ClangDiagnostics::OnIdle\n");
 }
+
