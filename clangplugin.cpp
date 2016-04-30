@@ -1175,7 +1175,7 @@ void ClangPlugin::OnClangSyncTaskFinished(wxEvent& event)
     if (event.GetId() == idClangCodeCompleteTask)
     {
         ClangProxy::CodeCompleteAtJob* pCCJob = dynamic_cast<ClangProxy::CodeCompleteAtJob*>(pJob);
-        if (pCCJob == m_pOutstandingCodeCompletion)
+        if ((!m_pOutstandingCodeCompletion)||(*pCCJob == *m_pOutstandingCodeCompletion))
         {
             ClangEvent evt( clEVT_GETCODECOMPLETE_FINISHED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetResults());
             evt.SetStartedTime(pJob->GetTimestamp());
