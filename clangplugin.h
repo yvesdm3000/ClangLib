@@ -213,6 +213,8 @@ private: // Members
     ClangProxy m_Proxy;
     wxImageList m_ImageList;
 
+    ClangProxy::CodeCompleteAtJob* m_pOutstandingCodeCompletion;
+
     wxTimer m_ReparseTimer;
     std::map<wxString, wxString> m_compInclDirs;
     cbEditor* m_pLastEditor;
@@ -220,6 +222,7 @@ private: // Members
     int m_EditorHookId;
     int m_LastCallTipPos;
     std::vector<wxStringVec> m_LastCallTips;
+
     wxString m_CompileCommand;
     int m_UpdateCompileCommand;
     int m_ReparseNeeded;

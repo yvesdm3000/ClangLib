@@ -528,6 +528,7 @@ public:
     /* final */
     class CodeCompleteAtJob : public SyncJob
     {
+        static unsigned int s_SerialNo;
     public:
         /** @brief Constructor
          *
@@ -535,12 +536,12 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        CodeCompleteAtJob( const wxEventType evtType, const int evtId, const bool isAuto,
+        CodeCompleteAtJob( const wxEventType evtType, const int evtId,
                            const wxString& filename, const ClTokenPosition& location,
                            const ClTranslUnitId translId, const std::map<wxString, wxString>& unsavedFiles,
                            bool includeCtors ):
             SyncJob(CodeCompleteAtType, evtType, evtId),
-            m_IsAuto(isAuto),
+            m_SerialNo( ++s_SerialNo ),
             m_Filename(filename),
             m_Location(location),
             m_TranslId(translId),
@@ -549,6 +550,12 @@ public:
             m_pResults(new std::vector<ClToken>()),
             m_Diagnostics()
         {
+        }
+        bool operator==(CodeCompleteAtJob& other)const
+        {
+            if (m_SerialNo == other.m_SerialNo)
+                return true;
+            return false;
         }
 
         ClangJob* Clone() const
@@ -559,7 +566,7 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             std::vector<ClToken> results;
-            clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Location, m_IsAuto, m_UnsavedFiles, results, m_Diagnostics);
+            clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Location, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {
                 switch (tknIt->category)
@@ -619,7 +626,7 @@ public:
          */
         CodeCompleteAtJob( const CodeCompleteAtJob& other ) :
             SyncJob(other),
-            m_IsAuto(other.m_IsAuto),
+            m_SerialNo(other.m_SerialNo),
             m_Filename(other.m_Filename.c_str()),
             m_Location(other.m_Location),
             m_TranslId(other.m_TranslId),
@@ -631,9 +638,8 @@ public:
             {
                 m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
             }
-
         }
-        bool m_IsAuto;
+        unsigned int m_SerialNo;
         wxString m_Filename;
         ClTokenPosition m_Location;
         ClTranslUnitId m_TranslId;
@@ -950,7 +956,7 @@ protected: // jobs that are run only on the thread
     void UpdateTokenDatabase( const ClTranslUnitId translId );
     void GetDiagnostics(  const ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     void CodeCompleteAt(  const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
-                          bool isAuto, const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
+                          const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
     wxString DocumentCCToken( ClTranslUnitId translId, int tknId );
     void GetTokensAt(     const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, std::vector<wxString>& results);
     void GetCallTipsAt(   const ClTranslUnitId translId,const wxString& filename, const ClTokenPosition& location,

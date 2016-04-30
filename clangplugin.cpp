@@ -74,6 +74,7 @@ ClangPlugin::ClangPlugin() :
     m_Database(m_FileDatabase),
     m_Proxy(this, m_Database, m_CppKeywords),
     m_ImageList(16, 16),
+    m_pOutstandingCodeCompletion(nullptr),
     m_ReparseTimer(this, idReparseTimer),
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND),
@@ -1174,9 +1175,14 @@ void ClangPlugin::OnClangSyncTaskFinished(wxEvent& event)
     if (event.GetId() == idClangCodeCompleteTask)
     {
         ClangProxy::CodeCompleteAtJob* pCCJob = dynamic_cast<ClangProxy::CodeCompleteAtJob*>(pJob);
-        ClangEvent evt( clEVT_GETCODECOMPLETE_FINISHED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetResults());
-        evt.SetStartedTime(pJob->GetTimestamp());
-        ProcessEvent(evt);
+        if (pCCJob == m_pOutstandingCodeCompletion)
+        {
+            ClangEvent evt( clEVT_GETCODECOMPLETE_FINISHED, pCCJob->GetTranslationUnitId(), pCCJob->GetFilename(), pCCJob->GetLocation(), pCCJob->GetResults());
+            evt.SetStartedTime(pJob->GetTimestamp());
+            ProcessEvent(evt);
+            delete m_pOutstandingCodeCompletion;
+            m_pOutstandingCodeCompletion = nullptr;
+        }
     }
     else if (event.GetId() == idClangGetCCDocumentationTask)
     {
@@ -1245,6 +1251,21 @@ wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, 
                                              bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults)
 {
     CCLogger::Get()->DebugLog(F(wxT("GetCodeCompletionAt %d,%d"), loc.line, loc.column));
+
+    if ( m_pOutstandingCodeCompletion)
+    {
+        if (  (m_pOutstandingCodeCompletion->GetTranslationUnitId() == translUnitId)
+            &&(m_pOutstandingCodeCompletion->GetFilename() == filename)
+            &&(m_pOutstandingCodeCompletion->GetLocation() == loc)
+           )
+        {
+            // duplicate request
+            return wxCOND_TIMEOUT;
+        }
+        delete m_pOutstandingCodeCompletion;
+        m_pOutstandingCodeCompletion = nullptr;
+    }
+
     std::map<wxString, wxString> unsavedFiles;
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
     for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
@@ -1253,13 +1274,16 @@ wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, 
         if (ed && ed->GetModified())
             unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
     }
-    ClangProxy::CodeCompleteAtJob job(cbEVT_CLANG_SYNCTASK_FINISHED, idClangCodeCompleteTask, 0, filename, loc, translUnitId, unsavedFiles, includeCtors);
-    m_Proxy.AppendPendingJob(job);
+    m_pOutstandingCodeCompletion = new ClangProxy::CodeCompleteAtJob(cbEVT_CLANG_SYNCTASK_FINISHED, idClangCodeCompleteTask, filename, loc, translUnitId, unsavedFiles, includeCtors);
+    m_Proxy.AppendPendingJob(*m_pOutstandingCodeCompletion);
     if( timeout == 0 )
         return wxCOND_TIMEOUT;
-    if (wxCOND_TIMEOUT == job.WaitCompletion(timeout))
+    if (wxCOND_TIMEOUT == m_pOutstandingCodeCompletion->WaitCompletion(timeout))
         return wxCOND_TIMEOUT;
-    out_tknResults = job.GetResults();
+    out_tknResults = m_pOutstandingCodeCompletion->GetResults();
+
+    delete m_pOutstandingCodeCompletion;
+    m_pOutstandingCodeCompletion = nullptr;
 
     return wxCOND_NO_ERROR;
 }

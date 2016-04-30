@@ -20,6 +20,8 @@
 #include <cbcolourmanager.h>
 #include "cclogger.h"
 
+unsigned int ClangProxy::CodeCompleteAtJob::s_SerialNo = 0;
+
 namespace ProxyHelper
 {
 static ClTokenCategory GetTokenCategory(CXCursorKind kind, CX_CXXAccessSpecifier access = CX_CXXInvalidAccessSpecifier)
@@ -826,7 +828,7 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslU
  *
  */
 void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxString& filename,
-                                 const ClTokenPosition& location, bool /*isAuto*/,
+                                 const ClTokenPosition& location,
                                  const std::map<wxString, wxString>& unsavedFiles,
                                  std::vector<ClToken>& out_results,
                                  std::vector<ClDiagnostic>& out_diagnostics )
@@ -1873,4 +1875,3 @@ void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
 
     return;
 }
-
