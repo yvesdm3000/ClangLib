@@ -30,8 +30,8 @@ typedef std::map<ClFileId, ClFunctionScopeList> ClFunctionScopeMap;
 class ClTranslationUnit
 {
 public:
-    ClTranslationUnit(const ClTranslUnitId id);
-    ClTranslationUnit(const ClTranslUnitId id, CXIndex clIndex);
+    ClTranslationUnit(ClTokenIndexDatabase& tokenIndexDatabase, const ClTranslUnitId id);
+    ClTranslationUnit(ClTokenIndexDatabase& tokenIndexDatabase, const ClTranslUnitId id, CXIndex clIndex);
     // move ctor
 #if __cplusplus >= 201103L
     ClTranslationUnit(ClTranslationUnit&& other);
@@ -52,6 +52,7 @@ public:
     {
         using std::swap;
         assert( first.m_Id == second.m_Id );
+        swap(first.m_Database, second.m_Database);
         swap(first.m_Id, second.m_Id);
         swap(first.m_FileId, second.m_FileId);
         swap(first.m_Files, second.m_Files);
@@ -99,16 +100,22 @@ public:
         return m_LastParsed;
     }
 
+    const ClTokenDatabase& GetTokenDatabase()
+    {
+        return m_Database;
+    }
+    bool Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
+                const std::map<wxString, wxString>& unsavedFiles, const bool bReparse = true );
+    void Reparse(const std::map<wxString, wxString>& unsavedFiles);
+    bool ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClFunctionScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const;
+    void SwapTokenDatabase(ClTokenDatabase& other);
     // note that complete_line and complete_column are 1 index, not 0 index!
     CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,
                                            struct CXUnsavedFile* unsaved_files,
                                            unsigned num_unsaved_files );
     const CXCompletionResult* GetCCResult(unsigned index);
-    CXCursor GetTokenAt(const wxString& filename, const ClTokenPosition& location);
-    void Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
-                const std::map<wxString, wxString>& unsavedFiles );
-    void Reparse(const std::map<wxString, wxString>& unsavedFiles);
-    void ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_includeFileList, ClFunctionScopeMap& out_functionScopes) const;
+    CXCursor GetTokenAt(const wxString& filename, const ClTokenPosition& position);
+    wxString GetTokenIdentifierAt(const wxString& filename, const ClTokenPosition& position);
 
     void GetDiagnostics(const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const wxString& filename) const;
@@ -118,7 +125,9 @@ public:
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; }
     void UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList& functionScopes );
     void GetFunctionScopes( const ClFileId fileId, ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes[fileId]; }
+
 private:
+    ClTokenDatabase m_Database;
     ClTranslUnitId m_Id;
     ClFileId m_FileId; ///< The file that triggered the creation of this TU
     std::vector<ClFileId> m_Files; ///< All files linked to this TU

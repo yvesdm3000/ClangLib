@@ -42,7 +42,8 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion
 
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data);
 
-ClTranslationUnit::ClTranslationUnit(const ClTranslUnitId id, CXIndex clIndex) :
+ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase& IndexDatabase, const ClTranslUnitId id, CXIndex clIndex) :
+    m_Database(IndexDatabase),
     m_Id(id),
     m_FileId(-1),
     m_ClIndex(clIndex),
@@ -53,7 +54,8 @@ ClTranslationUnit::ClTranslationUnit(const ClTranslUnitId id, CXIndex clIndex) :
     m_LastParsed(wxDateTime::Now())
 {
 }
-ClTranslationUnit::ClTranslationUnit(const ClTranslUnitId id) :
+ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase& indexDatabase, const ClTranslUnitId id) :
+    m_Database(indexDatabase),
     m_Id(id),
     m_FileId(-1),
     m_ClIndex(nullptr),
@@ -68,6 +70,7 @@ ClTranslationUnit::ClTranslationUnit(const ClTranslUnitId id) :
 
 #if __cplusplus >= 201103L
 ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
+    m_Database(std::move(other.m_Database)),
     m_Id(other.m_Id),
     m_FileId(other.m_FileId),
     m_Files(std::move(other.m_Files)),
@@ -80,6 +83,7 @@ ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
 }
 #else
 ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
+    m_Database(other.m_Database),
     m_Id(other.m_Id),
     m_FileId( other.m_FileId ),
     m_ClIndex(other.m_ClIndex),
@@ -87,6 +91,7 @@ ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
     m_LastCC(nullptr),
     m_LastPos(-1, -1)
 {
+    swap(m_Database, const_cast<ClTranslationUnit&>(other).m_Database);
     m_Files.swap(const_cast<ClTranslationUnit&>(other).m_Files);
     const_cast<ClTranslationUnit&>(other).m_ClTranslUnit = nullptr;
 }
@@ -163,13 +168,30 @@ CXCursor ClTranslationUnit::GetTokenAt(const wxString& filename, const ClTokenPo
     {
         return clang_getNullCursor();
     }
-    return clang_getCursor(m_ClTranslUnit, clang_getLocation(m_ClTranslUnit, GetFileHandle(filename), location.line, location.column));
+    CXCursor cursor = clang_getCursor(m_ClTranslUnit, clang_getLocation(m_ClTranslUnit, GetFileHandle(filename), location.line, location.column));
+    return cursor;
+}
+
+wxString ClTranslationUnit::GetTokenIdentifierAt( const wxString &filename, const ClTokenPosition &position )
+{
+    wxString tokenName;
+    CCLogger::Get()->DebugLog(F(wxT("GetTokenIdentifierAt %d,%d")+filename, position.line, position.column));
+    CXCursor cursor = GetTokenAt( filename, position );
+    CXCompletionString token = clang_getCursorCompletionString(cursor);
+    HashToken( token, tokenName);
+    if (tokenName.length() == 0)
+    {
+        CXString str = clang_getCursorDisplayName(cursor);
+        tokenName = wxString::FromUTF8(clang_getCString(str));
+        clang_disposeString(str);
+    }
+    return tokenName;
 }
 
 /**
  * Parses the supplied file and unsaved files
  */
-void ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<wxString, wxString>& unsavedFiles)
+bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<wxString, wxString>& unsavedFiles, const bool bReparse )
 {
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse %s id=%d"), filename.c_str(), (int)m_Id));
 
@@ -223,21 +245,27 @@ void ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                                                    );
         if (m_ClTranslUnit == nullptr)
         {
-            return;
+            CCLogger::Get()->DebugLog( wxT("clang_parseTranslationUnit failed") );
+            return false;
         }
-        //Reparse(0, nullptr); // seems to improve performance for some reason?
-        int ret = clang_reparseTranslationUnit(m_ClTranslUnit, clUnsavedFiles.size(),
-                                               clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0],
-                                               clang_defaultReparseOptions(m_ClTranslUnit) );
-        if (ret != 0)
+        if (bReparse)
         {
-            CCLogger::Get()->Log(_T("ReparseTranslationUnit failed"));
-            // clang spec specifies that the only valid operation on the translation unit after a failure is to dispose the TU
-            clang_disposeTranslationUnit(m_ClTranslUnit);
-            m_ClTranslUnit = nullptr;
-            return;
+            //Reparse(0, nullptr); // seems to improve performance for some reason?
+            int ret = clang_reparseTranslationUnit(m_ClTranslUnit, clUnsavedFiles.size(),
+                                                   clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0],
+                                                   clang_defaultReparseOptions(m_ClTranslUnit) );
+            if (ret != 0)
+            {
+                CCLogger::Get()->Log(_T("ReparseTranslationUnit failed"));
+                // clang spec specifies that the only valid operation on the translation unit after a failure is to dispose the TU
+                clang_disposeTranslationUnit(m_ClTranslUnit);
+                m_ClTranslUnit = nullptr;
+                return false;
+            }
         }
+        return true;
     }
+    return false;
 }
 
 void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFiles)
@@ -295,32 +323,47 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d finished"), (int)m_Id));
 }
 
-void ClTranslationUnit::ProcessAllTokens(ClTokenDatabase& database, std::vector<ClFileId>& out_includeFileList, ClFunctionScopeMap& out_functionScopes) const
+bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClFunctionScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const
 {
     if (m_ClTranslUnit == nullptr)
-        return;
-    std::pair<std::vector<ClFileId>*, ClTokenDatabase*> visitorData = std::make_pair(&out_includeFileList, &database);
-    clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
+        return false;
+    if (out_pIncludeFileList)
+    {
+        std::pair<std::vector<ClFileId>*, ClTokenDatabase*> visitorData = std::make_pair(out_pIncludeFileList, out_pTokenDatabase);
+        clang_getInclusions(m_ClTranslUnit, ClInclusionVisitor, &visitorData);
+        out_pIncludeFileList->push_back( m_FileId );
+        std::sort(out_pIncludeFileList->begin(), out_pIncludeFileList->end());
+        std::unique(out_pIncludeFileList->begin(), out_pIncludeFileList->end());
+#if __cplusplus >= 201103L
+        //m_Files.shrink_to_fit();
+        out_pIncludeFileList->shrink_to_fit();
+#else
+        //std::vector<ClFileId>(m_Files).swap(m_Files);
+        std::vector<ClFileId>(out_pIncludeFileList).swap(out_pIncludeFileList);
+#endif
+    }
     //m_Files.reserve(1024);
     //m_Files.push_back(m_FileId);
     //std::sort(m_Files.begin(), m_Files.end());
     //std::unique(m_Files.begin(), m_Files.end());
-    out_includeFileList.push_back( m_FileId );
-    std::sort(out_includeFileList.begin(), out_includeFileList.end());
-    std::unique(out_includeFileList.begin(), out_includeFileList.end());
-#if __cplusplus >= 201103L
-    //m_Files.shrink_to_fit();
-    out_includeFileList.shrink_to_fit();
-#else
-    //std::vector<ClFileId>(m_Files).swap(m_Files);
-    std::vector<ClFileId>(out_includeFileList).swap(out_includeFileList);
-#endif
-    struct ClangVisitorContext ctx(&database);
-    //unsigned rc =
-    clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
-    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed, %d function scopes"), (int)m_Id, (int)ctx.tokenCount, (int)ctx.functionScopes.size()));
-    out_functionScopes = ctx.functionScopes;
+    if (out_pTokenDatabase)
+    {
+        struct ClangVisitorContext ctx(out_pTokenDatabase);
+        //unsigned rc =
+        clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
+        CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed, %d function scopes"), (int)m_Id, (int)ctx.tokenCount, (int)ctx.functionScopes.size()));
+        if (out_pFunctionScopes)
+            *out_pFunctionScopes = ctx.functionScopes;
+    }
+
+    return true;
 }
+
+void ClTranslationUnit::SwapTokenDatabase(ClTokenDatabase& other)
+{
+    swap(m_Database, other);
+}
+
 
 void ClTranslationUnit::GetDiagnostics(const wxString& filename,  std::vector<ClDiagnostic>& diagnostics)
 {
@@ -475,7 +518,31 @@ void ClTranslationUnit::UpdateFunctionScopes( const ClFileId fileId, const ClFun
     m_FunctionScopes.erase(fileId);
     m_FunctionScopes.insert(std::make_pair(fileId, functionScopes));
 }
+#if 0
+bool ClTranslationUnit::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_Position)
+{
+    std::set<ClTokenId> tokenIdList;
+    m_Database.GetTokenMatches(identifier, tokenIdList);
 
+    for (std::set<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
+    {
+        ClAbstractToken tok = m_Database.GetToken( *it );
+        if (tok.fileId == fileId)
+        {
+            if ( (tok.tokenType&ClTokenType_DefGroup) == ClTokenType_DefGroup ) // We only want token definitions
+            {
+                CCLogger::Get()->DebugLog( wxT("Candidate: ")+tok.identifier+wxT(" USR=")+tok.USR );
+                if( (usr.Length() == 0)||(tok.USR == usr))
+                {
+                    out_Position = tok.location;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+#endif
 /** @brief Calculate a hash from a Clang token
  *
  * @param token CXCompletionString
@@ -542,42 +609,60 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     case CXCursor_EnumDecl:
     case CXCursor_Namespace:
     case CXCursor_ClassTemplate:
+        typ = ClTokenType_Scope;
         ret = CXChildVisit_Recurse;
-        typ = ClTokenType_ScopeDecl;
         break;
 
     case CXCursor_FieldDecl:
+        typ = ClTokenType_Var;
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_EnumConstantDecl:
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_FunctionDecl:
-        typ = ClTokenType_FuncDecl;
+        typ = ClTokenType_Func;
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_VarDecl:
-        typ = ClTokenType_VarDecl;
+        typ = ClTokenType_Var;
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_ParmDecl:
-        typ = ClTokenType_ParmDecl;
+        typ = ClTokenType_Parm;
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_TypedefDecl:
         //case CXCursor_MacroDefinition: // this can crash Clang on Windows
         ret = CXChildVisit_Continue;
         break;
+//    case CXCursor_TypeRef:
+//        typ = ClTokenType_VarDef;
+//        ret = CXChildVisit_Continue;
+//        break;
     case CXCursor_CXXMethod:
     case CXCursor_Constructor:
     case CXCursor_Destructor:
     case CXCursor_FunctionTemplate:
-        typ = ClTokenType_FuncDecl;
+        typ = ClTokenType_Func;
         ret = CXChildVisit_Continue;
         break;
 
     default:
+//        CCLogger::Get()->DebugLog( F(wxT("Unhandled cursor type: %d"), (int)cursor.kind) );
         return CXChildVisit_Recurse;
+    }
+    if (clang_isCursorDefinition( cursor ))
+    {
+        typ = (ClTokenType)(typ | ClTokenType_DefGroup);
+    }
+    else if (clang_isDeclaration( cursor.kind ))
+    {
+        typ = (ClTokenType)(typ | ClTokenType_DeclGroup);
+    }
+    else if (clang_isExpression( cursor.kind ))
+    {
+        typ = (ClTokenType)(typ | ClTokenType_RefGroup);
     }
 
     CXSourceLocation loc = clang_getCursorLocation(cursor);
@@ -592,9 +677,19 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 
     CXCompletionString token = clang_getCursorCompletionString(cursor);
     wxString identifier;
+    str = clang_getCursorUSR( cursor );
+    wxString usr = wxString::FromUTF8( clang_getCString( str ) );
+    clang_disposeString( str );
     unsigned tokenHash = HashToken(token, identifier);
-    if (!identifier.IsEmpty())
+
+    if (identifier.IsEmpty())
     {
+        //str = clang_getCursorDisplayName(cursor);
+        //wxString displayName = wxString::FromUTF8( clang_getCString( str ) );
+        //CCLogger::Get()->DebugLog( F(wxT("Skipping symbol %d,%d")+displayName, line, col ));
+        //clang_disposeString(str);
+    }else{
+        //CCLogger::Get()->DebugLog( wxT("Visited symbol ")+identifier );
         wxString displayName;
         wxString scopeName;
         while (!clang_Cursor_isNull(cursor))
@@ -625,7 +720,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         }
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
-        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, tokenHash);
+        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, usr, tokenHash);
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
         if (displayName.Length() > 0)

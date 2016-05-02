@@ -31,9 +31,16 @@ public: // Code::Blocks events
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
     void OnTimer(wxTimerEvent& event);
 
+    // Build popup menu
+    virtual void BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data = nullptr);
+
+public: // UI Command Events
+    void OnGotoDefinition(wxCommandEvent& event);
+
 public: // Clang events
     void OnTranslationUnitCreated(ClangEvent& event);
     void OnRequestOccurrencesFinished(ClangEvent& event);
+    void OnGetDefinitionFinished(ClangEvent& event);
 
 private:
     /** Get the current translation unit id */

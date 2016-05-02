@@ -2,6 +2,8 @@
 #define CLANGPLUGIN_H
 
 #include <cbplugin.h>
+#include <cbproject.h>
+
 #include <wx/imaglist.h>
 #include <wx/timer.h>
 
@@ -12,6 +14,7 @@
 #include "clangcc.h"
 #include "clangdiagnostics.h"
 #include "clangrefactoring.h"
+#include "clangindexer.h"
 
 // milliseconds
 #define CLANG_REPARSE_DELAY 10000
@@ -122,24 +125,9 @@ private:
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
     /// Resolve the token under the cursor and open the relevant location
     void OnGotoDeclaration(wxCommandEvent& event);
-    /// Find the token implementation under the cursor and open the relevant location
-    void OnGotoImplementation(wxCommandEvent& event);
-
-    // Async
-    //void OnReparse( wxCommandEvent& evt );
 
     // Async
     void OnCreateTranslationUnit(wxCommandEvent& evt);
-
-    /**
-     * Update editor diagnostic mark up
-     *
-     * @param ed The editor to diagnose
-     * @param diagLv Update only the highlights, or highlights and text annotations
-     */
-    //void DiagnoseEd(cbEditor* ed, DiagnosticLevel diagLv);
-    //void OnDiagnoseEd( wxCommandEvent& event );
-
 
     /// Set the clang translation unit (callback)
     void OnClangCreateTUFinished(wxEvent& event);
@@ -159,9 +147,13 @@ private:
     /// Update after clang has finished building the occurrences list
     void OnClangGetOccurrencesFinished(wxEvent& event);
 
+    void OnClangReindexFinished(wxEvent& event);
+
+    void OnClangLookupDefinitionFinished(wxEvent& event);
 
 private: // Internal utility functions
     // Builds compile command
+    wxString GetCompileCommand(ProjectFile* pf, const wxString& filename);
     int UpdateCompileCommand(cbEditor* ed);
 
     void RequestReparse(int delayMilliseconds = CLANG_REPARSE_DELAY);
@@ -178,10 +170,11 @@ public: // IClangPlugin
     void RemoveAllEventSinksFor(void* owner);
 
     void RequestReparse(const ClTranslUnitId id, const wxString& filename);
+    void BeginReindexFile(const wxString& filename);
     std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
-                                                     const ClTokenPosition& location);
-    void GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
-                                             const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location);
+                                                     const ClTokenPosition& position);
+    void GetFunctionScopePosition(const ClTranslUnitId id, const wxString& filename,
+                                             const wxString& scope, const wxString& functioname, ClTokenPosition& out_Position);
     void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                            std::vector<std::pair<wxString, wxString> >& out_scopes);
     void RequestOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc);
@@ -191,6 +184,7 @@ public: // IClangPlugin
                                                  const ClTokenPosition& loc, const ClTokenId tokenId);
     wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                            std::vector< std::pair<int, int> >& offsets);
+    void RequestTokenDefinitions(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc);
 
     const wxImageList& GetImageList(const ClTranslUnitId WXUNUSED(id))
     {
@@ -208,7 +202,7 @@ private: // Members
     EventSinksMap m_EventSinks;
 
     ClFilenameDatabase m_FileDatabase;
-    ClTokenDatabase m_Database;
+    ClTokenIndexDatabase m_Database;
     wxStringVec m_CppKeywords;
     ClangProxy m_Proxy;
     wxImageList m_ImageList;
@@ -231,6 +225,7 @@ private: // Members
     ClangDiagnostics m_Diagnostics;
     ClangRefactoring m_Refactoring;
     ClangToolbar m_Toolbar;
+    ClangIndexer m_Indexer;
 };
 
 #endif // CLANGPLUGIN_H

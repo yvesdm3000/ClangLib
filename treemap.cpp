@@ -210,17 +210,17 @@ void ClTreeMap<int>::Shrink()
 #endif // USE_TREE_MAP
 }
 
-std::vector<int> ClTreeMap<int>::GetIdSet(const wxString& key) const
+void ClTreeMap<int>::GetIdSet(const wxString& key, std::set<int>& out_ids) const
 {
 #ifdef USE_TREE_MAP
     return m_Root->GetLeaves(key);
 #else
     typedef std::multimap<wxString, int>::const_iterator constLeafItr;
     std::pair<constLeafItr, constLeafItr> rg = m_Root->leaves.equal_range(key);
-    std::vector<int> out;
     for (constLeafItr itr = rg.first; itr != rg.second; ++itr)
-        out.push_back(itr->second);
-    return out;
+    {
+        out_ids.insert(itr->second);
+    }
 #endif // USE_TREE_MAP
 }
 
@@ -235,3 +235,13 @@ int ClTreeMap<int>::GetCount() const
     return 0;
 }
 
+std::set<wxString> ClTreeMap<int>::GetKeySet() const
+{
+    std::set<wxString> retList;
+    typedef std::multimap<wxString, int>::const_iterator constLeafItr;
+    for (constLeafItr it = m_Root->leaves.begin(); it != m_Root->leaves.end(); ++it)
+    {
+        retList.insert( it->first );
+    }
+    return retList;
+}

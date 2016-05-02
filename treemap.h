@@ -2,6 +2,7 @@
 #define TREEMAP_H
 
 #include <vector>
+#include <set>
 
 struct TreeNode;
 class wxString;
@@ -17,9 +18,10 @@ public:
     int Insert(const wxString& key, int value); // returns value
     void Remove(const wxString& key, int value);
     void Shrink();
-    std::vector<int> GetIdSet(const wxString& key) const;
+    void GetIdSet(const wxString& key, std::set<int>& out_ids) const;
     int GetValue(int id) const; // returns id
     int GetCount() const;
+    std::set<wxString> GetKeySet() const;
 private:
     TreeNode* m_Root;
 };
@@ -45,9 +47,9 @@ public:
 #endif
     }
 
-    std::vector<int> GetIdSet(const wxString& key) const
+    void GetIdSet(const wxString& key, std::set<int>& out_ids) const
     {
-        return m_Tree.GetIdSet(key);
+        m_Tree.GetIdSet(key, out_ids);
     }
     void RemoveIdKey( const wxString& key, int id )
     {
@@ -70,6 +72,10 @@ public:
     int GetCount() const
     {
         return m_Data.size();
+    }
+    std::set<wxString> GetKeySet() const
+    {
+        return m_Tree.GetKeySet();
     }
 
 private:

@@ -19,12 +19,15 @@
 #include <algorithm>
 #include <vector>
 #include <wx/dir.h>
+#include <wx/menu.h>
 #include <wx/tokenzr.h>
 #include <wx/choice.h>
+#include <wx/choicdlg.h>
 //#endif // CB_PRECOMP
 #include "cclogger.h"
 
 const int idHighlightTimer = wxNewId();
+const int idGotoDefinition = wxNewId();
 
 #define HIGHLIGHT_DELAY 700
 
@@ -49,12 +52,14 @@ void ClangRefactoring::OnAttach(IClangPlugin* pClangPlugin)
 {
     ClangPluginComponent::OnAttach(pClangPlugin);
 
+    Connect(idGotoDefinition,          wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnGotoDefinition),    nullptr, this);
+
     typedef cbEventFunctor<ClangRefactoring, CodeBlocksEvent> CBEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBEvent(this, &ClangRefactoring::OnEditorActivate));
 
     typedef cbEventFunctor<ClangRefactoring, ClangEvent> ClEvent;
     pClangPlugin->RegisterEventSink(clEVT_GETOCCURRENCES_FINISHED, new ClEvent(this, &ClangRefactoring::OnRequestOccurrencesFinished));
-
+    pClangPlugin->RegisterEventSink(clEVT_GETDEFINITION_FINISHED,  new ClEvent(this, &ClangRefactoring::OnGetDefinitionFinished));
     ConfigurationChanged();
 }
 
@@ -67,6 +72,8 @@ void ClangRefactoring::OnRelease(IClangPlugin* pClangPlugin)
         EditorHooks::UnregisterHook(m_EditorHookId);
     }
     Manager::Get()->RemoveAllEventSinksFor(this);
+
+    Disconnect( idGotoDefinition );
 
     ClangPluginComponent::OnRelease(pClangPlugin);
 }
@@ -243,7 +250,7 @@ void ClangRefactoring::OnRequestOccurrencesFinished(ClangEvent& event)
     const int line = stc->LineFromPosition(pos);
     ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
 
-    if (event.GetLocation() != loc)
+    if (event.GetPosition() != loc)
     {
         CCLogger::Get()->DebugLog( wxT("Location has changed since last GetOccurrences request") );
         return; // Location has changed since the request
@@ -269,5 +276,90 @@ void ClangRefactoring::OnRequestOccurrencesFinished(ClangEvent& event)
          tkn != occurrences.end(); ++tkn)
     {
         stc->IndicatorFillRange(tkn->first, tkn->second);
+    }
+}
+
+void ClangRefactoring::BuildModuleMenu(const ModuleType type, wxMenu* menu,
+                                  const FileTreeData* WXUNUSED(data))
+{
+    if (type != mtEditorManager)
+        return;
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    const int pos = stc->GetCurrentPos();
+    if (stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
+        return;
+    //menu->Insert(0, idGotoDeclaration,    _("Find declaration (clang)"));
+    wxMenuItem* item = menu->Insert(0, idGotoDefinition, _("Goto definition (clang)"));
+    if (GetCurrentTranslationUnitId() == wxNOT_FOUND)
+    {
+        item->Enable(false);
+    }
+}
+
+void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
+{
+    CCLogger::Get()->DebugLog( wxT("OnGotoDefinition") );
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    const int pos = stc->GetCurrentPos();
+    wxString filename = ed->GetFilename();
+    int line = stc->LineFromPosition(pos);
+    int column = pos - stc->PositionFromLine(line);
+    if (stc->GetLine(line).StartsWith(wxT("#include")))
+        column = 3;
+    ClTokenPosition loc(line+1, column+1);
+    ClTranslUnitId translId = GetCurrentTranslationUnitId();
+    if(translId == wxNOT_FOUND)
+        return;
+    CCLogger::Get()->DebugLog( wxT("Calling RequestTokenDefinitions") );
+    m_pClangPlugin->RequestTokenDefinitions( translId, filename, loc );
+}
+
+void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
+{
+    CCLogger::Get()->DebugLog( wxT("OnGetDefinitionFinished") );
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    const std::vector< std::pair<wxString,ClTokenPosition> >& results = event.GetLocationResults();
+
+    CCLogger::Get()->DebugLog( F(wxT("Received %d location results"), (int)results.size()) );
+
+    wxString tokenFilename;
+    ClTokenPosition tokenPosition(0,0);
+
+    if (results.size() == 1)
+    {
+        tokenFilename = results.front().first;
+        tokenPosition = results.front().second;
+    }
+    else if (results.size() > 0)
+    {
+        wxArrayString list;
+        for (std::vector< std::pair<wxString,ClTokenPosition> >::const_iterator it = results.begin(); it != results.end(); ++it)
+            list.Add(F(it->first+wxT(":%d"), it->second.line));
+        int choice = wxGetSingleChoiceIndex(wxT("Please make your choice: "), wxT("Goto definition:"), list);
+        if ((choice >= 0)&&(choice < (int)results.size()))
+        {
+            tokenFilename = results[choice].first;
+            tokenPosition = results[choice].second;
+        }
+        else
+            return;
+    }
+    else // Nothing found...
+        return;
+
+    cbEditor* newEd = Manager::Get()->GetEditorManager()->Open(results.front().first);
+    if (newEd)
+    {
+        CCLogger::Get()->DebugLog( wxT("Going to file ")+results.front().first );
+        newEd->GotoTokenPosition(results.front().second.line - 1, stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true)));
     }
 }

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <vector>
 #include <wx/dir.h>
+#include <wx/menu.h>
 #include <wx/tokenzr.h>
 #include <wx/choice.h>
 //#endif // CB_PRECOMP
@@ -98,6 +99,15 @@ void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
     }
 }
 
+void ClangCodeCompletion::OnEditorSave(CodeBlocksEvent& event)
+{
+    event.Skip();
+    m_CCOutstanding = 0;
+    m_CCOutstandingTokenStart = 0;
+    m_CCOutstandingResults.clear();
+}
+
+
 void ClangCodeCompletion::OnKeyDown(wxKeyEvent& event)
 {
     if (event.GetKeyCode() == WXK_TAB)
@@ -138,8 +148,6 @@ void ClangCodeCompletion::OnCompleteCode(CodeBlocksEvent &event)
     if (!ed)
         return;
     m_CCOutstanding = 0;
-    //wxString filename = ed->GetFilename();
-    //m_pClangPlugin->RequestReparse( m_TranslUnitId, filename );
 }
 
 ClTranslUnitId ClangCodeCompletion::GetCurrentTranslationUnitId()
@@ -530,7 +538,7 @@ void ClangCodeCompletion::OnCodeCompleteFinished(ClangEvent& event)
 
     if (m_CCOutstanding > 0)
     {
-        if (event.GetLocation() != m_CCOutstandingLoc)
+        if (event.GetPosition() != m_CCOutstandingLoc)
         {
             CCLogger::Get()->DebugLog(wxT("Discard old CodeCompletion request result"));
             return;

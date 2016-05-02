@@ -251,7 +251,7 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
     }
 
     const std::vector<ClDiagnostic>& diagnostics = event.GetDiagnosticResults();
-    if ( (diagLv == dlFull)&&(event.GetLocation().line != 0) && (event.GetLocation().column != 0) )
+    if ( (diagLv == dlFull)&&(event.GetPosition().line != 0) && (event.GetPosition().column != 0) )
     {
         CCLogger::Get()->DebugLog( wxT("OnDiagnostics: Doing partial update") );
         update = true;
@@ -282,7 +282,7 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
         stc->AnnotationClearAll();
     else if ((diagLv == dlFull) && update)
     {
-        int line = event.GetLocation().line-1;
+        int line = event.GetPosition().line-1;
         stc->AnnotationClearLine(line);
         stc->MarkerDelete( line, FIXIT_MARKER );
     }

@@ -33,6 +33,7 @@ public:
 
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
+    void OnEditorSave(CodeBlocksEvent& event);
     void OnKeyDown(wxKeyEvent& event);
     void OnCompleteCode(CodeBlocksEvent& event);
 

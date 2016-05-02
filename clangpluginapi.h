@@ -108,14 +108,33 @@ struct ClDiagnostic
 typedef enum _TokenType
 {
     ClTokenType_Unknown = 0,
-    ClTokenType_DeclGroup = 0,
-    ClTokenType_DefGroup  = 1<<9,
 
-    ClTokenType_FuncDecl  = 1 | ClTokenType_DeclGroup,
-    ClTokenType_VarDecl   = 2 | ClTokenType_DeclGroup,
-    ClTokenType_ParmDecl  = 3 | ClTokenType_DeclGroup,
-    ClTokenType_ScopeDecl = 4 | ClTokenType_DeclGroup,
-    ClTokenType_FuncDef   = ClTokenType_FuncDecl | ClTokenType_DefGroup,
+    ClTokenType_DeclGroup = 1<<8,   // Token declaration
+    ClTokenType_DefGroup  = 1<<9,   // Token definition
+    ClTokenType_RefGroup  = 1<<10,  // Token reference (function call, type of a variable declaration etc
+
+    ClTokenType_Func  = 1<<0,
+    ClTokenType_Var   = 1<<1,
+    ClTokenType_Member= 1<<2,
+    ClTokenType_Parm  = 1<<3,
+    ClTokenType_Scope = 1<<4,
+
+    ClTokenType_FuncDecl  = ClTokenType_Func  | ClTokenType_DeclGroup,
+    ClTokenType_VarDecl   = ClTokenType_Var   | ClTokenType_DeclGroup,
+    ClTokenType_MemberDecl= ClTokenType_Member| ClTokenType_DeclGroup,
+    ClTokenType_ParmDecl  = ClTokenType_Parm  | ClTokenType_DeclGroup,
+    ClTokenType_ScopeDecl = ClTokenType_Scope | ClTokenType_DeclGroup,
+
+    ClTokenType_FuncDef   = ClTokenType_Func  | ClTokenType_DefGroup,
+    ClTokenType_VarDef    = ClTokenType_Var   | ClTokenType_DefGroup,
+    ClTokenType_ParmDef   = ClTokenType_Parm  | ClTokenType_DefGroup,
+    ClTokenType_ScopeDef  = ClTokenType_Scope | ClTokenType_DefGroup,
+
+    ClTokenType_FuncRef   = ClTokenType_Func  | ClTokenType_RefGroup,
+    ClTokenType_VarRef    = ClTokenType_Var   | ClTokenType_RefGroup,
+    ClTokenType_MemberRef = ClTokenType_Member| ClTokenType_RefGroup,
+    ClTokenType_ParmRef   = ClTokenType_Parm  | ClTokenType_RefGroup,
+    ClTokenType_ScopeRef  = ClTokenType_Scope | ClTokenType_RefGroup,
 
 } ClTokenType;
 
@@ -128,35 +147,42 @@ public:
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
-        m_Location(0,0) {}
+        m_Position(0,0) {}
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
                 const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
-        m_Location(pos),
+        m_Position(pos),
         m_GetOccurrencesResults(occurrences) {}
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
                 const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
-        m_Location(pos),
+        m_Position(pos),
         m_GetCodeCompletionResults(completions) {}
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
                 const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
-        m_Location(loc),
+        m_Position(loc),
         m_DiagnosticResults(diag) {}
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
                 const ClTokenPosition& loc, const wxString& documentation ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_Filename(filename),
-        m_Location(loc),
+        m_Position(loc),
         m_DocumentationResults(documentation) {}
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+               const ClTokenPosition& loc, const std::vector< std::pair<wxString, ClTokenPosition > >& locations ) :
+        wxCommandEvent(wxEVT_NULL, evtId),
+        m_TranslationUnitId(id),
+        m_Filename(filename),
+        m_Position(loc),
+        m_LocationResults(locations) {}
 
     /** @brief Copy constructor
      *
@@ -167,7 +193,7 @@ public:
         wxCommandEvent(other),
         m_TranslationUnitId(other.m_TranslationUnitId),
         m_Filename(other.m_Filename),
-        m_Location(other.m_Location),
+        m_Position(other.m_Position),
         m_GetOccurrencesResults(other.m_GetOccurrencesResults),
         m_GetCodeCompletionResults(other.m_GetCodeCompletionResults),
         m_DiagnosticResults(other.m_DiagnosticResults),
@@ -182,43 +208,52 @@ public:
     {
         return m_TranslationUnitId;
     }
-    const ClTokenPosition& GetLocation() const
+    const ClTokenPosition& GetPosition() const
     {
-        return m_Location;
+        return m_Position;
     }
-    const std::vector< std::pair<int, int> >& GetOccurrencesResults()
+    const std::vector< std::pair<int, int> >& GetOccurrencesResults() const
     {
         return m_GetOccurrencesResults;
     }
-    const std::vector<ClToken>& GetCodeCompletionResults()
+    const std::vector<ClToken>& GetCodeCompletionResults() const
     {
         return m_GetCodeCompletionResults;
     }
-    const std::vector<ClDiagnostic>& GetDiagnosticResults()
+    const std::vector<ClDiagnostic>& GetDiagnosticResults() const
     {
         return m_DiagnosticResults;
     }
-    const wxString& GetDocumentationResults()
+    const wxString& GetDocumentationResults() const
     {
         return m_DocumentationResults;
+    }
+    const std::vector< std::pair<wxString, ClTokenPosition> > GetLocationResults() const
+    {
+        return m_LocationResults;
     }
     void SetStartedTime( const wxDateTime& tm )
     {
         m_StartedTime = tm;
     }
-    const wxDateTime& GetStartedTime()
+    const wxDateTime& GetStartedTime() const
     {
         return m_StartedTime;
+    }
+    const wxString& GetFilename() const
+    {
+        return m_Filename;
     }
 private:
     wxDateTime m_StartedTime;
     const ClTranslUnitId m_TranslationUnitId;
     const wxString m_Filename;
-    const ClTokenPosition m_Location;
+    const ClTokenPosition m_Position;
     const std::vector< std::pair<int, int> > m_GetOccurrencesResults;
     const std::vector<ClToken> m_GetCodeCompletionResults;
     const std::vector<ClDiagnostic> m_DiagnosticResults;
     const wxString m_DocumentationResults;
+    const std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults;
 };
 
 extern const wxEventType clEVT_TRANSLATIONUNIT_CREATED;
@@ -228,6 +263,8 @@ extern const wxEventType clEVT_GETCODECOMPLETE_FINISHED;
 extern const wxEventType clEVT_GETOCCURRENCES_FINISHED;
 extern const wxEventType clEVT_GETDOCUMENTATION_FINISHED;
 extern const wxEventType clEVT_DIAGNOSTICS_UPDATED;
+extern const wxEventType clEVT_REINDEXFILE_FINISHED;
+extern const wxEventType clEVT_GETDEFINITION_FINISHED;
 
 /* interface */
 class IClangPlugin
@@ -245,11 +282,15 @@ public:
 
     /** Request reparsing of a Translation unit */
     virtual void RequestReparse(const ClTranslUnitId id, const wxString& filename) = 0;
-    /** Retrieve unction scope */
+
+    /** Request reindexing of a file */
+    virtual void BeginReindexFile(const wxString& filename) = 0;
+
+    /** Retrieve function scope */
     virtual std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
-                                                             const ClTokenPosition& location) = 0;
-    virtual void GetFunctionScopeLocation(const ClTranslUnitId id, const wxString& filename,
-                                                     const wxString& scope, const wxString& functioname, ClTokenPosition& out_Location) = 0;
+                                                             const ClTokenPosition& position) = 0;
+    virtual void GetFunctionScopePosition(const ClTranslUnitId id, const wxString& filename,
+                                                     const wxString& scope, const wxString& functioname, ClTokenPosition& out_Position) = 0;
     virtual void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
                                    std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
     /** Occurrences highlighting
@@ -260,9 +301,12 @@ public:
     virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
                                             bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
     virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,
-                                                         const ClTokenPosition& location, const ClTokenId tokenId) = 0;
+                                                         const ClTokenPosition& position, const ClTokenId tokenId) = 0;
     virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                                    std::vector< std::pair<int, int> >& offsets) = 0;
+
+    /** Token definition lookup */
+    virtual void RequestTokenDefinitions(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc) = 0;
 };
 
 /** @brief Base class for ClangPlugin components.
@@ -291,7 +335,10 @@ public:
     {
         return false;
     }
+    /* optional */
     virtual void BuildMenu(wxMenuBar* WXUNUSED(menuBar)) {}
+    /* optional */
+    virtual void BuildModuleMenu(const ModuleType WXUNUSED(type), wxMenu* WXUNUSED(menu), const FileTreeData* WXUNUSED(data)) {}
     // Does this plugin handle code completion for the editor ed?
     virtual cbCodeCompletionPlugin::CCProviderStatus GetProviderStatusFor(cbEditor* WXUNUSED(ed))
     {

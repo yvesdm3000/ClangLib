@@ -94,6 +94,8 @@
 		<Unit filename="clangccsettingsdlg.h" />
 		<Unit filename="clangdiagnostics.cpp" />
 		<Unit filename="clangdiagnostics.h" />
+		<Unit filename="clangindexer.cpp" />
+		<Unit filename="clangindexer.h" />
 		<Unit filename="clangplugin.cpp" />
 		<Unit filename="clangplugin.h" />
 		<Unit filename="clangpluginapi.h" />
