@@ -220,6 +220,7 @@ private: // Members
     wxString m_CompileCommand;
     int m_UpdateCompileCommand;
     int m_ReparseNeeded;
+    ClTranslUnitId m_ReparsingTranslUnitId;
 
     ClangCodeCompletion m_CodeCompletion;
     ClangDiagnostics m_Diagnostics;

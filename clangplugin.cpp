@@ -83,7 +83,8 @@ ClangPlugin::ClangPlugin() :
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND),
     m_UpdateCompileCommand(0),
-    m_ReparseNeeded(0)
+    m_ReparseNeeded(0),
+    m_ReparsingTranslUnitId(wxNOT_FOUND)
 {
     CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger);
     if (!Manager::LoadResource(wxT("clanglib.zip")))
@@ -615,7 +616,7 @@ void ClangPlugin::OnEditorActivate(CodeBlocksEvent& event)
             AddPendingEvent(evt);
         }
         else
-            RequestReparse();
+            RequestReparse(1);
     }
 }
 
@@ -713,7 +714,10 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     const int evId = event.GetId();
     if (evId == idReparseTimer)
     {
-        RequestReparse(m_TranslUnitId, ed->GetFilename());
+        if (m_ReparsingTranslUnitId == m_TranslUnitId)
+            return;
+        if (m_ReparseNeeded > 0)
+            RequestReparse(m_TranslUnitId, ed->GetFilename());
     }
 }
 
@@ -1109,6 +1113,7 @@ void ClangPlugin::OnClangReparseFinished( wxEvent& event )
     event.Skip();
     CCLogger::Get()->DebugLog( F(_T("OnClangReparseFinished reparseNeeded=%d"), m_ReparseNeeded));
     ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
+    m_ReparsingTranslUnitId = wxNOT_FOUND;
     if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
     {
         ClangProxy::GetDiagnosticsJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangGetDiagnostics, pJob->GetTranslationUnitId(), pJob->GetFilename());
@@ -1409,6 +1414,7 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const wxStri
     }
     ClangProxy::ReparseJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReparse, translUnitId, m_CompileCommand, filename, unsavedFiles);
     m_Proxy.AppendPendingJob(job);
+    m_ReparsingTranslUnitId = translUnitId;
 }
 
 void ClangPlugin::RegisterEventSink(const wxEventType eventType, IEventFunctorBase<ClangEvent>* functor)
