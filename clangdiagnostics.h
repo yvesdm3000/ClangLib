@@ -18,8 +18,6 @@ public:
     void OnRelease(IClangPlugin* pClangPlugin);
     void BuildMenu(wxMenuBar* menuBar);
 
-    void OnIdle( wxIdleEvent& event );
-
 public: // Command handlers
     void OnGotoNextDiagnostic(wxCommandEvent& WXUNUSED(event));
     void OnGotoPrevDiagnostic(wxCommandEvent& WXUNUSED(event));

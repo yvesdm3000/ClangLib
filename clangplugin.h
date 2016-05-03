@@ -107,8 +107,6 @@ private:
     void OnCCDebugLogger(CodeBlocksThreadEvent& event);
 
     /// Start up parsing timers
-    void OnEditorOpen(CodeBlocksEvent& event);
-    /// Start up parsing timers
     void OnEditorActivate(CodeBlocksEvent& event);
     void OnEditorSave(CodeBlocksEvent& event);
     void OnEditorClose(CodeBlocksEvent& event);

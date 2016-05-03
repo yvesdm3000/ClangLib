@@ -3,6 +3,7 @@
 
 #include <cbplugin.h>
 
+#define CLANG_CONFIGMANAGER _T("ClangLib")
 
 typedef int8_t ClTranslUnitId;
 typedef int ClTokenId;

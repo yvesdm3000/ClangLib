@@ -11,8 +11,6 @@
 #include <settings.h>
 #include "clangcc.h"
 
-#define CLANG_CONFIGMANAGER _T("ClangLib")
-
 class ClangPlugin;
 
 class ClangSettingsDlg : public cbConfigurationPanel

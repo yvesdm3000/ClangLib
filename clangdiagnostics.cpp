@@ -389,9 +389,3 @@ ClTranslUnitId ClangDiagnostics::GetCurrentTranslationUnitId()
     }
     return m_TranslUnitId;
 }
-
-void ClangDiagnostics::OnIdle(wxIdleEvent& WXUNUSED(event))
-{
-    //fprintf(stdout,"ClangDiagnostics::OnIdle\n");
-}
-

@@ -15,6 +15,7 @@ public:
     void OnRelease(IClangPlugin* pClangPlugin);
 
     void OnProjectOpen(CodeBlocksEvent& evt);
+    void OnEditorOpen(CodeBlocksEvent& evt);
     void OnEditorSave(CodeBlocksEvent& evt);
 
     void OnReindexFileFinished(ClangEvent& evt);
