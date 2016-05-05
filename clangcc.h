@@ -4,6 +4,7 @@
 #include <cbplugin.h>
 #include <wx/imaglist.h>
 #include <wx/timer.h>
+#include <deque>
 
 #include "clangpluginapi.h"
 
@@ -83,6 +84,7 @@ private:
     ClTokenPosition m_CCOutstandingLoc;
     std::vector<ClToken> m_CCOutstandingResults;
     std::vector<wxString> m_TabJumpArguments;
+    std::deque<wxString> m_CCHistory;
 };
 
 

@@ -349,7 +349,6 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
                 tokens.push_back(cbCodeCompletionPlugin::CCToken(tknIt->id, tknIt->name, tknIt->name, tknIt->weight, tknIt->category));
         }
     }
-
     if (!tokens.empty())
     {
         if (prefix.IsEmpty() && (tokens.size() > maxResultCount)) // reduce to give only top matches
@@ -366,6 +365,10 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         for (std::vector<cbCodeCompletionPlugin::CCToken>::iterator tknIt = tokens.begin();
              tknIt != tokens.end(); ++tknIt)
         {
+            if (std::find( m_CCHistory.begin(), m_CCHistory.end(), tknIt->displayName ) != m_CCHistory.end())
+            {
+                tknIt->weight--;
+            }
             usedWeights.insert(tknIt->weight);
             switch (tknIt->category)
             {
@@ -413,8 +416,14 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
 
 bool ClangCodeCompletion::DoAutocomplete( const cbCodeCompletionPlugin::CCToken& token, cbEditor* ed)
 {
-    CCLogger::Get()->DebugLog( wxT("ClangCodeCompletion::DoAutocomplete") );
+    CCLogger::Get()->DebugLog( wxT("ClangCodeCompletion::DoAutocomplete ")+token.displayName );
     wxString tknText = token.name;
+    if (std::find( m_CCHistory.begin(), m_CCHistory.end(), token.displayName ) == m_CCHistory.end())
+    {
+        m_CCHistory.push_front(token.displayName);
+        if (m_CCHistory.size() > 10)
+            m_CCHistory.pop_back();
+    }
     int idx = tknText.Find(wxT(':'));
     if (idx != wxNOT_FOUND)
         tknText.Truncate(idx);
