@@ -55,13 +55,13 @@ DEFINE_EVENT_TYPE(clEVT_GETDEFINITION_FINISHED);
 static const wxString g_InvalidStr(wxT("invalid"));
 const int idReparseTimer    = wxNewId();
 const int idGotoDeclaration = wxNewId();
+const int idCreateTU = wxNewId();
 
 DEFINE_EVENT_TYPE(cbEVT_COMMAND_CREATETU);
 // Asynchronous events received
 DEFINE_EVENT_TYPE(cbEVT_CLANG_ASYNCTASK_FINISHED);
 DEFINE_EVENT_TYPE(cbEVT_CLANG_SYNCTASK_FINISHED);
 
-const int idClangCreateTU = wxNewId();
 const int idClangRemoveTU = wxNewId();
 const int idClangReparse = wxNewId();
 const int idClangReindex = wxNewId();
@@ -72,6 +72,7 @@ const int idClangCodeComplete = wxNewId();
 const int idClangGetCCDocumentation = wxNewId();
 const int idClangGetOccurrences = wxNewId();
 const int idClangLookupDefinition = wxNewId();
+const int idClangTUCreated = wxNewId();
 
 ClangPlugin::ClangPlugin() :
     m_FileDatabase(),
@@ -158,7 +159,6 @@ void ClangPlugin::OnAttach()
     wxStringVec(m_CppKeywords).swap(m_CppKeywords);
 
     typedef cbEventFunctor<ClangPlugin, CodeBlocksEvent> CbEvent;
-    Manager::Get()->RegisterEventSink(cbEVT_EDITOR_OPEN,             new CbEvent(this, &ClangPlugin::OnEditorOpen));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED,        new CbEvent(this, &ClangPlugin::OnEditorActivate));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_SAVE,             new CbEvent(this, &ClangPlugin::OnEditorSave));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_CLOSE,            new CbEvent(this, &ClangPlugin::OnEditorClose));
@@ -171,8 +171,8 @@ void ClangPlugin::OnAttach()
     Connect(g_idCCDebugLogger,             wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCDebugLogger));
     Connect(idReparseTimer,                wxEVT_TIMER,                    wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idGotoDeclaration,             wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangPlugin::OnGotoDeclaration),       nullptr, this);
-    Connect(idClangCreateTU,               cbEVT_COMMAND_CREATETU,         wxCommandEventHandler(ClangPlugin::OnCreateTranslationUnit), nullptr, this);
-    Connect(idClangCreateTU,               cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangCreateTUFinished),        nullptr, this);
+    Connect(idCreateTU,                    cbEVT_COMMAND_CREATETU,         wxCommandEventHandler(ClangPlugin::OnCreateTranslationUnit), nullptr, this);
+    Connect(idClangTUCreated,              cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangCreateTUFinished),        nullptr, this);
     Connect(idClangReparse,                cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangReparseFinished),         nullptr, this);
     Connect(idClangReindex,                cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangReindexFinished),         nullptr, this);
     Connect(idClangGetDiagnostics,         cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangGetDiagnosticsFinished),  nullptr, this);
@@ -221,7 +221,8 @@ void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
     Disconnect(idClangSyncTask);
     Disconnect(idClangGetDiagnostics);
     Disconnect(idClangReparse);
-    Disconnect(idClangCreateTU);
+    Disconnect(idCreateTU);
+    Disconnect(idClangTUCreated);
     Disconnect(idGotoDeclaration);
     Disconnect(idReparseTimer);
     Disconnect(g_idCCDebugLogger);
@@ -583,13 +584,6 @@ void ClangPlugin::OnCCDebugLogger(CodeBlocksThreadEvent& event)
         Manager::Get()->GetLogManager()->DebugLog(event.GetString());
 }
 
-void ClangPlugin::OnEditorOpen(CodeBlocksEvent& event)
-{
-    event.Skip();
-
-    return;
-}
-
 void ClangPlugin::OnEditorActivate(CodeBlocksEvent& event)
 {
     event.Skip();
@@ -611,7 +605,7 @@ void ClangPlugin::OnEditorActivate(CodeBlocksEvent& event)
         UpdateCompileCommand(ed);
         if (m_TranslUnitId == wxNOT_FOUND)
         {
-            wxCommandEvent evt(cbEVT_COMMAND_CREATETU, idClangCreateTU);
+            wxCommandEvent evt(cbEVT_COMMAND_CREATETU, idCreateTU);
             evt.SetString(ed->GetFilename());
             AddPendingEvent(evt);
         }
@@ -744,7 +738,7 @@ void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
             if (ed && ed->GetModified())
                 unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
         }
-        ClangProxy::CreateTranslationUnitJob job( cbEVT_CLANG_ASYNCTASK_FINISHED, idClangCreateTU, filename, m_CompileCommand, unsavedFiles );
+        ClangProxy::CreateTranslationUnitJob job( cbEVT_CLANG_ASYNCTASK_FINISHED, idClangTUCreated, filename, m_CompileCommand, unsavedFiles );
         m_Proxy.AppendPendingJob(job);
     }
 }
@@ -1087,7 +1081,10 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 
     ClangProxy::CreateTranslationUnitJob* pJob = static_cast<ClangProxy::CreateTranslationUnitJob*>(event.GetEventObject());
     if (!pJob)
+    {
+        CCLogger::Get()->DebugLog( wxT("Wrong event detected") );
         return;
+    }
     if (m_TranslUnitId == pJob->GetTranslationUnitId())
     {
         CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );
