@@ -1189,6 +1189,7 @@ public:
 
     ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId);
     ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const wxString& filename);
+    void GetAllTranslationUnitIds( std::set<ClTranslUnitId>& out_list ) const;
 
 protected: // jobs that are run only on the thread
     void CreateTranslationUnit( const wxString& filename, const wxString& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);

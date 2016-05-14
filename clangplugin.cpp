@@ -675,6 +675,7 @@ void ClangPlugin::OnProjectActivate(CodeBlocksEvent& event)
 
 void ClangPlugin::OnProjectOptionsChanged(CodeBlocksEvent& event)
 {
+    CCLogger::Get()->DebugLog( wxT("OnProjectOptionsChanged") );
     event.Skip();
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed && ed->IsOK())
@@ -682,10 +683,11 @@ void ClangPlugin::OnProjectOptionsChanged(CodeBlocksEvent& event)
         int compileCommandChanged = UpdateCompileCommand(ed);
         if (compileCommandChanged)
         {
-            RequestReparse(1);
+            FlushTranslationUnits();
         }
     }
 }
+
 void ClangPlugin::OnProjectTargetsModified(CodeBlocksEvent& event)
 {
     CCLogger::Get()->DebugLog( wxT("OnProjectTargetsModified") );
@@ -696,7 +698,7 @@ void ClangPlugin::OnProjectTargetsModified(CodeBlocksEvent& event)
         int compileCommandChanged = UpdateCompileCommand(ed);
         if (compileCommandChanged)
         {
-            RequestReparse(1);
+            FlushTranslationUnits();
         }
     }
 }
@@ -1244,6 +1246,27 @@ void ClangPlugin::RequestReparse(int millisecs)
     m_ReparseNeeded++;
     m_ReparseTimer.Stop();
     m_ReparseTimer.Start( millisecs, wxTIMER_ONE_SHOT);
+}
+
+void ClangPlugin::FlushTranslationUnits()
+{
+    std::set<ClTranslUnitId> l;
+    m_Proxy.GetAllTranslationUnitIds( l );
+    for (std::set<ClTranslUnitId>::const_iterator it = l.begin(); it != l.end(); ++it)
+    {
+        ClangProxy::RemoveTranslationUnitJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangRemoveTU, *it);
+        m_Proxy.AppendPendingJob(job);
+    }
+    m_TranslUnitId = wxNOT_FOUND;
+    m_ReparseNeeded = 0;
+
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (ed && ed->IsOK())
+    {
+        wxCommandEvent evt(cbEVT_COMMAND_CREATETU, idCreateTU);
+        evt.SetString(ed->GetFilename());
+        AddPendingEvent(evt);
+    }
 }
 
 void ClangPlugin::BeginReindexFile(const wxString& filename)

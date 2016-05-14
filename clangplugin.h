@@ -156,6 +156,7 @@ private: // Internal utility functions
     int UpdateCompileCommand(cbEditor* ed);
 
     void RequestReparse(int delayMilliseconds = CLANG_REPARSE_DELAY);
+    void FlushTranslationUnits();
 
     bool ActivateComponent(ClangPluginComponent* pComponent);
     bool DeactivateComponent(ClangPluginComponent* pComponent);

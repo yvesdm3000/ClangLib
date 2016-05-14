@@ -1909,3 +1909,11 @@ void ClangProxy::BuildCompileArgs(const wxString& filename, const wxString& comm
     }
 }
 
+void ClangProxy::GetAllTranslationUnitIds( std::set<ClTranslUnitId>& out_list ) const
+{
+    for ( std::vector<ClTranslationUnit>::const_iterator it = m_TranslUnits.begin(); it != m_TranslUnits.end(); ++it)
+    {
+        if (it->IsValid())
+            out_list.insert( it->GetId() );
+    }
+}
