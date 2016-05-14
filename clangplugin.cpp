@@ -165,6 +165,7 @@ void ClangPlugin::OnAttach()
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_ACTIVATE,        new CbEvent(this, &ClangPlugin::OnProjectActivate));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_FILE_CHANGED,    new CbEvent(this, &ClangPlugin::OnProjectFileChanged));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_OPTIONS_CHANGED, new CbEvent(this, &ClangPlugin::OnProjectOptionsChanged));
+    Manager::Get()->RegisterEventSink(cbEVT_PROJECT_TARGETS_MODIFIED,new CbEvent(this, &ClangPlugin::OnProjectTargetsModified));
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_CLOSE,           new CbEvent(this, &ClangPlugin::OnProjectClose));
 
     Connect(g_idCCLogger,                  wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCLogger));
@@ -685,6 +686,21 @@ void ClangPlugin::OnProjectOptionsChanged(CodeBlocksEvent& event)
         }
     }
 }
+void ClangPlugin::OnProjectTargetsModified(CodeBlocksEvent& event)
+{
+    CCLogger::Get()->DebugLog( wxT("OnProjectTargetsModified") );
+    event.Skip();
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
+    if (ed && ed->IsOK())
+    {
+        int compileCommandChanged = UpdateCompileCommand(ed);
+        if (compileCommandChanged)
+        {
+            RequestReparse(1);
+        }
+    }
+}
+
 
 void ClangPlugin::OnProjectClose(CodeBlocksEvent& event)
 {

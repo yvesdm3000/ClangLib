@@ -115,6 +115,7 @@ private:
     void OnProjectFileChanged(CodeBlocksEvent& event);
     /// Update project-dependent setup
     void OnProjectOptionsChanged(CodeBlocksEvent& event);
+    void OnProjectTargetsModified(CodeBlocksEvent& event);
     /// Close project
     void OnProjectClose(CodeBlocksEvent& event);
     /// Generic handler for various timers
