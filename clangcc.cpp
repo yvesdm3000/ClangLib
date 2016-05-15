@@ -57,6 +57,7 @@ void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
 
     typedef cbEventFunctor<ClangCodeCompletion, CodeBlocksEvent> CBCCEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBCCEvent(this, &ClangCodeCompletion::OnEditorActivate));
+    Manager::Get()->RegisterEventSink(cbEVT_EDITOR_CC_DONE, new CBCCEvent(this, &ClangCodeCompletion::OnCCDone));
 
     typedef cbEventFunctor<ClangCodeCompletion, ClangEvent> ClCCEvent;
     pClangPlugin->RegisterEventSink(clEVT_TRANSLATIONUNIT_CREATED,  new ClCCEvent(this, &ClangCodeCompletion::OnTranslationUnitCreated));
@@ -107,6 +108,12 @@ void ClangCodeCompletion::OnEditorSave(CodeBlocksEvent& event)
     m_CCOutstandingResults.clear();
 }
 
+void ClangCodeCompletion::OnCCDone(CodeBlocksEvent& event)
+{
+    CCLogger::Get()->DebugLog( wxT("OnCCDone") );
+    event.Skip();
+    m_CCOutstanding = 0;
+}
 
 void ClangCodeCompletion::OnKeyDown(wxKeyEvent& event)
 {
