@@ -1,10 +1,9 @@
 /*
  * Communication proxy to libclang-c
  */
+#include "clangproxy.h"
 
 #include <sdk.h>
-
-#include "clangproxy.h"
 
 #include <wx/tokenzr.h>
 
@@ -591,8 +590,11 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
 
     if ( m_Parents )
     {
+        ClTokenIndexDatabase* db = clangproxy.GetTokenIndexDatabase(m_File.GetProject());
+        if (!db)
+            return;
         // Following code also includes children. Will fix that later
-        ClFileId fileId = clangproxy.m_Database.GetFilenameId(m_Filename);
+        ClFileId fileId = db->GetFilenameId(m_File.GetFilename());
         std::set<ClTranslUnitId> parentTranslUnits;
         {
             wxMutexLocker l(clangproxy.m_Mutex);
@@ -618,6 +620,43 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
 
 }
 
+void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
+{
+    ClTokenIndexDatabase* database = clangproxy.GetTokenIndexDatabase( m_File.GetProject() );
+    if (!database)
+    {
+        database = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
+    }
+    wxFileName fn(m_File.GetFilename());
+    wxDateTime timestamp = fn.GetModificationTime();
+    CCLogger::Get()->DebugLog(F(wxT("Reindex on tokenindexdb %p project=")+m_File.GetProject(), database));
+    CXIndex clangIndex = clang_createIndex(0,0);
+    { // Scope for TU
+        ClTranslationUnit tu(database, 127, clangIndex);
+        ClFileId fileId = database->GetFilenameId(m_File.GetFilename());
+        std::vector<wxCharBuffer> argsBuffer;
+        std::vector<const char*> args;
+        clangproxy.BuildCompileArgs( m_File.GetFilename(), m_Commands, argsBuffer, args );
+        const std::map<wxString, wxString> unsavedFiles; // No unsaved files for reindex...
+        if (!tu.Parse( m_File.GetFilename(), fileId, args, unsavedFiles, false ))
+        {
+            CCLogger::Get()->DebugLog(wxT("Reindex: Parsing failed for ")+m_File.GetFilename());
+        }
+        else
+        {
+            std::vector<ClFileId> includeFileList;
+            ClFunctionScopeMap functionScopes;
+            ClTokenDatabase tokenDatabase(database);
+            tu.ProcessAllTokens( &includeFileList, &functionScopes, &tokenDatabase );
+            tokenDatabase.StoreIndexes();
+            database->UpdateFilenameTimestamp(fileId, timestamp);
+        }
+    }
+    clang_disposeIndex(clangIndex);
+    //clangproxy.StoreTokenIndexDatabase( m_File.GetProject() );
+}
+
+
 /** @brief ClangProxy constructor.
  *
  * @param pEvtCallbackHandler Pointer to the event handler where to send completed jobs to
@@ -625,9 +664,9 @@ void ClangProxy::ReparseJob::Execute(ClangProxy& clangproxy)
  * @param cppKeywords CPP Keywords to use
  *
  */
-ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, ClTokenIndexDatabase& database, const std::vector<wxString>& cppKeywords):
+ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, const std::vector<wxString>& cppKeywords):
     m_Mutex(),
-    m_Database(database),
+    m_DatabaseMap(),
     m_CppKeywords(cppKeywords),
     m_pEventCallbackHandler(pEvtCallbackHandler)
 {
@@ -665,14 +704,22 @@ ClangProxy::~ClangProxy()
  *
  * This call will choose either a free slot of translation units or free one if all slots are occupied. It then parses the translation unit and when that is successfull, assign it a slot.
  */
-void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
+void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
 {
-    if ( filename.Length() == 0 )
+    if (file.GetFilename().Length() == 0)
+    {
+        CCLogger::Get()->DebugLog( wxT("Cannot create TU from file '")+file.GetFilename()+wxT("'") );
         return;
+    }
     std::vector<wxCharBuffer> argsBuffer;
     std::vector<const char*> args;
+    ClTokenIndexDatabase* db = GetTokenIndexDatabase( file.GetProject() );
+    if (!db)
+    {
+        db = LoadTokenIndexDatabase( file.GetProject() );
+    }
 
-    BuildCompileArgs(filename, commands, argsBuffer, args);
+    BuildCompileArgs(file.GetFilename(), commands, argsBuffer, args);
 
     std::vector<ClTranslationUnit>::iterator it;
     int id = 0;
@@ -707,9 +754,9 @@ void ClangProxy::CreateTranslationUnit(const wxString& filename, const wxString&
             }
         }
     }
-    ClTranslationUnit tu = ClTranslationUnit(m_Database, translId, m_ClIndex);
-    ClFileId fileId = m_Database.GetFilenameId(filename);
-    tu.Parse(filename, fileId, args, unsavedFiles);
+    ClTranslationUnit tu = ClTranslationUnit(db, translId, m_ClIndex);
+    ClFileId fileId = db->GetFilenameId(file.GetFilename());
+    tu.Parse(file.GetFilename(), fileId, args, unsavedFiles);
     {
         wxMutexLocker lock(m_Mutex);
         if (it == m_TranslUnits.end())
@@ -747,7 +794,7 @@ void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
         return;
     }
     // Replace with empty one
-    ClTranslationUnit tu(m_Database, translUnitId, nullptr);
+    ClTranslationUnit tu(nullptr, translUnitId, nullptr);
     swap(m_TranslUnits[translUnitId], tu);
 }
 
@@ -758,7 +805,7 @@ void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
  * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
  *
  */
-ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId)
+ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId) const
 {
     wxMutexLocker locker(m_Mutex);
 
@@ -797,9 +844,12 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslU
  * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
  *
  */
-ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const wxString& filename)
+ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const ClangFile& file) const
 {
-    return GetTranslationUnitId( CtxTranslUnitId, m_Database.GetFilenameId(filename));
+    const ClTokenIndexDatabase* db = GetTokenIndexDatabase( file.GetProject() );
+    if (!db)
+        return wxNOT_FOUND;
+    return GetTranslationUnitId( CtxTranslUnitId, db->GetFilenameId(file.GetFilename()));
 }
 
 /** @brief Perform codecompletion
@@ -994,7 +1044,7 @@ wxString ClangProxy::DocumentCCToken( const ClTranslUnitId translUnitId, int tkn
             if (tId != wxNOT_FOUND)
             {
                 ClAbstractToken aTkn = m_TranslUnits[translUnitId].GetTokenDatabase().GetToken(tId);
-                CXCursor clTkn = m_TranslUnits[translUnitId].GetTokenAt(m_Database.GetFilename(aTkn.fileId),
+                CXCursor clTkn = m_TranslUnits[translUnitId].GetTokenAt(m_TranslUnits[translUnitId].GetTokenDatabase().GetFilename(aTkn.fileId),
                                  aTkn.location);
                 if (!clang_Cursor_isNull(clTkn) && !clang_isInvalid(clTkn.kind))
                 {
@@ -1182,7 +1232,7 @@ void ClangProxy::RefineTokenType( const ClTranslUnitId translUnitId, int tknId, 
         if (tId != wxNOT_FOUND)
         {
             const ClAbstractToken& aTkn = m_TranslUnits[translUnitId].GetTokenDatabase().GetToken(tId);
-            CXCursor clTkn = m_TranslUnits[translUnitId].GetTokenAt(m_Database.GetFilename(aTkn.fileId),
+            CXCursor clTkn = m_TranslUnits[translUnitId].GetTokenAt(m_TranslUnits[translUnitId].GetTokenDatabase().GetFilename(aTkn.fileId),
                              aTkn.location);
             if (!clang_Cursor_isNull(clTkn) && !clang_isInvalid(clTkn.kind))
             {
@@ -1245,7 +1295,7 @@ void ClangProxy::GetCallTipsAt( const ClTranslUnitId translUnitId, const wxStrin
     for (std::set<ClTokenId>::const_iterator itr = tknIds.begin(); itr != tknIds.end(); ++itr)
     {
         const ClAbstractToken& aTkn = m_TranslUnits[translUnitId].GetTokenDatabase().GetToken(*itr);
-        CXCursor token = m_TranslUnits[translUnitId].GetTokenAt(m_Database.GetFilename(aTkn.fileId),
+        CXCursor token = m_TranslUnits[translUnitId].GetTokenAt(m_TranslUnits[translUnitId].GetTokenDatabase().GetFilename(aTkn.fileId),
                          aTkn.location);
         if (!clang_Cursor_isNull(token) && !clang_isInvalid(token.kind))
             tokenSet.push_back(token);
@@ -1673,7 +1723,6 @@ bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const wxString& i
  */
 void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& location, wxString &out_ScopeName, wxString &out_MethodName )
 {
-    ClFileId fileId = m_Database.GetFilenameId(filename);
     if (translUnitId < 0)
     {
         out_ScopeName = wxT("");
@@ -1689,6 +1738,7 @@ void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wx
             out_MethodName = wxT("");
             return;
         }
+        ClFileId fileId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
         m_TranslUnits[translUnitId].GetFunctionScopes( fileId, functionScopes );
     }
     ClFunctionScopeList::const_iterator candidate = functionScopes.end();
@@ -1726,7 +1776,6 @@ void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wx
  */
 void ClangProxy::GetFunctionScopePosition( const ClTranslUnitId translUnitId, const wxString& filename, const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Location)
 {
-    ClFileId fId = m_Database.GetFilenameId( filename );
     if (translUnitId < 0 )
     {
         out_Location = ClTokenPosition(0,0);
@@ -1740,6 +1789,7 @@ void ClangProxy::GetFunctionScopePosition( const ClTranslUnitId translUnitId, co
             out_Location = ClTokenPosition(0,0);
             return;
         }
+        ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
         m_TranslUnits[translUnitId].GetFunctionScopes(fId, functionScopes);
     }
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
@@ -1759,7 +1809,6 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
     {
         return;
     }
-    ClFileId fId = m_Database.GetFilenameId( filename );
     ClFunctionScopeList functionScopes;
     {
         wxMutexLocker lock(m_Mutex);
@@ -1767,6 +1816,7 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
         {
             return;
         }
+        ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
         m_TranslUnits[translUnitId].GetFunctionScopes(fId,functionScopes);
     }
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it )
@@ -1787,7 +1837,7 @@ void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const wxString& /*c
 {
     if (translUnitId < 0 )
         return;
-    ClTranslationUnit tu(m_Database, translUnitId);
+    ClTranslationUnit tu(nullptr, translUnitId);
     {
         wxMutexLocker lock(m_Mutex);
         if (translUnitId >= (int)m_TranslUnits.size())
@@ -1814,7 +1864,7 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
 {
     if (translUnitId < 0 )
         return;
-    ClTranslationUnit tu(m_Database, translUnitId);
+    ClTranslationUnit tu(nullptr, translUnitId);
     {
         wxMutexLocker lock(m_Mutex);
         if (translUnitId >= (int)m_TranslUnits.size())
@@ -1826,7 +1876,7 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
     {
         std::vector<ClFileId> includeFiles;
         ClFunctionScopeMap functionScopes;
-        ClTokenDatabase tokenDatabase(m_Database);
+        ClTokenDatabase tokenDatabase(tu.GetTokenIndexDatabase());
         if (tu.ProcessAllTokens( &includeFiles, &functionScopes, &tokenDatabase ) )
         {
             tu.SetFiles(includeFiles);
@@ -1917,3 +1967,72 @@ void ClangProxy::GetAllTranslationUnitIds( std::set<ClTranslUnitId>& out_list ) 
             out_list.insert( it->GetId() );
     }
 }
+
+void ClangProxy::GetLoadedTokenIndexDatabases( std::set<wxString>& out_projectFileNamesSet ) const
+{
+    for (ClTokenIndexDatabaseMap_t::const_iterator it = m_DatabaseMap.begin(); it != m_DatabaseMap.end(); ++it)
+    {
+        out_projectFileNamesSet.insert( it->first );
+    }
+}
+
+wxString ClangProxy::GetTokenIndexDatabaseFilename( const wxString& project )
+{
+    wxFileName fn(project);
+    fn.ClearExt();
+    fn.SetExt(wxT("indexdb"));
+    return fn.GetFullPath();
+}
+
+ClTokenIndexDatabase* ClangProxy::GetTokenIndexDatabase( const wxString& projectFileName )
+{
+    ClTokenIndexDatabaseMap_t::iterator it = m_DatabaseMap.find(projectFileName);
+    if (it == m_DatabaseMap.end())
+        return nullptr;
+    return it->second;
+}
+
+const ClTokenIndexDatabase* ClangProxy::GetTokenIndexDatabase( const wxString& projectFileName ) const
+{
+    ClTokenIndexDatabaseMap_t::const_iterator it = m_DatabaseMap.find(projectFileName);
+    if (it == m_DatabaseMap.end())
+        return nullptr;
+    return it->second;
+}
+
+
+ClTokenIndexDatabase* ClangProxy::LoadTokenIndexDatabase( const wxString& projectFileName )
+{
+    ClTokenIndexDatabaseMap_t::const_iterator it = m_DatabaseMap.find(projectFileName);
+    if (it == m_DatabaseMap.end())
+    {
+        ClTokenIndexDatabase* ret = new ClTokenIndexDatabase();
+        m_DatabaseMap.insert( std::make_pair( projectFileName, ret ) );
+        wxString fn = GetTokenIndexDatabaseFilename( projectFileName );
+        CCLogger::Get()->DebugLog( wxT("Reading token index database from ")+fn );
+        wxFileInputStream in(fn);
+        ClTokenIndexDatabase::ReadIn( *ret, in );
+        return ret;
+    }
+    return it->second;
+}
+
+void ClangProxy::StoreTokenIndexDatabase( const wxString& projectFileName ) const
+{
+    if (projectFileName.Length() == 0)
+    {
+        CCLogger::Get()->DebugLog(wxT("StoreTokenIndexDatabase: empty project filename"));
+        return;
+    }
+    const ClTokenIndexDatabase* db = GetTokenIndexDatabase( projectFileName );
+    if (!db)
+    {
+        CCLogger::Get()->DebugLog(wxT("StoreTokenIndexDatabase: no token index database found"));
+        return;
+    }
+    CCLogger::Get()->DebugLog( F(wxT("Storing tokenIndexDb %p project=")+projectFileName, db) );
+    wxFileOutputStream out(GetTokenIndexDatabaseFilename(projectFileName));
+
+    ClTokenIndexDatabase::WriteOut( *db, out );
+}
+

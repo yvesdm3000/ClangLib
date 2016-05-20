@@ -57,6 +57,7 @@ class ClFilenameDatabase
 {
 public:
     ClFilenameDatabase();
+    ClFilenameDatabase(const ClFilenameDatabase& Other);
     ~ClFilenameDatabase();
 
     static bool ReadIn(ClFilenameDatabase& tokenDatabase, wxInputStream& in);
@@ -74,12 +75,14 @@ private:
 class ClTokenIndexDatabase
 {
 public:
-    ClTokenIndexDatabase(ClFilenameDatabase& fileDB) :
-        m_FileDB(fileDB),
+    ClTokenIndexDatabase() :
+        m_FileDB(),
         m_pIndexTokenMap( new ClTreeMap<ClIndexToken>() ),
+        m_bModified(false),
         m_Mutex(wxMUTEX_RECURSIVE){}
     ClTokenIndexDatabase(const ClTokenIndexDatabase& other) :
         m_FileDB(other.m_FileDB),
+        m_bModified(other.m_bModified),
         m_Mutex(wxMUTEX_RECURSIVE){}
     ~ClTokenIndexDatabase()
     {
@@ -89,9 +92,10 @@ public:
     static bool ReadIn(ClTokenIndexDatabase& tokenDatabase, wxInputStream& in);
     static bool WriteOut(const ClTokenIndexDatabase& tokenDatabase, wxOutputStream& out);
 
-    ClFileId GetFilenameId( const wxString& filename ){ return m_FileDB.GetFilenameId( filename ); }
+    ClFileId GetFilenameId( const wxString& filename ) const { return m_FileDB.GetFilenameId( filename ); }
     wxString GetFilename(ClFileId fId) const { return m_FileDB.GetFilename( fId );}
     wxDateTime GetFilenameTimestamp( const ClFileId fId ) const { return m_FileDB.GetFilenameTimestamp( fId );}
+    void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp) { m_FileDB.UpdateFilenameTimestamp( fId, timestamp );}
 
     std::set<ClFileId> LookupTokenFileList( const wxString& identifier, const ClTokenType typeMask ) const
     {
@@ -129,28 +133,38 @@ public:
             ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
             if (token.fileId == fileId)
             {
-                token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
+                ClTokenType tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
+                if (token.tokenTypeMask != tokenTypeMask)
+                {
+                    m_bModified = true;
+                    token.tokenTypeMask = tokenTypeMask;
+                }
                 return;
             }
         }
         m_pIndexTokenMap->Insert( identifier, ClIndexToken(fileId, tokType) );
+        m_bModified = true;
     }
     void Clear()
     {
         delete(m_pIndexTokenMap);
         m_pIndexTokenMap = new ClTreeMap<ClIndexToken>();
     }
+    bool IsModified() const { return m_bModified; }
 
 private:
-    ClFilenameDatabase& m_FileDB;
+    ClFilenameDatabase m_FileDB;
     ClTreeMap<ClIndexToken>* m_pIndexTokenMap;
+    bool m_bModified;
     mutable wxMutex m_Mutex;
 };
+
+typedef std::map<wxString, ClTokenIndexDatabase*> ClTokenIndexDatabaseMap_t;
 
 class ClTokenDatabase
 {
 public:
-    ClTokenDatabase(ClTokenIndexDatabase& IndexDB);
+    ClTokenDatabase(ClTokenIndexDatabase* IndexDB);
     ClTokenDatabase(const ClTokenDatabase& other);
     ~ClTokenDatabase();
 
@@ -188,11 +202,13 @@ public:
     unsigned long GetTokenCount();
 
     void StoreIndexes() const;
-    ClTokenIndexDatabase& GetTokenIndexDatabase() const { return m_TokenIndexDB; }
+    ClTokenIndexDatabase* GetTokenIndexDatabase() { return m_pTokenIndexDB; }
+    const ClTokenIndexDatabase* GetTokenIndexDatabase() const { return m_pTokenIndexDB; }
 private:
     void UpdateToken(const ClTokenId tokenId, const ClAbstractToken& token);
 private:
-    ClTokenIndexDatabase& m_TokenIndexDB;
+    ClTokenIndexDatabase* m_pTokenIndexDB;
+    ClTokenIndexDatabase* m_pLocalTokenIndexDB;
     ClTreeMap<ClAbstractToken>* m_pTokens;
     ClTreeMap<int>* m_pFileTokens;
     mutable wxMutex m_Mutex;

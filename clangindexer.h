@@ -21,7 +21,7 @@ public:
     void OnReindexFileFinished(ClangEvent& evt);
 
 private:
-    std::set<wxString> m_StagingFiles;
+    std::set<ClangFile> m_StagingFiles;
 };
 
 #endif //CLANGINDEXER_H

@@ -25,10 +25,6 @@
 //#endif // CB_PRECOMP
 #include "cclogger.h"
 
-const int idHighlightTimer = wxNewId();
-
-#define HIGHLIGHT_DELAY 700
-
 const wxString ClangCodeCompletion::SettingName = _T("/code_completion");
 
 ClangCodeCompletion::ClangCodeCompletion() :
@@ -37,14 +33,14 @@ ClangCodeCompletion::ClangCodeCompletion() :
     m_CCOutstanding(0),
     m_CCOutstandingLastMessageTime(0),
     m_CCOutstandingTokenStart(-1),
-    m_CCOutstandingLoc(0,0)
+    m_CCOutstandingLoc(0,0),
+    m_CCHistory()
 {
 
 }
 
 ClangCodeCompletion::~ClangCodeCompletion()
 {
-
 }
 
 void ClangCodeCompletion::OnAttach(IClangPlugin* pClangPlugin)
@@ -82,8 +78,12 @@ void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
     if (ed)
     {
         wxString fn = ed->GetFilename();
-
-        ClTranslUnitId id = m_pClangPlugin->GetTranslationUnitId(fn);
+        ClangFile file(ed->GetFilename());
+        if (ed->GetProjectFile())
+        {
+            file = ClangFile(*ed->GetProjectFile());
+        }
+        ClTranslUnitId id = m_pClangPlugin->GetTranslationUnitId(file);
         m_TranslUnitId = id;
         m_CCOutstanding = 0;
         m_CCOutstandingLastMessageTime = 0;
@@ -164,8 +164,12 @@ ClTranslUnitId ClangCodeCompletion::GetCurrentTranslationUnitId()
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
         if (!ed)
             return wxNOT_FOUND;
-        wxString filename = ed->GetFilename();
-        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( filename );
+        ClangFile file(ed->GetFilename());
+        if (ed->GetProjectFile())
+        {
+            file = ClangFile(*ed->GetProjectFile());
+        }
+        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( file );
     }
     return m_TranslUnitId;
 }
@@ -408,7 +412,6 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
             }
         }
     }
-
     CCLogger::Get()->DebugLog( F(wxT("Delivering list of CC Tokens %d total (%d,%d) curPos=%d"), (int)tokens.size(), (int)tknStart, (int)tknEnd, (int)stc->GetCurrentPos()) );
 
     return tokens;

@@ -156,14 +156,18 @@ void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed)
     {
-        wxString fn = ed->GetFilename();
+        ClangFile file(ed->GetFilename());
+        if (ed->GetProjectFile())
+        {
+            file = ClangFile(*ed->GetProjectFile());
+        }
 
         ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
         m_bShowInline  = cfg->ReadBool(wxT("/diagnostics_show_inline"),   true);
         m_bShowWarning = cfg->ReadBool(wxT("/diagnostics_show_warnings"), true);
         m_bShowError   = cfg->ReadBool(wxT("/diagnostics_show_errors"),   true);
 
-        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId(fn);
+        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId(file);
         cbStyledTextCtrl* stc = ed->GetControl();
 
         stc->StyleSetBackground(51, Manager::Get()->GetColourManager()->GetColour(wxT("diagnostics_popup_warnbg")));
@@ -215,7 +219,10 @@ void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
                         offsetCorrection += it->text.length() - (endPos - beginPos);
                     }
                     stc->MarkerDelete( line, FIXIT_MARKER );
-                    m_pClangPlugin->RequestReparse( m_TranslUnitId, ed->GetFilename() );
+                    ClangFile file(ed->GetFilename());
+                    if (ed->GetProjectFile())
+                        file = ClangFile( *ed->GetProjectFile());
+                    m_pClangPlugin->RequestReparse( m_TranslUnitId, file );
                     return;
                 }
             }
@@ -384,8 +391,10 @@ ClTranslUnitId ClangDiagnostics::GetCurrentTranslationUnitId()
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
         if (!ed)
             return wxNOT_FOUND;
-        wxString filename = ed->GetFilename();
-        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( filename );
+        ClangFile file(ed->GetFilename());
+        if (ed->GetProjectFile())
+            file = ClangFile(*ed->GetProjectFile());
+        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( file );
     }
     return m_TranslUnitId;
 }

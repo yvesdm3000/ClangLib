@@ -30,8 +30,8 @@ typedef std::map<ClFileId, ClFunctionScopeList> ClFunctionScopeMap;
 class ClTranslationUnit
 {
 public:
-    ClTranslationUnit(ClTokenIndexDatabase& tokenIndexDatabase, const ClTranslUnitId id);
-    ClTranslationUnit(ClTokenIndexDatabase& tokenIndexDatabase, const ClTranslUnitId id, CXIndex clIndex);
+    ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id);
+    ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex clIndex);
     // move ctor
 #if __cplusplus >= 201103L
     ClTranslationUnit(ClTranslationUnit&& other);
@@ -69,7 +69,7 @@ public:
         return idx == m_ClIndex;
     }
 
-    bool Contains(ClFileId fId)
+    bool Contains(ClFileId fId) const
     {
         return std::binary_search(m_Files.begin(), m_Files.end(), fId);
     }
@@ -104,6 +104,16 @@ public:
     {
         return m_Database;
     }
+
+    const ClTokenIndexDatabase* GetTokenIndexDatabase() const
+    {
+        return m_Database.GetTokenIndexDatabase();
+    }
+    ClTokenIndexDatabase* GetTokenIndexDatabase()
+    {
+        return m_Database.GetTokenIndexDatabase();
+    }
+
     bool Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
                 const std::map<wxString, wxString>& unsavedFiles, const bool bReparse = true );
     void Reparse(const std::map<wxString, wxString>& unsavedFiles);

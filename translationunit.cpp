@@ -42,7 +42,7 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion
 
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data);
 
-ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase& IndexDatabase, const ClTranslUnitId id, CXIndex clIndex) :
+ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const ClTranslUnitId id, CXIndex clIndex) :
     m_Database(IndexDatabase),
     m_Id(id),
     m_FileId(-1),
@@ -54,7 +54,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase& IndexDatabase, const 
     m_LastParsed(wxDateTime::Now())
 {
 }
-ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase& indexDatabase, const ClTranslUnitId id) :
+ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const ClTranslUnitId id) :
     m_Database(indexDatabase),
     m_Id(id),
     m_FileId(-1),

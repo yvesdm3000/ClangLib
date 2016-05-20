@@ -63,12 +63,16 @@ void ClangIndexer::OnProjectOpen(CodeBlocksEvent& evt)
         for (FilesList::iterator it = proj->GetFilesList().begin(); it != proj->GetFilesList().end(); ++it)
         {
             ProjectFile* f = *it;
-            wxFileName fn = f->file;
-            m_StagingFiles.insert( fn.GetFullPath() );
+            wxDateTime ts = m_pClangPlugin->GetFileIndexingTimestamp( ClangFile(*f) );
+            if ((*it)->file.GetModificationTime() > ts )
+                m_StagingFiles.insert( ClangFile(*f));
         }
     }
     if (!m_StagingFiles.empty())
-        m_pClangPlugin->BeginReindexFile( *m_StagingFiles.begin() );
+    {
+        ClangFile file = *m_StagingFiles.begin();
+        m_pClangPlugin->BeginReindexFile( file );
+    }
 }
 
 void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
@@ -80,7 +84,25 @@ void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
         wxString indexingType = cfg->Read(wxT("/indexer_indexingtype"), IndexingDefault);
         if (indexingType == wxT("fileopen"))
         {
-            m_pClangPlugin->BeginReindexFile( ed->GetFilename() );
+            ClangFile file(ed->GetFilename());
+            if (ed->GetProjectFile())
+            {
+                file = ClangFile(*ed->GetProjectFile());
+            }
+            else
+            {
+                cbProject* pProject = event.GetProject();
+                if (!pProject)
+                {
+                    ProjectFile* pf = nullptr;
+                    pProject = Manager::Get()->GetProjectManager()->FindProjectForFile(ed->GetFilename(), &pf, false, false);
+                }
+                file = ClangFile( pProject, ed->GetFilename());
+            }
+            wxDateTime ts = m_pClangPlugin->GetFileIndexingTimestamp( file );
+            wxFileName fn(ed->GetFilename());
+            if (fn.GetModificationTime() > ts)
+                m_pClangPlugin->BeginReindexFile( file );
         }
     }
 }

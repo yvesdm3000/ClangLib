@@ -2,6 +2,7 @@
 #define __CLANGPLUGINAPI_H
 
 #include <cbplugin.h>
+#include <cbproject.h>
 
 #define CLANG_CONFIGMANAGER _T("ClangLib")
 
@@ -257,6 +258,33 @@ private:
     const std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults;
 };
 
+class ClangFile
+{
+    wxString m_Project;
+    wxString m_Filename;
+public:
+    ClangFile(const wxString& filename) :
+        m_Project(wxT("")),
+        m_Filename(filename){}
+    ClangFile(const cbProject* pProject, const wxString& filename) :
+        m_Project( pProject ? pProject->GetFilename() : wxT("") ),
+        m_Filename(filename){}
+    ClangFile(ProjectFile& pf):
+        m_Project(wxT("")),
+        m_Filename(pf.file.GetFullPath()){}
+    ClangFile(const ClangFile& Other) :
+        m_Project(Other.m_Project.c_str()),
+        m_Filename(Other.m_Filename.c_str()){}
+    friend bool operator<(const ClangFile& first, const ClangFile& second )
+    {
+        if (first.GetProject() < second.GetProject())
+            return true;
+        return first.GetFilename() < second.GetFilename();
+    }
+    const wxString& GetProject() const { return m_Project; }
+    const wxString& GetFilename() const { return m_Filename; }
+};
+
 extern const wxEventType clEVT_TRANSLATIONUNIT_CREATED;
 extern const wxEventType clEVT_REPARSE_FINISHED;
 extern const wxEventType clEVT_TOKENDATABASE_UPDATED;
@@ -274,7 +302,7 @@ public:
     virtual ~IClangPlugin() {};
 
     virtual bool IsProviderFor(cbEditor* ed) = 0;
-    virtual ClTranslUnitId GetTranslationUnitId(const wxString& filename) = 0;
+    virtual ClTranslUnitId GetTranslationUnitId(const ClangFile& file) = 0;
     virtual const wxImageList& GetImageList(const ClTranslUnitId id) = 0;
     virtual const wxStringVec& GetKeywords(const ClTranslUnitId id) = 0;
     /* Events  */
@@ -282,10 +310,11 @@ public:
     virtual void RemoveAllEventSinksFor(void* owner) = 0;
 
     /** Request reparsing of a Translation unit */
-    virtual void RequestReparse(const ClTranslUnitId id, const wxString& filename) = 0;
+    virtual void RequestReparse(const ClTranslUnitId id, const ClangFile& file) = 0;
 
+    virtual wxDateTime GetFileIndexingTimestamp(const ClangFile& file) = 0;
     /** Request reindexing of a file */
-    virtual void BeginReindexFile(const wxString& filename) = 0;
+    virtual void BeginReindexFile(const ClangFile& file) = 0;
 
     /** Retrieve function scope */
     virtual std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
@@ -296,7 +325,7 @@ public:
                                    std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
     /** Occurrences highlighting
      *  Performs an asynchronous request for occurences highlight. Will send an event with */
-    virtual void RequestOccurrencesOf(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc) = 0;
+    virtual void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;
 
     /** Code completion */
     virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
@@ -307,7 +336,7 @@ public:
                                                    std::vector< std::pair<int, int> >& offsets) = 0;
 
     /** Token definition lookup */
-    virtual void RequestTokenDefinitions(const ClTranslUnitId, const wxString& filename, const ClTokenPosition& loc) = 0;
+    virtual void RequestTokenDefinitions(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;
 };
 
 /** @brief Base class for ClangPlugin components.

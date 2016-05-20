@@ -80,6 +80,8 @@ static bool ReadInt( wxInputStream& in, int& out_Int )
     if (!in.CanRead())
         return false;
     in.Read(&val, sizeof(val));
+    if (in.LastRead() != sizeof(val))
+        return false;
     out_Int = val;
 
     return true;
@@ -98,6 +100,8 @@ static bool ReadLongLong( wxInputStream& in, long long& out_LongLong )
     if (!in.CanRead())
         return false;
     in.Read(&val, sizeof(val));
+    if (in.LastRead() != sizeof(val))
+        return false;
     out_LongLong = val;
 
     return true;
@@ -173,6 +177,12 @@ ClFilenameDatabase::ClFilenameDatabase() :
 {
 }
 
+ClFilenameDatabase::ClFilenameDatabase(const ClFilenameDatabase& Other) :
+    m_pFileEntries( Other.m_pFileEntries )
+{
+
+}
+
 ClFilenameDatabase::~ClFilenameDatabase()
 {
     delete m_pFileEntries;
@@ -191,6 +201,7 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
     wxMutexLocker l(db.m_Mutex);
     int cnt = db.m_pFileEntries->GetCount();
     WriteInt(out, cnt);
+    CCLogger::Get()->DebugLog( F(wxT("Writing %d filenames"), cnt) );
     for (i = 0; i < cnt; ++i)
     {
         ClFilenameEntry entry = db.m_pFileEntries->GetValue((ClFileId)i);
@@ -199,6 +210,7 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
         if (!WriteLongLong(out, entry.timestamp.GetValue().GetValue()))
             return false;
     }
+    CCLogger::Get()->DebugLog( F(wxT("Wrote filenames at %d"), (int)out.TellO()) );
     return true;
 }
 
@@ -216,6 +228,7 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
     int packetCount = 0;
     if (!ReadInt(in, packetCount))
         return false;
+    CCLogger::Get()->DebugLog( F(wxT("Reading %d filenames"), packetCount) );
     for (i = 0; i < packetCount; ++i)
     {
         wxString filename;
@@ -264,7 +277,8 @@ wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
 {
     wxMutexLocker lock(m_Mutex);
 
-    assert(m_pFileEntries->HasValue(fId));
+    if (!m_pFileEntries->HasValue(fId))
+        return wxEmptyString;
 
     ClFilenameEntry entry = m_pFileEntries->GetValue(fId);
     const wxChar* val = entry.filename.c_str();
@@ -308,12 +322,18 @@ void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDa
     entryRef.timestamp = timestamp;
 }
 
-ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase& IndexDB) :
-        m_TokenIndexDB( IndexDB ),
+ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* IndexDB) :
+        m_pTokenIndexDB( IndexDB ),
+        m_pLocalTokenIndexDB( nullptr ),
         m_pTokens(new ClTreeMap<ClAbstractToken>()),
         m_pFileTokens(new ClTreeMap<int>()),
         m_Mutex(wxMUTEX_RECURSIVE)
 {
+    if (!IndexDB)
+    {
+        m_pLocalTokenIndexDB = new ClTokenIndexDatabase();
+        m_pTokenIndexDB = m_pLocalTokenIndexDB;
+    }
 }
 
 /** @brief Copy constructor
@@ -322,11 +342,17 @@ ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase& IndexDB) :
  *
  */
 ClTokenDatabase::ClTokenDatabase( const ClTokenDatabase& other) :
-    m_TokenIndexDB(other.m_TokenIndexDB),
+    m_pTokenIndexDB(other.m_pTokenIndexDB),
+    m_pLocalTokenIndexDB(nullptr),
     m_pTokens(nullptr),
     m_pFileTokens(nullptr),
     m_Mutex(wxMUTEX_RECURSIVE)
 {
+    if (other.m_pLocalTokenIndexDB)
+    {
+        m_pLocalTokenIndexDB = new ClTokenIndexDatabase(*other.m_pLocalTokenIndexDB);
+        m_pTokenIndexDB = m_pLocalTokenIndexDB;
+    }
     wxMutexLocker lock(other.m_Mutex);
     m_pTokens = new ClTreeMap<ClAbstractToken>(*other.m_pTokens);
     m_pFileTokens = new ClTreeMap<int>(*other.m_pFileTokens);
@@ -338,6 +364,7 @@ ClTokenDatabase::~ClTokenDatabase()
 {
     delete m_pTokens;
     delete m_pFileTokens;
+    delete m_pLocalTokenIndexDB;
 }
 
 /** @brief Swap 2 token databases
@@ -369,13 +396,16 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
  */
 bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputStream& in )
 {
-    in.SeekI(4); // Magic number
-    int version = 0;
+    char buffer[5];
+    in.Read( buffer, 4 );
+    buffer[4] = '\0';
+    int version = 0xff;
     if (!ReadInt(in, version))
         return false;
     int i = 0;
     if (version != 0x01)
     {
+        CCLogger::Get()->DebugLog(F(wxT("Wrong version of token database: %d"), version));
         return false;
     }
     tokenDatabase.Clear();
@@ -384,19 +414,29 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
     wxMutexLocker(tokenDatabase.m_Mutex);
     while (in.CanRead())
     {
+        CCLogger::Get()->DebugLog( F(wxT("Start reading packet at %d"), (int)in.TellI() ) );
         int packetType = 0;
         if (!ReadInt(in, packetType))
+        {
+            CCLogger::Get()->DebugLog(wxT("TokenIndexDatabase: Could not read packet type"));
             return false;
+        }
         switch (packetType)
         {
-//        case ClTokenPacketType_filenames:
-//            if (!ClFilenameDatabase::ReadIn(tokenDatabase.m_FileDB, in))
-//                return false;
-//            break;
+        case 0:
+            return true;
+        case ClTokenPacketType_filenames:
+            if (!ClFilenameDatabase::ReadIn(tokenDatabase.m_FileDB, in))
+            {
+                CCLogger::Get()->DebugLog( wxT("Failed to read filename database") );
+                return false;
+            }
+            break;
         case ClTokenPacketType_tokens:
             int packetCount = 0;
             if (!ReadInt(in, packetCount))
                 return false;
+            CCLogger::Get()->DebugLog( F(wxT("Reading %d packets from file"), (int)packetCount) );
             for (i = 0; i < packetCount; ++i)
             {
                 wxString identifier;
@@ -432,9 +472,9 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
     out.Write("ClDb", 4); // Magic number
     WriteInt(out, 1); // Version number
 
-//    WriteInt(out, ClTokenPacketType_filenames);
-//    if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
-//        return false;
+    WriteInt(out, ClTokenPacketType_filenames);
+    if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
+        return false;
 
     wxMutexLocker(tokenDatabase.m_Mutex);
 
@@ -442,6 +482,7 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
     std::set<wxString> tokens = tokenDatabase.m_pIndexTokenMap->GetKeySet();
     cnt = tokens.size();
     WriteInt(out, cnt);
+    CCLogger::Get()->DebugLog( F(wxT("Token count: %d at %d"), (int)cnt, (int)out.TellO() ) );
 
     uint32_t written_count = 0;
     for (std::set<wxString>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
@@ -460,7 +501,8 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
             written_count++;
         }
     }
-    CCLogger::Get()->DebugLog(F(_T("Wrote token database: %d tokens"), written_count));
+    CCLogger::Get()->DebugLog(F(_T("Wrote token index database: %d tokens at %d"), (int)written_count, (int)out.TellO()));
+    WriteInt(out, 0);
     return true;
 }
 
@@ -484,7 +526,7 @@ void ClTokenDatabase::Clear()
  */
 ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename) const
 {
-    return m_TokenIndexDB.GetFilenameId(filename);
+    return m_pTokenIndexDB->GetFilenameId(filename);
 }
 
 /** @brief Get the filename that is known with an ID
@@ -495,7 +537,7 @@ ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename) const
  */
 wxString ClTokenDatabase::GetFilename(ClFileId fId) const
 {
-    return m_TokenIndexDB.GetFilename( fId );
+    return m_pTokenIndexDB->GetFilename( fId );
 }
 
 /** @brief Get the timestamp of the filename entry when the file was last parsed
@@ -506,7 +548,7 @@ wxString ClTokenDatabase::GetFilename(ClFileId fId) const
  */
 wxDateTime ClTokenDatabase::GetFilenameTimestamp( const ClFileId fId ) const
 {
-    return m_TokenIndexDB.GetFilenameTimestamp(fId);
+    return m_pTokenIndexDB->GetFilenameTimestamp(fId);
 }
 
 /** @brief Insert or update a token into the token database
@@ -658,14 +700,14 @@ void ClTokenDatabase::StoreIndexes() const
 {
     wxMutexLocker lock(m_Mutex);
     ClTokenId id;
-    uint32_t cnt = m_TokenIndexDB.GetTokenCount();
+    uint32_t cnt = m_pTokenIndexDB->GetTokenCount();
     for (id=0; id < m_pTokens->GetCount(); ++id)
     {
         ClAbstractToken& token = m_pTokens->GetValue( id );
-        m_TokenIndexDB.UpdateToken( token.identifier, token.fileId, token.tokenType );
+        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.tokenType );
     }
-    uint32_t cnt2 = m_TokenIndexDB.GetTokenCount();
-    CCLogger::Get()->DebugLog( F(wxT("StoreIndexes: Stored %d tokens. %d tokens extra. Total: %d"), (int)m_pTokens->GetCount(), (int)cnt2 - cnt, cnt2) );
+    uint32_t cnt2 = m_pTokenIndexDB->GetTokenCount();
+    CCLogger::Get()->DebugLog( F(wxT("StoreIndexes: Stored %d tokens. %d tokens extra. Total: %d (merged) IndexDb: %p"), (int)m_pTokens->GetCount(), (int)cnt2 - cnt, cnt2, m_pTokenIndexDB) );
 }
 
 bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_Position) const
