@@ -242,6 +242,20 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
     return true;
 }
 
+bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
+{
+    wxMutexLocker lock(m_Mutex);
+    assert(m_pFileEntries);
+    wxFileName fln(filename.c_str());
+    fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
+    const wxString& normFile = fln.GetFullPath(wxPATH_UNIX);
+    std::set<int> idList;
+    m_pFileEntries->GetIdSet(normFile, idList);
+    if (idList.empty())
+        return false;
+    return true;
+}
+
 /** @brief Get a filename id from a filename. Creates a new ID if the filename was not known yet.
  *
  * @param filename const wxString&

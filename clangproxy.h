@@ -771,6 +771,7 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             std::vector<ClToken> results;
+            CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt ")+m_Filename+wxT(" pos=%d,%d"), m_Position.line, m_Position.column) );
             clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Position, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {
@@ -1197,9 +1198,9 @@ public:
     void AppendPendingJob( ClangProxy::ClangJob& job );
     //void PrependPendingJob( ClangProxy::ClangJob& job );
 
-    ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId) const;
     ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const ClangFile& file) const;
     void GetAllTranslationUnitIds( std::set<ClTranslUnitId>& out_list ) const;
+    void SetMaxTranslationUnits( unsigned int Max );
 
 public: // TokenIndexDatabase functions
     void GetLoadedTokenIndexDatabases( std::set<wxString>& out_projectFileNamesSet ) const;
@@ -1252,6 +1253,7 @@ private:
     ClTokenIndexDatabaseMap_t m_DatabaseMap;
     const std::vector<wxString>& m_CppKeywords;
     std::vector<ClTranslationUnit> m_TranslUnits;
+    unsigned int m_MaxTranslUnits;
     CXIndex m_ClIndex;
 private: // Thread
     wxEvtHandler* m_pEventCallbackHandler;

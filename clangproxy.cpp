@@ -629,7 +629,7 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
     }
     wxFileName fn(m_File.GetFilename());
     wxDateTime timestamp = fn.GetModificationTime();
-    CCLogger::Get()->DebugLog(F(wxT("Reindex on tokenindexdb %p project=")+m_File.GetProject(), database));
+    CCLogger::Get()->DebugLog(F(wxT("Reindex on tokenindexdb %p project=")+m_File.GetProject()+wxT(" ")+m_File.GetFilename(), database));
     CXIndex clangIndex = clang_createIndex(0,0);
     { // Scope for TU
         ClTranslationUnit tu(database, 127, clangIndex);
@@ -668,6 +668,7 @@ ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, const std::vector<wxS
     m_Mutex(),
     m_DatabaseMap(),
     m_CppKeywords(cppKeywords),
+    m_MaxTranslUnits(5),
     m_pEventCallbackHandler(pEvtCallbackHandler)
 {
     m_ClIndex = clang_createIndex(1, 1);
@@ -722,28 +723,29 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
     BuildCompileArgs(file.GetFilename(), commands, argsBuffer, args);
 
     std::vector<ClTranslationUnit>::iterator it;
-    int id = 0;
     ClTranslUnitId translId = -1;
     {
         ClTranslUnitId oldestTranslId = 0;
         wxDateTime ts = wxDateTime::Now();
         wxMutexLocker lock(m_Mutex);
-        for ( it = m_TranslUnits.begin(); it != m_TranslUnits.end(); ++it, ++id)
+        for ( it = m_TranslUnits.begin(); it != m_TranslUnits.end(); ++it)
         {
             if (it->IsEmpty())
             {
-                translId = id;
+                CCLogger::Get()->DebugLog( F(wxT("Using id %d because it's empty"), it->GetId()) );
+                translId = it->GetId();
                 break;
             }
             if (it->GetLastParsed().GetTicks() < ts.GetTicks())
             {
                 ts = it->GetLastParsed();
-                oldestTranslId = id;
+                oldestTranslId = it->GetId();
             }
         }
+        CCLogger::Get()->DebugLog( F(wxT("Oldest TU: %d"), oldestTranslId) );
         if (it == m_TranslUnits.end())
         {
-            if( m_TranslUnits.size() < 5 )
+            if( m_TranslUnits.size() < m_MaxTranslUnits )
             {
                 translId = m_TranslUnits.size();
             }
@@ -801,55 +803,64 @@ void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
 /** @brief Find a translation unit id from a file id. In case the file id is part of multiple translation units, it will search the one in the argument first.
  *
  * @param CtxTranslUnitId Translation Unit ID to search first, or wxID_ANY if you don't want this
- * @param fId The file ID to search
- * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
- *
- */
-ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, ClFileId fId) const
-{
-    wxMutexLocker locker(m_Mutex);
-
-    // Prefer from current file
-    if ((CtxTranslUnitId >= 0)&&(CtxTranslUnitId < (int)m_TranslUnits.size()))
-    {
-        if (m_TranslUnits[CtxTranslUnitId].Contains(fId))
-        {
-            return CtxTranslUnitId;
-        }
-    }
-    // Is it an open file?
-    for (size_t i = 0; i < m_TranslUnits.size(); ++i)
-    {
-        if (m_TranslUnits[i].GetFileId() == fId)
-        {
-            return i;
-        }
-    }
-    // Search any include files
-    for (size_t i = 0; i < m_TranslUnits.size(); ++i)
-    {
-        if (m_TranslUnits[i].Contains(fId))
-        {
-            return i;
-        }
-    }
-
-    return wxNOT_FOUND;
-}
-
-/** @brief Find a translation unit id from a file id. In case the file id is part of multiple translation units, it will search the one in the argument first.
- *
- * @param CtxTranslUnitId Translation Unit ID to search first, or wxID_ANY if you don't want this
  * @param filename The filename to search
  * @return ClTranslUnitId The translation unit ID of the TU that contains this file or wxID_ANY if not found
  *
  */
 ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const ClangFile& file) const
 {
+#if 0
     const ClTokenIndexDatabase* db = GetTokenIndexDatabase( file.GetProject() );
     if (!db)
         return wxNOT_FOUND;
     return GetTranslationUnitId( CtxTranslUnitId, db->GetFilenameId(file.GetFilename()));
+#endif
+
+    wxMutexLocker locker(m_Mutex);
+
+    // Prefer from current file
+    if ((CtxTranslUnitId >= 0)&&(CtxTranslUnitId < (int)m_TranslUnits.size()))
+    {
+        if (m_TranslUnits[CtxTranslUnitId].IsValid()&& m_TranslUnits[CtxTranslUnitId].GetTokenDatabase().HasFilename(file.GetFilename()))
+        {
+            ClFileId fId = m_TranslUnits[CtxTranslUnitId].GetTokenDatabase().GetFilenameId(file.GetFilename());
+            if (m_TranslUnits[CtxTranslUnitId].Contains(fId))
+            {
+                CCLogger::Get()->DebugLog( F(wxT("Translation unit %d contains %d"), (int)CtxTranslUnitId, (int)fId) );
+                return CtxTranslUnitId;
+            }
+        }
+    }
+    // Is it an open file?
+    for (size_t i = 0; i < m_TranslUnits.size(); ++i)
+    {
+        if (m_TranslUnits[i].IsValid()&&m_TranslUnits[i].GetTokenDatabase().HasFilename(file.GetFilename()))
+        {
+            ClFileId fId = m_TranslUnits[i].GetTokenDatabase().GetFilenameId(file.GetFilename());
+            if (m_TranslUnits[i].GetFileId() == fId)
+            {
+                CCLogger::Get()->DebugLog( F(wxT("Translation unit %d points to %d"), (int)i, (int)fId) );
+                return i;
+            }
+        }
+    }
+
+    // Search any include files
+    for (size_t i = 0; i < m_TranslUnits.size(); ++i)
+    {
+        if (m_TranslUnits[i].IsValid()&&m_TranslUnits[i].GetTokenDatabase().HasFilename(file.GetFilename()))
+        {
+            ClFileId fId = m_TranslUnits[i].GetTokenDatabase().GetFilenameId(file.GetFilename());
+            if (m_TranslUnits[i].Contains(fId))
+            {
+                CCLogger::Get()->DebugLog( F(wxT("Transl unit %d contains file %d "), (int)i, (int)fId) );
+                return i;
+            }
+        }
+    }
+
+    return wxNOT_FOUND;
+
 }
 
 /** @brief Perform codecompletion
@@ -2036,3 +2047,8 @@ void ClangProxy::StoreTokenIndexDatabase( const wxString& projectFileName ) cons
     ClTokenIndexDatabase::WriteOut( *db, out );
 }
 
+void ClangProxy::SetMaxTranslationUnits( unsigned int Max )
+{
+    CCLogger::Get()->DebugLog(F(wxT("Setting maximum amount of loaded translation units to %d"), Max));
+    m_MaxTranslUnits = Max;
+}

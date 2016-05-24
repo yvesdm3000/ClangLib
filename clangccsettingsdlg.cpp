@@ -184,14 +184,13 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     //CCTRL(*this, "chkDocumentation",      wxCheckBox)->SetValue(m_Documentation->IsEnabled());
 #endif
     // Page "Semantic"
-    XRCCTRL(*this, "chkOccurrenceHighlight",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/occurrence_highlight"),   true));
+    XRCCTRL(*this, "chkOccurrenceHighlight",wxCheckBox)->SetValue(cfg->ReadBool(_T("/occurrence_highlight"),   true));
 
     // Page "Advanced"
 
-    XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->SetValue(cfg->Read(_T("/cmdoption_extra"),   wxEmptyString ));
+    XRCCTRL(*this, "spnClangMaxTU",         wxSpinCtrl)->SetValue(cfg->ReadInt(_T("/max_tu"),   5 ));
+    XRCCTRL(*this, "txtClangExtraOptions",  wxTextCtrl)->SetValue(cfg->Read(_T("/cmdoption_extra"),   wxEmptyString ));
 
-//    m_Parser.ParseBuffer(g_SampleClasses, true);
-//    m_Parser.BuildTree(*XRCCTRL(*this, "treeClasses", wxTreeCtrl));
 }
 
 ClangSettingsDlg::~ClangSettingsDlg()
@@ -273,12 +272,13 @@ void ClangSettingsDlg::OnApply()
 
     // Page "Semantic"
 
-    cfg->Write(_T("/occurrence_highlight"),              (bool) XRCCTRL(*this, "chkOccurrenceHighlight",        wxCheckBox)->GetValue());
+    cfg->Write(_T("/occurrence_highlight"),     (bool) XRCCTRL(*this, "chkOccurrenceHighlight",        wxCheckBox)->GetValue());
 
 
     // Page "Advanced"
 
-    cfg->Write(_T("/cmdoption_extra"),               XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->GetValue());
+    cfg->Write(_T("/max_tu"),                   (int) XRCCTRL(*this, "spnClangMaxTU", wxSpinCtrl)->GetValue());
+    cfg->Write(_T("/cmdoption_extra"),          XRCCTRL(*this, "txtClangExtraOptions", wxTextCtrl)->GetValue());
 
 
     // -----------------------------------------------------------------------

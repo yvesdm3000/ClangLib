@@ -63,6 +63,7 @@ public:
     static bool ReadIn(ClFilenameDatabase& tokenDatabase, wxInputStream& in);
     static bool WriteOut(const ClFilenameDatabase& db, wxOutputStream& out);
 
+    bool HasFilename( const wxString& filename )const;
     ClFileId GetFilenameId(const wxString& filename) const;
     wxString GetFilename(const ClFileId fId) const;
     const wxDateTime GetFilenameTimestamp(const ClFileId fId) const;
@@ -92,6 +93,7 @@ public:
     static bool ReadIn(ClTokenIndexDatabase& tokenDatabase, wxInputStream& in);
     static bool WriteOut(const ClTokenIndexDatabase& tokenDatabase, wxOutputStream& out);
 
+    bool HasFilename( const wxString& filename ) const { return m_FileDB.HasFilename(filename); }
     ClFileId GetFilenameId( const wxString& filename ) const { return m_FileDB.GetFilenameId( filename ); }
     wxString GetFilename(ClFileId fId) const { return m_FileDB.GetFilename( fId );}
     wxDateTime GetFilenameTimestamp( const ClFileId fId ) const { return m_FileDB.GetFilenameTimestamp( fId );}
@@ -170,6 +172,7 @@ public:
 
     friend void swap(ClTokenDatabase& first, ClTokenDatabase& second);
 
+    bool HasFilename(const wxString& filename)const { return m_pTokenIndexDB->HasFilename(filename); }
     ClFileId GetFilenameId(const wxString& filename) const;
     wxString GetFilename(const ClFileId fId) const;
     wxDateTime GetFilenameTimestamp(const ClFileId fId) const;

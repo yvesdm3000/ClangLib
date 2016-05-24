@@ -190,6 +190,8 @@ void ClangPlugin::OnAttach()
 
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 
+    m_Proxy.SetMaxTranslationUnits( cfg->ReadInt( wxT("/max_tu") ) );
+
     if (cfg->ReadBool(ClangCodeCompletion::SettingName, true))
         ActivateComponent(&m_CodeCompletion);
     if (cfg->ReadBool(ClangDiagnostics::SettingName, true))
@@ -309,6 +311,8 @@ void ClangPlugin::UpdateComponents()
         if (DeactivateComponent(&m_Indexer))
             reloadEditor = true;
     }
+
+    m_Proxy.SetMaxTranslationUnits( cfg->ReadInt( wxT("/max_tu") ));
 
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
     {
@@ -1168,7 +1172,6 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 {
     event.Skip();
-    CCLogger::Get()->DebugLog( F(wxT("OnClangCreateTUFinished current tu=%d"), (int)m_TranslUnitId) );
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
         return;
@@ -1179,6 +1182,7 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
         CCLogger::Get()->DebugLog( wxT("Wrong event detected") );
         return;
     }
+    CCLogger::Get()->DebugLog( F(wxT("OnClangCreateTUFinished current tu=%d ")+pJob->GetFilename(), (int)m_TranslUnitId) );
     if (m_TranslUnitId == pJob->GetTranslationUnitId())
     {
         CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );

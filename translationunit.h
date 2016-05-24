@@ -100,7 +100,7 @@ public:
         return m_LastParsed;
     }
 
-    const ClTokenDatabase& GetTokenDatabase()
+    const ClTokenDatabase& GetTokenDatabase() const
     {
         return m_Database;
     }

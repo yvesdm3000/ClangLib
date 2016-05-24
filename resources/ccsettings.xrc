@@ -714,8 +714,23 @@
 										<vgap>8</vgap>
 										<hgap>8</hgap>
 										<object class="sizeritem">
-											<object class="wxStaticText" name="ID_STATICTEXT13">
-												<label>Extra options to pass to Clang:</label>
+											<object class="wxStaticText" name="ID_STATICTEXT">
+												<label>Cached translation units:</label>
+											</object>
+											<flag>wxALL|wxTOP</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxSpinCtrl" name="spnClangMaxTU">
+												<value>5</value>
+												<min>2</min>
+												<max>100</max>
+											</object>
+											<flag>wxALL|wxALIGN_TOP</flag>
+										</object>
+										<object class="sizeritem">
+											<object class="wxStaticText" name="ID_STATICTEXT">
+												<label>Extra clang options:</label>
 											</object>
 											<flag>wxALL|wxTOP</flag>
 											<border>5</border>
