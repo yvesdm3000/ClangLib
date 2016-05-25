@@ -722,12 +722,13 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
 
     BuildCompileArgs(file.GetFilename(), commands, argsBuffer, args);
 
-    std::vector<ClTranslationUnit>::iterator it;
+    bool newTU = false;
     ClTranslUnitId translId = -1;
     {
         ClTranslUnitId oldestTranslId = 0;
         wxDateTime ts = wxDateTime::Now();
         wxMutexLocker lock(m_Mutex);
+        std::vector<ClTranslationUnit>::iterator it;
         for ( it = m_TranslUnits.begin(); it != m_TranslUnits.end(); ++it)
         {
             if (it->IsEmpty())
@@ -742,26 +743,25 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
                 oldestTranslId = it->GetId();
             }
         }
-        CCLogger::Get()->DebugLog( F(wxT("Oldest TU: %d"), oldestTranslId) );
         if (it == m_TranslUnits.end())
         {
             if( m_TranslUnits.size() < m_MaxTranslUnits )
             {
                 translId = m_TranslUnits.size();
+                newTU = true;
             }
             else
             {
                 translId = oldestTranslId;
-                it = m_TranslUnits.begin();
             }
         }
     }
     ClTranslationUnit tu = ClTranslationUnit(db, translId, m_ClIndex);
     ClFileId fileId = db->GetFilenameId(file.GetFilename());
-    tu.Parse(file.GetFilename(), fileId, args, unsavedFiles);
+    if (tu.Parse(file.GetFilename(), fileId, args, unsavedFiles) )
     {
         wxMutexLocker lock(m_Mutex);
-        if (it == m_TranslUnits.end())
+        if (newTU)
         {
 #if __cplusplus >= 201103L
             m_TranslUnits.push_back(std::move(tu));
@@ -773,8 +773,8 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
         {
             swap(m_TranslUnits[translId], tu);
         }
+        out_TranslId = translId;
     }
-    out_TranslId = translId;
 }
 
 /** @brief Removes a translation unit from memory.
@@ -839,7 +839,7 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslU
             ClFileId fId = m_TranslUnits[i].GetTokenDatabase().GetFilenameId(file.GetFilename());
             if (m_TranslUnits[i].GetFileId() == fId)
             {
-                CCLogger::Get()->DebugLog( F(wxT("Translation unit %d points to %d"), (int)i, (int)fId) );
+                CCLogger::Get()->DebugLog( F(wxT("Translation unit %d points to %d ")+m_TranslUnits[i].GetTokenDatabase().GetFilename( fId )+wxT(" ")+file.GetFilename(), (int)i, (int)fId) );
                 return i;
             }
         }
@@ -2049,6 +2049,8 @@ void ClangProxy::StoreTokenIndexDatabase( const wxString& projectFileName ) cons
 
 void ClangProxy::SetMaxTranslationUnits( unsigned int Max )
 {
+    if (Max <= 2 )
+        return;
     CCLogger::Get()->DebugLog(F(wxT("Setting maximum amount of loaded translation units to %d"), Max));
     m_MaxTranslUnits = Max;
 }
