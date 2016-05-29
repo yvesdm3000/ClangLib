@@ -140,49 +140,95 @@ typedef enum _TokenType
 
 } ClTokenType;
 
+class ClangFile
+{
+    wxString m_Project;
+    wxString m_Filename;
+public:
+    ClangFile(const wxString& filename) :
+        m_Project(wxT("")),
+        m_Filename(filename){}
+    ClangFile(const cbProject* pProject, const wxString& filename) :
+        m_Project( pProject ? pProject->GetFilename() : wxT("") ),
+        m_Filename(filename){}
+    ClangFile(ProjectFile& pf):
+        m_Project( pf.GetParentProject() ? pf.GetParentProject()->GetFilename() : wxT("")),
+        m_Filename(pf.file.GetFullPath()){}
+    ClangFile(ProjectFile* pPf, const wxString& fallbackFilename)
+    {
+        if (pPf)
+        {
+            m_Project = pPf->GetParentProject() ? pPf->GetParentProject()->GetFilename() : wxT("");
+            m_Filename = pPf->file.GetFullPath();
+        }
+        else
+        {
+            m_Project = wxT("");
+            m_Filename = fallbackFilename;
+        }
+    }
+    ClangFile(const ClangFile& Other) :
+        m_Project(Other.m_Project.c_str()),
+        m_Filename(Other.m_Filename.c_str()){}
+    friend bool operator<(const ClangFile& first, const ClangFile& second )
+    {
+        if (first.GetProject() < second.GetProject())
+            return true;
+        return first.GetFilename() < second.GetFilename();
+    }
+    bool operator==(const ClangFile& other) const
+    {
+        if (other.m_Project != m_Project)
+            return false;
+        return other.m_Filename == m_Filename;
+    }
+    const wxString& GetProject() const { return m_Project; }
+    const wxString& GetFilename() const { return m_Filename; }
+};
+
 /** @brief Event used in wxWidgets command event returned by the plugin.
  */
 class ClangEvent : public wxCommandEvent
 {
 public:
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename ) :
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(0,0) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
                 const ClTokenPosition& pos, const std::vector< std::pair<int, int> >& occurrences ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(pos),
         m_GetOccurrencesResults(occurrences) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
                 const ClTokenPosition& pos, const std::vector<ClToken>& completions ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(pos),
         m_GetCodeCompletionResults(completions) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file ,
                 const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(loc),
         m_DiagnosticResults(diag) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
                 const ClTokenPosition& loc, const wxString& documentation ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(loc),
         m_DocumentationResults(documentation) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const wxString& filename,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
                const ClTokenPosition& loc, const std::vector< std::pair<wxString, ClTokenPosition > >& locations ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
-        m_Filename(filename),
+        m_File(file),
         m_Position(loc),
         m_LocationResults(locations) {}
 
@@ -194,7 +240,7 @@ public:
     ClangEvent( const ClangEvent& other) :
         wxCommandEvent(other),
         m_TranslationUnitId(other.m_TranslationUnitId),
-        m_Filename(other.m_Filename),
+        m_File(other.m_File),
         m_Position(other.m_Position),
         m_GetOccurrencesResults(other.m_GetOccurrencesResults),
         m_GetCodeCompletionResults(other.m_GetCodeCompletionResults),
@@ -242,14 +288,14 @@ public:
     {
         return m_StartedTime;
     }
-    const wxString& GetFilename() const
+    const ClangFile& GetFile() const
     {
-        return m_Filename;
+        return m_File;
     }
 private:
     wxDateTime m_StartedTime;
     const ClTranslUnitId m_TranslationUnitId;
-    const wxString m_Filename;
+    const ClangFile m_File;
     const ClTokenPosition m_Position;
     const std::vector< std::pair<int, int> > m_GetOccurrencesResults;
     const std::vector<ClToken> m_GetCodeCompletionResults;
@@ -258,32 +304,6 @@ private:
     const std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults;
 };
 
-class ClangFile
-{
-    wxString m_Project;
-    wxString m_Filename;
-public:
-    ClangFile(const wxString& filename) :
-        m_Project(wxT("")),
-        m_Filename(filename){}
-    ClangFile(const cbProject* pProject, const wxString& filename) :
-        m_Project( pProject ? pProject->GetFilename() : wxT("") ),
-        m_Filename(filename){}
-    ClangFile(ProjectFile& pf):
-        m_Project(wxT("")),
-        m_Filename(pf.file.GetFullPath()){}
-    ClangFile(const ClangFile& Other) :
-        m_Project(Other.m_Project.c_str()),
-        m_Filename(Other.m_Filename.c_str()){}
-    friend bool operator<(const ClangFile& first, const ClangFile& second )
-    {
-        if (first.GetProject() < second.GetProject())
-            return true;
-        return first.GetFilename() < second.GetFilename();
-    }
-    const wxString& GetProject() const { return m_Project; }
-    const wxString& GetFilename() const { return m_Filename; }
-};
 
 extern const wxEventType clEVT_TRANSLATIONUNIT_CREATED;
 extern const wxEventType clEVT_REPARSE_FINISHED;
@@ -328,9 +348,9 @@ public:
     virtual void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;
 
     /** Code completion */
-    virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& loc,
+    virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc,
                                             bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
-    virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const wxString& filename,
+    virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const ClangFile& file,
                                                          const ClTokenPosition& position, const ClTokenId tokenId) = 0;
     virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                                    std::vector< std::pair<int, int> >& offsets) = 0;

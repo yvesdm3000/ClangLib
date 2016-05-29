@@ -845,6 +845,7 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslU
         }
     }
 
+    return wxNOT_FOUND;
     // Search any include files
     for (size_t i = 0; i < m_TranslUnits.size(); ++i)
     {
@@ -2018,11 +2019,15 @@ ClTokenIndexDatabase* ClangProxy::LoadTokenIndexDatabase( const wxString& projec
     if (it == m_DatabaseMap.end())
     {
         ClTokenIndexDatabase* ret = new ClTokenIndexDatabase();
+        if (projectFileName.Length() > 0)
+        {
+            wxString fn = GetTokenIndexDatabaseFilename( projectFileName );
+            CCLogger::Get()->DebugLog( wxT("Reading token index database from ")+fn );
+            wxFileInputStream in(fn);
+            ClTokenIndexDatabase::ReadIn( *ret, in );
+        }
+
         m_DatabaseMap.insert( std::make_pair( projectFileName, ret ) );
-        wxString fn = GetTokenIndexDatabaseFilename( projectFileName );
-        CCLogger::Get()->DebugLog( wxT("Reading token index database from ")+fn );
-        wxFileInputStream in(fn);
-        ClTokenIndexDatabase::ReadIn( *ret, in );
         return ret;
     }
     return it->second;
