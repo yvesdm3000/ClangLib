@@ -123,7 +123,10 @@ public:
     CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,
                                            struct CXUnsavedFile* unsaved_files,
                                            unsigned num_unsaved_files );
-    const CXCompletionResult* GetCCResult(unsigned index);
+    const CXCodeCompleteResults* GetCCResults() const;
+    const CXCompletionResult* GetCCResult(unsigned index) const;
+    bool HasCCContext( CXCompletionContext ctx ) const;
+
     CXCursor GetTokenAt(const wxString& filename, const ClTokenPosition& position);
     wxString GetTokenIdentifierAt(const wxString& filename, const ClTokenPosition& position);
 

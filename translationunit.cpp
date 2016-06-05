@@ -140,9 +140,46 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
     m_LastPos.Set(complete_location.line, complete_location.column);
     if (m_LastCC)
     {
+#if 0
+        unsigned long long context = clang_codeCompleteGetContexts( m_LastCC );
+        CCLogger::Get()->DebugLog( F(wxT("Code completion context: %llu (%x)"), context, (int)context) );
+        if (context&CXCompletionContext_AnyType)
+            CCLogger::Get()->DebugLog( wxT("AnyType") );
+        if (context&CXCompletionContext_AnyValue)
+            CCLogger::Get()->DebugLog( wxT("AnyValue") );
+        if (context&CXCompletionContext_ArrowMemberAccess)
+            CCLogger::Get()->DebugLog( wxT("ArrowMemberAccess") );
+        if (context&CXCompletionContext_ClassTag)
+            CCLogger::Get()->DebugLog( wxT("ClassTag") );
+        if (context&CXCompletionContext_CXXClassTypeValue)
+            CCLogger::Get()->DebugLog( wxT("CXXClassTypeValue") );
+        if (context&CXCompletionContext_DotMemberAccess)
+            CCLogger::Get()->DebugLog( wxT("DotMemberAccess") );
+        if (context&CXCompletionContext_EnumTag)
+            CCLogger::Get()->DebugLog( wxT("EnumTag") );
+        if (context&CXCompletionContext_MacroName)
+            CCLogger::Get()->DebugLog( wxT("MacroName") );
+        if (context&CXCompletionContext_Namespace)
+            CCLogger::Get()->DebugLog( wxT("Namespace") );
+        if (context&CXCompletionContext_NaturalLanguage)
+            CCLogger::Get()->DebugLog( wxT("NaturalLanguage") );
+        if (context&CXCompletionContext_NestedNameSpecifier)
+            CCLogger::Get()->DebugLog( wxT("NestedNameSpecifier") );
+        if (context&CXCompletionContext_StructTag)
+            CCLogger::Get()->DebugLog( wxT("StructTag") );
+        if (context&CXCompletionContext_Unexposed)
+            CCLogger::Get()->DebugLog( wxT("Unexposed") );
+        if (context&CXCompletionContext_UnionTag)
+            CCLogger::Get()->DebugLog( wxT("UnionTag") );
+        if (context&CXCompletionContext_Unknown)
+            CCLogger::Get()->DebugLog( wxT("Unknown") );
+#endif
         unsigned numDiag = clang_codeCompleteGetNumDiagnostics(m_LastCC);
+
         //unsigned int IsIncomplete = 0;
         //CXCursorKind kind = clang_codeCompleteGetContainerKind(m_LastCC, &IsIncomplete );
+
+
         unsigned int diagIdx = 0;
         std::vector<ClDiagnostic> diaglist;
         for (diagIdx=0; diagIdx < numDiag; ++diagIdx)
@@ -155,7 +192,22 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
     return m_LastCC;
 }
 
-const CXCompletionResult* ClTranslationUnit::GetCCResult(unsigned index)
+const CXCodeCompleteResults* ClTranslationUnit::GetCCResults() const
+{
+    return m_LastCC;
+}
+
+bool ClTranslationUnit::HasCCContext( CXCompletionContext ctx ) const
+{
+    if (!m_LastCC)
+        return false;
+    unsigned long long contexts = clang_codeCompleteGetContexts( m_LastCC );
+    if ( ctx &&( (contexts & ctx) == ctx) )
+        return true;
+    return ctx == contexts;
+}
+
+const CXCompletionResult* ClTranslationUnit::GetCCResult(unsigned index) const
 {
     if (m_LastCC && index < m_LastCC->NumResults)
         return m_LastCC->Results + index;

@@ -1118,6 +1118,8 @@ wxString ClangProxy::GetCCInsertSuffix( const ClTranslUnitId translUnitId, int t
     {
         return wxT("");
     }
+    if ( m_TranslUnits[translUnitId].HasCCContext(CXCompletionContext_Unexposed) )
+        isDecl = true;
     const CXCompletionResult* token = m_TranslUnits[translUnitId].GetCCResult(tknId);
     if (!token)
         return wxEmptyString;
