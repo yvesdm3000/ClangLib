@@ -636,7 +636,8 @@ public:
                         ClTranslationUnit tu(indexdb, 127, clangIndex);
                         const std::map<wxString, wxString> unsavedFiles; // No unsaved files for reindex...
                         CCLogger::Get()->DebugLog( wxT("Parsing file ")+it->first);
-                        if (!tu.Parse( it->first, destFileId, args, unsavedFiles, false ))
+                        ClFileId fileId = tu.GetTokenDatabase().GetFilenameId( it->first );
+                        if (!tu.Parse( it->first, fileId, args, unsavedFiles, false ))
                             CCLogger::Get()->DebugLog(wxT("Could not parse file ")+it->first);
                         else
                         {

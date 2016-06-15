@@ -633,7 +633,7 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
     CXIndex clangIndex = clang_createIndex(0,0);
     { // Scope for TU
         ClTranslationUnit tu(database, 127, clangIndex);
-        ClFileId fileId = database->GetFilenameId(m_File.GetFilename());
+        ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(m_File.GetFilename());
         std::vector<wxCharBuffer> argsBuffer;
         std::vector<const char*> args;
         clangproxy.BuildCompileArgs( m_File.GetFilename(), m_Commands, argsBuffer, args );
@@ -757,7 +757,7 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
         }
     }
     ClTranslationUnit tu = ClTranslationUnit(db, translId, m_ClIndex);
-    ClFileId fileId = db->GetFilenameId(file.GetFilename());
+    ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(file.GetFilename());
     if (tu.Parse(file.GetFilename(), fileId, args, unsavedFiles) )
     {
         wxMutexLocker lock(m_Mutex);
@@ -988,10 +988,13 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxStri
 
     unsigned numDiag = clang_codeCompleteGetNumDiagnostics(clResults);
     unsigned int diagIdx = 0;
+    wxString srcText;
+    if (unsavedFiles.find(filename) != unsavedFiles.end())
+        srcText = unsavedFiles.at(filename);
     for ( diagIdx=0; diagIdx < numDiag; ++diagIdx )
     {
         CXDiagnostic diag = clang_codeCompleteGetDiagnostic( clResults, diagIdx );
-        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, unsavedFiles.at( filename ), out_diagnostics );
+        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, srcText, out_diagnostics );
     }
 
     //CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)out_results.size()) );

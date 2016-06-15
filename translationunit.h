@@ -59,6 +59,7 @@ public:
         swap(first.m_ClIndex, second.m_ClIndex);
         swap(first.m_ClTranslUnit, second.m_ClTranslUnit);
         swap(first.m_LastCC, second.m_LastCC);
+        swap(first.m_Diagnostics, second.m_Diagnostics);
         swap(first.m_LastPos.line, second.m_LastPos.line);
         swap(first.m_LastPos.column, second.m_LastPos.column);
         swap(first.m_LastParsed, second.m_LastParsed);
@@ -73,7 +74,7 @@ public:
     {
         return std::binary_search(m_Files.begin(), m_Files.end(), fId);
     }
-    int GetFileId() const
+    ClFileId GetFileId() const
     {
         return m_FileId;
     }
@@ -142,12 +143,12 @@ public:
 private:
     ClTokenDatabase m_Database;
     ClTranslUnitId m_Id;
-    ClFileId m_FileId; ///< The file that triggered the creation of this TU
+    ClFileId m_FileId; ///< The file that triggered the creation of this TU. Index in the local TokenDatabase.
     std::vector<ClFileId> m_Files; ///< All files linked to this TU
     CXIndex m_ClIndex;
     CXTranslationUnit m_ClTranslUnit;
     CXCodeCompleteResults* m_LastCC;
-
+    std::vector<ClDiagnostic> m_Diagnostics;
     struct FilePos
     {
         FilePos(unsigned ln, unsigned col) :
@@ -167,7 +168,6 @@ private:
         unsigned line;
         unsigned column;
     } m_LastPos;
-    bool m_Occupied; // Sentinel flag
     wxDateTime m_LastParsed; // Timestamp when the file was last parsed
     ClFunctionScopeMap m_FunctionScopes;
 };

@@ -1198,7 +1198,7 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
     CCLogger::Get()->DebugLog( F(wxT("OnClangCreateTUFinished current tu=%d ")+pJob->GetFile().GetFilename(), (int)m_TranslUnitId) );
     if (m_TranslUnitId == pJob->GetTranslationUnitId())
     {
-        CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );
+        //CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );
         return;
     }
     ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
