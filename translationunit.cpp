@@ -174,6 +174,7 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
         if (context&CXCompletionContext_Unknown)
             CCLogger::Get()->DebugLog( wxT("Unknown") );
 #endif
+#if 0
         unsigned numDiag = clang_codeCompleteGetNumDiagnostics(m_LastCC);
 
         //unsigned int IsIncomplete = 0;
@@ -187,6 +188,7 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
             CXDiagnostic diag = clang_codeCompleteGetDiagnostic(m_LastCC, diagIdx);
             ExpandDiagnostic(diag, complete_filename, diaglist);
         }
+#endif
     }
 
     return m_LastCC;
@@ -242,6 +244,9 @@ wxString ClTranslationUnit::GetTokenIdentifierAt( const wxString &filename, cons
 
 /**
  * Parses the supplied file and unsaved files
+ *
+ * @arg filename The filename that is the main file of the translation unit
+ * @arg fileId The fileid that is the view for this translation unit
  */
 bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<wxString, wxString>& unsavedFiles, const bool bReparse )
 {
@@ -257,6 +262,7 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
         clang_disposeTranslationUnit(m_ClTranslUnit);
         m_ClTranslUnit = nullptr;
     }
+    m_Occupied = false;
 
     // TODO: check and handle error conditions
     std::vector<CXUnsavedFile> clUnsavedFiles;
@@ -276,10 +282,10 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
 #endif
         clUnsavedFiles.push_back(unit);
     }
-    m_FileId = fileId;
-    m_Files.push_back( fileId );
     m_LastParsed = wxDateTime::Now();
     m_FunctionScopes.clear();
+    m_Files.clear();
+    m_FileId = wxNOT_FOUND;
 
     if (filename.length() != 0)
     {
@@ -315,6 +321,8 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                 return false;
             }
         }
+        m_FileId = fileId;
+        m_Files.push_back( fileId );
         return true;
     }
     return false;
