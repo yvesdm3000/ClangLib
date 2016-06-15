@@ -87,11 +87,12 @@ enum ClDiagnosticSeverity { sWarning, sError, sNote };
 
 struct ClDiagnosticFixit
 {
-    ClDiagnosticFixit(const wxString& txt, const unsigned rgStart, const unsigned rgEnd) :
-        text(txt), range(rgStart,rgEnd){}
+    ClDiagnosticFixit(const wxString& txt, const unsigned rgStart, const unsigned rgEnd, const wxString& srcLn) :
+        text(txt), range(rgStart,rgEnd), srcLine(srcLn){}
 
-    wxString text;
-    std::pair<unsigned,unsigned> range;
+    wxString text;                      ///< Text to insert to Fix It
+    std::pair<unsigned,unsigned> range; ///< Range where the fixit applies
+    wxString srcLine;                   ///< Copy of the source line of the fixit.
 };
 
 struct ClDiagnostic

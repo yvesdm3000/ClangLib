@@ -457,12 +457,12 @@ static void RangeToColumns(CXSourceRange range, unsigned& rgStart, unsigned& rgE
  * @return void
  *
  */
-void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, std::vector<ClDiagnostic>& inout_diagnostics )
+void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& inout_diagnostics )
 {
     if (diag == nullptr)
         return;
-    CXSourceLocation loc = clang_getDiagnosticLocation(diag);
-    if (clang_equalLocations(loc, clang_getNullLocation()))
+    CXSourceLocation diagLoc = clang_getDiagnosticLocation(diag);
+    if (clang_equalLocations(diagLoc, clang_getNullLocation()))
         return;
     switch (clang_getDiagnosticSeverity(diag))
     {
@@ -475,7 +475,7 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
     unsigned line;
     unsigned column;
     CXFile file;
-    clang_getSpellingLocation(loc, &file, &line, &column, nullptr);
+    clang_getSpellingLocation(diagLoc, &file, &line, &column, nullptr);
     CXString str = clang_getFileName(file);
     wxString flName = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
@@ -505,7 +505,7 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
         }
         if (rgEnd == 0) // still no range -> use the range of the current token
         {
-            CXCursor token = clang_getCursor(m_ClTranslUnit, loc);
+            CXCursor token = clang_getCursor(m_ClTranslUnit, diagLoc);
             RangeToColumns(clang_getCursorExtent(token), rgStart, rgEnd);
         }
         if (rgEnd < column || rgStart > column) // out of bounds?
@@ -542,12 +542,22 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
         {
             CXSourceRange sourceRange;
             str = clang_getDiagnosticFixIt( diag, fixIdx, &sourceRange );
+            wxString text = wxString::FromUTF8( clang_getCString(str) );
+            clang_disposeString(str);
             unsigned fixitStart = rgStart;
             unsigned fixitEnd = rgEnd;
             RangeToColumns(sourceRange, fixitStart, fixitEnd);
-            wxString text = wxString::FromUTF8( clang_getCString(str) );
-            clang_disposeString(str);
-            fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd) );
+
+            CXSourceLocation srcLoc = clang_getRangeStart(sourceRange);
+            CXFile file;
+            unsigned line = 0, column = 0, offset1 = 0, offset2 = 0;
+            clang_getFileLocation(srcLoc, &file, &line, &column, NULL);
+            srcLoc = clang_getLocation( m_ClTranslUnit, file, line, 1 );
+            clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset1);
+            srcLoc = clang_getLocation( m_ClTranslUnit, file, line + 1, 1 );
+            clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset2);
+
+            fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd, srcText.SubString( offset1, offset2 )) );
         }
         inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText, fixitList ));
     }
@@ -561,13 +571,13 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
  * @return void
  *
  */
-void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, std::vector<ClDiagnostic>& diagnostics)
+void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics)
 {
     size_t numDiags = clang_getNumDiagnosticsInSet(diagSet);
     for (size_t i = 0; i < numDiags; ++i)
     {
         CXDiagnostic diag = clang_getDiagnosticInSet(diagSet, i);
-        ExpandDiagnostic(diag, filename, diagnostics);
+        ExpandDiagnostic(diag, filename, srcText, diagnostics);
         //ExpandDiagnosticSet(clang_getChildDiagnostics(diag), diagnostics);
         clang_disposeDiagnostic(diag);
     }

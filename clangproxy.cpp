@@ -991,7 +991,7 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxStri
     for ( diagIdx=0; diagIdx < numDiag; ++diagIdx )
     {
         CXDiagnostic diag = clang_codeCompleteGetDiagnostic( clResults, diagIdx );
-        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, out_diagnostics );
+        m_TranslUnits[translUnitId].ExpandDiagnostic( diag, filename, unsavedFiles.at( filename ), out_diagnostics );
     }
 
     //CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt done: %d elements"), (int)out_results.size()) );
