@@ -23,7 +23,7 @@
 					<Add directory="." />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>
@@ -43,7 +43,7 @@
 					<Add directory="." />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>

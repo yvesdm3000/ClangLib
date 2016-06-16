@@ -583,8 +583,7 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
             clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset2);
             wxString fixitLine;
             if (offset2 < srcText.Length())
-                fixitLine = srcText.SubString( offset1, offset2 );
-
+                fixitLine = srcText.SubString( offset1, offset2 ).Trim();
             fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd, fixitLine) );
         }
         inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText, fixitList ));

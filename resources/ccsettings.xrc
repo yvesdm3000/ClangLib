@@ -386,6 +386,20 @@
 											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
 											<border>5</border>
 										</object>
+										<object class="sizeritem">
+                                            <object class="wxBoxSizer">
+                                                <orient>wxVERTICAL</orient>
+                                                <object class="sizeritem">
+                                                    <object class="wxCheckBox" name="chkDiagnosticAutoFixit">
+                                                        <label>Automatic apply fix-it</label>
+                                                    </object>
+                                                    <flag>wxLEFT|wxALIGN_LEFT</flag>
+                                                    <border>15</border>
+                                                </object>
+                                            </object>
+											<flag>wxBOTTOM|wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+											<border>5</border>
+										</object>
 									</object>
 									<flag>wxALL|wxEXPAND</flag>
 									<border>8</border>

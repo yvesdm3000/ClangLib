@@ -34,7 +34,8 @@ ClangDiagnostics::ClangDiagnostics() :
     m_Diagnostics(),
     m_bShowInline(false),
     m_bShowWarning(false),
-    m_bShowError(false)
+    m_bShowError(false),
+    m_bShowNote(false)
 {
 
 }
@@ -166,6 +167,7 @@ void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
         m_bShowInline  = cfg->ReadBool(wxT("/diagnostics_show_inline"),   true);
         m_bShowWarning = cfg->ReadBool(wxT("/diagnostics_show_warnings"), true);
         m_bShowError   = cfg->ReadBool(wxT("/diagnostics_show_errors"),   true);
+        m_bShowNote   = cfg->ReadBool(wxT("/diagnostics_show_notes"),   false);
 
         m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId(file);
         cbStyledTextCtrl* stc = ed->GetControl();
@@ -209,19 +211,13 @@ void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
             {
                 if (dgItr->fixitList.size() > 0)
                 {
-                    for (std::vector<ClDiagnosticFixit>::const_iterator it = dgItr->fixitList.begin(); it != dgItr->fixitList.end(); ++it)
-                    {
-                        int offsetCorrection = 0;
-                        CCLogger::Get()->DebugLog( F(_T("Perform fix-it at %d,%d"), (int)it->range.first, (int)it->range.second) );
-                        int beginPos = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
-                        int endPos   = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
-                        stc->Replace( beginPos, endPos, it->text );
-                        offsetCorrection += it->text.length() - (endPos - beginPos);
-                    }
-                    stc->MarkerDelete( line, FIXIT_MARKER );
                     ClangFile file(ed->GetFilename());
                     if (ed->GetProjectFile())
                         file = ClangFile( *ed->GetProjectFile());
+                    if (HandleFixits( stc, line, dgItr->fixitList ))
+                    {
+                        stc->MarkerDelete( line, FIXIT_MARKER );
+                    }
                     m_pClangPlugin->RequestReparse( m_TranslUnitId, file );
                     return;
                 }
@@ -229,6 +225,31 @@ void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
         }
     }
 }
+
+bool ClangDiagnostics::HandleFixits(cbStyledTextCtrl* stc, unsigned int line, const std::vector<ClDiagnosticFixit>& fixitList ) const
+{
+    if (fixitList.size() == 0)
+        return false;
+    int beginPos = stc->PositionFromLine( line );
+    int endPos = stc->PositionFromLine( line + 1 ) - 1;
+    wxString text = stc->GetTextRange( beginPos, endPos );
+    if (fixitList.front().srcLine != text.Trim())
+    {
+        CCLogger::Get()->DebugLog( wxT("Fix-it line has changed since last reparse '")+fixitList.front().srcLine+wxT("' '")+text );
+        return false;
+    }
+    for (std::vector<ClDiagnosticFixit>::const_iterator it = fixitList.begin(); it != fixitList.end(); ++it)
+    {
+        int offsetCorrection = 0;
+        CCLogger::Get()->DebugLog( F(_T("Perform fix-it at %d,%d"), (int)it->range.first, (int)it->range.second) );
+        int beginPos = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
+        int endPos   = stc->PositionFromLine( (int)line ) + (int)it->range.first - 1 + offsetCorrection;
+        stc->Replace( beginPos, endPos, it->text );
+        offsetCorrection += it->text.length() - (endPos - beginPos);
+    }
+    return true;
+}
+
 
 void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
 {
@@ -343,6 +364,11 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
                         }
                         break;
                     case sNote:
+                        if (m_bShowNote)
+                        {
+                            stc->AnnotationSetText(dgItr->line - 1, str + dgItr->message);
+                            stc->AnnotationSetStyle(dgItr->line - 1, 52);
+                        }
                         break;
                     }
                 }
@@ -374,7 +400,12 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
         stc->IndicatorFillRange(pos, range);
         if (cfg->ReadBool(wxT("/diagnostics_enable_fixits"),   true) )
             if (dgItr->fixitList.size() > 0)
+            {
                 stc->MarkerAdd( dgItr->line - 1, FIXIT_MARKER );
+                if (cfg->ReadBool(wxT("/diagnostics_auto_fixit"), false ))
+                    if ( (stc->GetCurrentLine() > dgItr->line )||(stc->GetCurrentLine() < dgItr->line - 2) )
+                        HandleFixits ( stc, dgItr->line - 1, dgItr->fixitList);
+            }
         lastLine = dgItr->line - 1;
     }
     if (diagLv == dlFull)

@@ -32,6 +32,8 @@ public: // Clang events
 public:
     ClTranslUnitId GetCurrentTranslationUnitId();
     void OnMarginClicked(cbEditor* ed, wxScintillaEvent& event );
+private:
+    bool HandleFixits(cbStyledTextCtrl* stc, unsigned int line, const std::vector<ClDiagnosticFixit>& fixitList ) const;
 
 private:
     ClTranslUnitId m_TranslUnitId;
@@ -41,6 +43,7 @@ private:
     bool m_bShowInline;
     bool m_bShowWarning;
     bool m_bShowError;
+    bool m_bShowNote;
 };
 
 
