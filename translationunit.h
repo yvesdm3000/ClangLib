@@ -14,14 +14,16 @@ unsigned HashToken(CXCompletionString token, wxString& identifier);
 
 struct ClFunctionScope
 {
-    ClFunctionScope( const wxString& l_functionName, const wxString& l_scopeName, const ClTokenPosition& l_startLocation) :
+    ClFunctionScope( const wxString& l_functionName, const wxString& l_scopeName, const ClTokenPosition& l_startLocation, const ClTokenPosition& l_endLocation) :
         functionName(l_functionName),
         scopeName(l_scopeName),
-        startLocation(l_startLocation)
+        startLocation(l_startLocation),
+        endLocation(l_endLocation)
     {}
     wxString functionName;
     wxString scopeName;
     ClTokenPosition startLocation;
+    ClTokenPosition endLocation;
 };
 
 typedef std::vector<ClFunctionScope> ClFunctionScopeList;

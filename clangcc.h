@@ -24,14 +24,6 @@ public:
     wxString GetDocumentation(const cbCodeCompletionPlugin::CCToken& token);
     bool DoAutocomplete(const cbCodeCompletionPlugin::CCToken& WXUNUSED(token), cbEditor* WXUNUSED(ed));
 
-    /**
-     * Semantically highlight all occurrences of the token under the cursor
-     * within the editor
-     *
-     * @param ed The editor to work in
-     */
-    void BeginHighlightOccurrences(cbEditor* ed);
-
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
     void OnEditorSave(CodeBlocksEvent& event);

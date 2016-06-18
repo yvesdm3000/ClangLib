@@ -1603,6 +1603,19 @@ void ClangProxy::GetOccurrencesOf( const ClTranslUnitId translUnitId, const wxSt
     CXCursor token = m_TranslUnits[translUnitId].GetTokenAt(filename, location);
     if (clang_Cursor_isNull(token))
         return;
+#if 0
+    CXSourceRange range = clang_getCursorExtent( token );
+    CXSourceLocation start = clang_getRangeStart(range);
+    CXSourceLocation end = clang_getRangeEnd( range );
+    unsigned ln1, col1;
+    clang_getSpellingLocation(start, nullptr, &ln1, &col1, nullptr);
+    unsigned ln2, col2;
+    clang_getSpellingLocation(end, nullptr, &ln2, &col2, nullptr);
+    CXCursorKind kind = clang_getCursorKind( token );
+
+    CCLogger::Get()->DebugLog( F(wxT("Occurrences cursor extent: %d,%d to %d,%d kind=%d isDefinintion=%d"), (int)ln1, (int)col1, (int)ln2, (int)col2, (int)kind, (int)clang_isCursorDefinition(token)) );
+#endif
+
     ProxyHelper::ResolveCursorDecl(token);
     CXCursorAndRangeVisitor visitor = {&out_results, ProxyHelper::ReferencesVisitor};
     clang_findReferencesInFile(token, m_TranslUnits[translUnitId].GetFileHandle(filename), visitor);
@@ -1765,13 +1778,17 @@ void ClangProxy::GetFunctionScopeAt( const ClTranslUnitId translUnitId, const wx
     ClFunctionScopeList::const_iterator candidate = functionScopes.end();
     for (ClFunctionScopeList::const_iterator it = functionScopes.begin(); it != functionScopes.end(); ++it)
     {
-        if (it->startLocation.line <= location.line)
+        if ((it->startLocation.line <= location.line)&&(location.line <= it->endLocation.line))
         {
-            candidate = it;
-        }
-        else if (candidate != functionScopes.end())
-        {
-            break;
+            if (candidate == functionScopes.end())
+                candidate = it;
+            else
+            {
+                if ((it->startLocation.line <= candidate->startLocation.line))
+                {
+                    candidate = it;
+                }
+            }
         }
     }
     if (candidate != functionScopes.end())

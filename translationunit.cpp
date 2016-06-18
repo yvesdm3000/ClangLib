@@ -763,6 +763,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     }
 
     CXSourceLocation loc = clang_getCursorLocation(cursor);
+        CXSourceRange tokenRange = clang_getCursorExtent( cursor );
     CXFile clFile;
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
@@ -829,6 +830,9 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         ctx->tokenCount++;
         if (displayName.Length() > 0)
         {
+            unsigned endLine = line;
+            unsigned endCol = col;
+            clang_getSpellingLocation(clang_getRangeEnd(tokenRange), nullptr, &endLine, &endCol, nullptr);
             if (ctx->functionScopes[fileId].size() > 0)
             {
                 // Save some memory
@@ -841,7 +845,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
                     }
                 }
             }
-            ctx->functionScopes[fileId].push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col)) );
+            ctx->functionScopes[fileId].push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col), ClTokenPosition(endLine, endCol)) );
         }
     }
     return ret;
