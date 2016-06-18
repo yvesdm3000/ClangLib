@@ -54,7 +54,6 @@ DEFINE_EVENT_TYPE(clEVT_GETDEFINITION_FINISHED);
 
 static const wxString g_InvalidStr(wxT("invalid"));
 const int idReparseTimer    = wxNewId();
-const int idGotoDeclaration = wxNewId();
 const int idCreateTU = wxNewId();
 const int idStoreIndexDBTimer = wxNewId();
 
@@ -175,7 +174,6 @@ void ClangPlugin::OnAttach()
     Connect(g_idCCDebugLogger,             wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCDebugLogger));
     Connect(idReparseTimer,                wxEVT_TIMER,                    wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idStoreIndexDBTimer,           wxEVT_TIMER,                    wxTimerEventHandler(ClangPlugin::OnTimer));
-    Connect(idGotoDeclaration,             wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangPlugin::OnGotoDeclaration),       nullptr, this);
     Connect(idCreateTU,                    cbEVT_COMMAND_CREATETU,         wxCommandEventHandler(ClangPlugin::OnCreateTranslationUnit), nullptr, this);
 
     Connect(idClangCreateTU,               cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangCreateTUFinished),        nullptr, this);
@@ -231,7 +229,6 @@ void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
     Disconnect(idClangReparse);
     Disconnect(idCreateTU);
     Disconnect(idClangCreateTU);
-    Disconnect(idGotoDeclaration);
     Disconnect(idReparseTimer);
     Disconnect(g_idCCDebugLogger);
     Disconnect(g_idCCLogger);
@@ -518,18 +515,10 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
 
 void ClangPlugin::BuildMenu(wxMenuBar* menuBar)
 {
-    int idx = menuBar->FindMenu(_("Sea&rch"));
-    if (idx != wxNOT_FOUND)
-    {
-        menuBar->GetMenu(idx)->AppendSeparator();
-        menuBar->GetMenu(idx)->Append(idGotoDeclaration, _("Find &declaration (clang)"));
-    }
-
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
     {
         (*it)->BuildMenu(menuBar);
     }
-    //m_Diagnostics.BuildMenu( menuBar );
 }
 
 void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu,
@@ -545,15 +534,6 @@ void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu,
         m_TranslUnitId = wxNOT_FOUND;
         m_pLastEditor = ed;
         m_ReparseNeeded = 0;
-    }
-    wxMenuItem* item = menu->Insert(0, idGotoDeclaration, _("Find declaration (clang)"));
-    item->Enable(false);
-    if ( m_TranslUnitId!= wxNOT_FOUND)
-    {
-        cbStyledTextCtrl* stc = ed->GetControl();
-        const int pos = stc->GetCurrentPos();
-        if (!stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
-            item->Enable(true);
     }
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
     {
@@ -851,30 +831,6 @@ void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
         }
         ClangProxy::CreateTranslationUnitJob job( cbEVT_CLANG_ASYNCTASK_FINISHED, idClangCreateTU, file, m_CompileCommand, unsavedFiles );
         m_Proxy.AppendPendingJob(job);
-    }
-}
-
-void ClangPlugin::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
-{
-    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
-    if (!ed || m_TranslUnitId == wxNOT_FOUND)
-        return;
-    cbStyledTextCtrl* stc = ed->GetControl();
-    const int pos = stc->GetCurrentPos();
-    wxString filename = ed->GetFilename();
-    int line = stc->LineFromPosition(pos);
-    int column = pos - stc->PositionFromLine(line);
-    if (stc->GetLine(line).StartsWith(wxT("#include")))
-        column = 3;
-    ClTokenPosition loc(line+1, column+1);
-    ClTokenPosition newLoc = loc;
-    if ( !m_Proxy.ResolveTokenDeclarationAt(m_TranslUnitId, filename, loc, newLoc) )
-        return;
-    ed = Manager::Get()->GetEditorManager()->Open(filename);
-    if (ed)
-    {
-        ed->GotoTokenPosition(newLoc.line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
-                              stc->WordEndPosition(pos, true)));
     }
 }
 
@@ -1487,7 +1443,7 @@ wxString ClangPlugin::GetCodeCompletionInsertSuffix(const ClTranslUnitId translI
     return m_Proxy.GetCCInsertSuffix(translId, tknId, false, newLine, offsets);
 }
 
-void ClangPlugin::RequestTokenDefinitions(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc)
+void ClangPlugin::RequestTokenDefinitionsAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc)
 {
     ClangProxy::LookupDefinitionJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangLookupDefinition, id, file, loc);
     m_Proxy.AppendPendingJob( job );
@@ -1535,6 +1491,18 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
+
+bool ClangPlugin::ResolveTokenDeclarationAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc, ClangFile& out_file, ClTokenPosition& out_loc)
+{
+    wxString filename = file.GetFilename();
+    if (m_Proxy.ResolveTokenDeclarationAt( id, filename, loc, out_loc ))
+    {
+        out_file = ClangFile(file, filename);
+        return true;
+    }
+    return false;
+}
+
 
 void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const ClangFile& file)
 {

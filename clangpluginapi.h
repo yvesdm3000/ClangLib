@@ -168,9 +168,15 @@ public:
             m_Filename = fallbackFilename;
         }
     }
+
+    ClangFile(const ClangFile& project, const wxString& filename) :
+        m_Project(project.m_Project.c_str()),
+        m_Filename(filename.c_str()){}
+
     ClangFile(const ClangFile& Other) :
         m_Project(Other.m_Project.c_str()),
         m_Filename(Other.m_Filename.c_str()){}
+
     friend bool operator<(const ClangFile& first, const ClangFile& second )
     {
         if (first.GetProject() < second.GetProject())
@@ -357,7 +363,10 @@ public:
                                                    std::vector< std::pair<int, int> >& offsets) = 0;
 
     /** Token definition lookup */
-    virtual void RequestTokenDefinitions(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;
+    virtual void RequestTokenDefinitionsAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;
+
+    /** Resolve the declaration of a token */
+    virtual bool ResolveTokenDeclarationAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc, ClangFile& out_file, ClTokenPosition& out_loc) = 0;
 };
 
 /** @brief Base class for ClangPlugin components.

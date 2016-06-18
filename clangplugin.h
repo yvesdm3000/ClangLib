@@ -124,8 +124,6 @@ private:
     void OnTimer(wxTimerEvent& event);
     /// Start re-parse
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
-    /// Resolve the token under the cursor and open the relevant location
-    void OnGotoDeclaration(wxCommandEvent& event);
 
     // Async
     void OnCreateTranslationUnit(wxCommandEvent& evt);
@@ -187,7 +185,9 @@ public: // IClangPlugin
                                                  const ClTokenPosition& loc, const ClTokenId tokenId);
     wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
                                            std::vector< std::pair<int, int> >& offsets);
-    void RequestTokenDefinitions(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);
+    void RequestTokenDefinitionsAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);
+    bool ResolveTokenDeclarationAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc,
+                                 ClangFile& out_file, ClTokenPosition& out_loc);
 
     const wxImageList& GetImageList(const ClTranslUnitId WXUNUSED(id))
     {

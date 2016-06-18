@@ -31,11 +31,16 @@ public: // Code::Blocks events
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
     void OnTimer(wxTimerEvent& event);
 
+    // Build menu bar
+    void BuildMenu(wxMenuBar* menuBar);
     // Build popup menu
-    virtual void BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data = nullptr);
+    void BuildModuleMenu(const ModuleType type, wxMenu* menu, const FileTreeData* data = nullptr);
 
 public: // UI Command Events
+    /// Resolve the token under the cursor and open the relevant location
     void OnGotoDefinition(wxCommandEvent& event);
+    /// Resolve the token under the cursor and open the relevant location
+    void OnGotoDeclaration(wxCommandEvent& event);
 
 public: // Clang events
     void OnTranslationUnitCreated(ClangEvent& event);

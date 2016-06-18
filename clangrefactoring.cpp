@@ -28,7 +28,7 @@
 
 const int idHighlightTimer = wxNewId();
 const int idGotoDefinition = wxNewId();
-
+const int idGotoDeclaration = wxNewId();
 #define HIGHLIGHT_DELAY 700
 
 const wxString ClangRefactoring::SettingName = _T("/refactoring");
@@ -53,6 +53,7 @@ void ClangRefactoring::OnAttach(IClangPlugin* pClangPlugin)
     ClangPluginComponent::OnAttach(pClangPlugin);
 
     Connect(idGotoDefinition,          wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnGotoDefinition),    nullptr, this);
+    Connect(idGotoDeclaration,         wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnGotoDeclaration),   nullptr, this);
 
     typedef cbEventFunctor<ClangRefactoring, CodeBlocksEvent> CBEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBEvent(this, &ClangRefactoring::OnEditorActivate));
@@ -73,6 +74,7 @@ void ClangRefactoring::OnRelease(IClangPlugin* pClangPlugin)
     }
     Manager::Get()->RemoveAllEventSinksFor(this);
 
+    Disconnect( idGotoDeclaration );
     Disconnect( idGotoDefinition );
 
     ClangPluginComponent::OnRelease(pClangPlugin);
@@ -279,6 +281,44 @@ void ClangRefactoring::OnRequestOccurrencesFinished(ClangEvent& event)
     }
 }
 
+void ClangRefactoring::BuildMenu( wxMenuBar *menuBar )
+{
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed)
+        return;
+    int idx = menuBar->FindMenu(_("Sea&rch"));
+    if (idx != wxNOT_FOUND)
+    {
+        menuBar->GetMenu(idx)->AppendSeparator();
+        cbStyledTextCtrl* stc = ed->GetControl();
+        const int pos = stc->GetCurrentPos();
+        const int wordStart = stc->WordStartPosition( pos, true );
+        const int wordEnd = stc->WordEndPosition( pos, true );
+        wxString word = stc->GetTextRange( wordStart, wordEnd );
+        wxMenuItem* item;
+        if (word.Length() == 0)
+            item = menuBar->GetMenu(idx)->Append(idGotoDeclaration, _("Goto &declaration (clang)"));
+        else
+            item = menuBar->GetMenu(idx)->Append(idGotoDeclaration, wxT("Goto &declaration of '")+word+wxT("' (clang)") );
+        item->Enable(false);
+        if (GetCurrentTranslationUnitId() != wxNOT_FOUND)
+        {
+            if (!word.Strip().IsEmpty())
+                item->Enable(true);
+        }
+        if (word.Length() == 0)
+            item = menuBar->GetMenu(idx)->Append(idGotoDefinition, _("Find &implementation (clang)"));
+        else
+            item = menuBar->GetMenu(idx)->Append(idGotoDefinition, wxT("Find &implementation of '")+word+wxT("' (clang)") );
+        item->Enable(false);
+        if (GetCurrentTranslationUnitId() != wxNOT_FOUND)
+        {
+            if (!word.Strip().IsEmpty())
+                item->Enable(true);
+        }
+    }
+}
+
 void ClangRefactoring::BuildModuleMenu(const ModuleType type, wxMenu* menu,
                                   const FileTreeData* WXUNUSED(data))
 {
@@ -287,21 +327,47 @@ void ClangRefactoring::BuildModuleMenu(const ModuleType type, wxMenu* menu,
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
         return;
+    wxMenuItem* item;
     cbStyledTextCtrl* stc = ed->GetControl();
     const int pos = stc->GetCurrentPos();
-    if (stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
-        return;
-    //menu->Insert(0, idGotoDeclaration,    _("Find declaration (clang)"));
-    wxMenuItem* item = menu->Insert(0, idGotoDefinition, _("Goto definition (clang)"));
-    if (GetCurrentTranslationUnitId() == wxNOT_FOUND)
+    int line = stc->LineFromPosition(pos);
+    if (stc->GetLine(line).StartsWith(wxT("#include")))
     {
-        item->Enable(false);
+        item = menu->Insert( 0, idGotoDeclaration, _("Open include file (clang)") );
+        return;
     }
+
+    const int wordStart = stc->WordStartPosition( pos, true );
+    const int wordEnd = stc->WordEndPosition( pos, true );
+    wxString word = stc->GetTextRange( wordStart, wordEnd );
+    if (word.Length() == 0)
+        item = menu->Insert(0, idGotoDefinition, _("Find implementation (clang)"));
+    else
+        item = menu->Insert(0, idGotoDefinition, wxT("Find implementation of '")+word+wxT("' (clang)") );
+    item->Enable(false);
+    if (GetCurrentTranslationUnitId() != wxNOT_FOUND)
+    {
+        if (!word.Strip().IsEmpty())
+            item->Enable(true);
+    }
+
+    if (word.Length() == 0)
+        item = menu->Insert(0, idGotoDeclaration, _("Goto declaration (clang)"));
+    else
+        item = menu->Insert(0, idGotoDeclaration, wxT("Goto declaration of '")+word+wxT("' (clang)") );
+    item->Enable(false);
+    if ( m_TranslUnitId!= wxNOT_FOUND)
+    {
+        if (!word.Strip().IsEmpty())
+            item->Enable(true);
+    }
+
+
+
 }
 
 void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
 {
-    CCLogger::Get()->DebugLog( wxT("OnGotoDefinition") );
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
         return;
@@ -316,8 +382,7 @@ void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
     ClTranslUnitId translId = GetCurrentTranslationUnitId();
     if(translId == wxNOT_FOUND)
         return;
-    CCLogger::Get()->DebugLog( wxT("Calling RequestTokenDefinitions") );
-    m_pClangPlugin->RequestTokenDefinitions( translId, filename, loc );
+    m_pClangPlugin->RequestTokenDefinitionsAt( translId, filename, loc );
 }
 
 void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
@@ -361,5 +426,30 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
     {
         CCLogger::Get()->DebugLog( wxT("Going to file ")+results.front().first );
         newEd->GotoTokenPosition(results.front().second.line - 1, stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true)));
+    }
+}
+
+void ClangRefactoring::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
+{
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed || m_TranslUnitId == wxNOT_FOUND)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    const int pos = stc->GetCurrentPos();
+    int line = stc->LineFromPosition(pos);
+    int column = pos - stc->PositionFromLine(line);
+    if (stc->GetLine(line).StartsWith(wxT("#include")))
+        column = 3;
+    ClangFile file(ed->GetProjectFile(), ed->GetFilename());
+    ClTokenPosition loc(line+1, column+1);
+    ClTokenPosition declLoc = loc;
+    ClangFile declFile = file;
+    if ( !m_pClangPlugin->ResolveTokenDeclarationAt(m_TranslUnitId, file, loc, declFile, declLoc) )
+        return;
+    ed = Manager::Get()->GetEditorManager()->Open(declFile.GetFilename());
+    if (ed)
+    {
+        ed->GotoTokenPosition(declLoc.line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
+                              stc->WordEndPosition(pos, true)));
     }
 }
