@@ -868,7 +868,7 @@ void ClangPlugin::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
         column = 3;
     ClTokenPosition loc(line+1, column+1);
     ClTokenPosition newLoc = loc;
-    if ( !m_Proxy.ResolveDeclTokenAt(m_TranslUnitId, filename, loc, newLoc) )
+    if ( !m_Proxy.ResolveTokenDeclarationAt(m_TranslUnitId, filename, loc, newLoc) )
         return;
     ed = Manager::Get()->GetEditorManager()->Open(filename);
     if (ed)

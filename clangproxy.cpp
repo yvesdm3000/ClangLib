@@ -1564,12 +1564,16 @@ bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const wxString& file
     }
     out_Identifier = m_TranslUnits[translId].GetTokenIdentifierAt( filename, position );
     CXCursor cursor = m_TranslUnits[translId].GetTokenAt(filename, position);
-    //CXString str = clang_getCursorDisplayName( cursor );
-    //out_Identifier = wxString::FromUTF8( clang_getCString( str ));
-    //clang_disposeString( str );
     CXString str = clang_getCursorUSR(cursor);
     out_USR = wxString::FromUTF8( clang_getCString( str ) );
     clang_disposeString( str );
+    if (out_USR.Length() == 0)
+    {
+        ProxyHelper::ResolveCursorDecl( cursor );
+        CXString str = clang_getCursorUSR(cursor);
+        out_USR = wxString::FromUTF8( clang_getCString( str ) );
+        clang_disposeString( str );
+    }
     CCLogger::Get()->DebugLog( wxT("GetTokenAt: Identifier=")+out_Identifier+wxT(" USR=")+out_USR );
 
     return true;
@@ -1612,7 +1616,7 @@ void ClangProxy::GetOccurrencesOf( const ClTranslUnitId translUnitId, const wxSt
  * @return true if the token declaration could be found, false otherwise
  *
  */
-bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location)
+bool ClangProxy::ResolveTokenDeclarationAt( const ClTranslUnitId translUnitId, wxString& filename, const ClTokenPosition& location, ClTokenPosition& out_location)
 {
     if (translUnitId < 0)
     {
@@ -1661,14 +1665,14 @@ bool ClangProxy::ResolveDeclTokenAt( const ClTranslUnitId translUnitId, wxString
  *
  * The definition is where a token is actually implemented.
  */
-bool ClangProxy::ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& location, ClTokenPosition& out_location)
+bool ClangProxy::ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& location, ClTokenPosition& out_location)
 {
     if (translUnitId == wxID_ANY)
     {
         wxMutexLocker lock(m_Mutex);
         for (ClTranslUnitId id = 0; id < (ClTranslUnitId)m_TranslUnits.size(); ++id)
         {
-            if (ResolveDefinitionTokenAt( id, inout_filename, location, out_location ))
+            if (ResolveTokenDefinitionAt( id, inout_filename, location, out_location ))
                 return true;
         }
         return false;

@@ -777,6 +777,13 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     str = clang_getCursorUSR( cursor );
     wxString usr = wxString::FromUTF8( clang_getCString( str ) );
     clang_disposeString( str );
+    if (usr.Length() == 0)
+    {
+        CXCursor declCursor = clang_getCursorDefinition( cursor );
+        str = clang_getCursorUSR( declCursor );
+        usr = wxString::FromUTF8( clang_getCString( str ) );
+        clang_disposeString( str );
+    }
     unsigned tokenHash = HashToken(token, identifier);
 
     if (identifier.IsEmpty())

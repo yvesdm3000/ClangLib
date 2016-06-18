@@ -501,7 +501,7 @@ public:
             CCLogger::Get()->DebugLog(wxT("LookupDefinition"));
             ClTokenPosition pos(0,0);
             wxString filename = GetFile().GetFilename();
-            if (clangproxy.ResolveDefinitionTokenAt( m_TranslId, filename, m_Position, pos))
+            if (clangproxy.ResolveTokenDefinitionAt( m_TranslId, filename, m_Position, pos))
             {
                 CCLogger::Get()->DebugLog(wxT("Token definition found in own TU"));
                 m_Locations.push_back( std::make_pair(filename, pos) );
@@ -1243,8 +1243,8 @@ protected: // jobs that are run only on the thread
 
 public: // Tokens
     wxString GetCCInsertSuffix( const  ClTranslUnitId translId, int tknId, bool isDecl, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
-    bool ResolveDeclTokenAt( const ClTranslUnitId translId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
-    bool ResolveDefinitionTokenAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
+    bool ResolveTokenDeclarationAt( const ClTranslUnitId translId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
+    bool ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
 
 public: // Function scopes
     void GetFunctionScopeAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, wxString &out_ClassName, wxString &out_FunctionName );
