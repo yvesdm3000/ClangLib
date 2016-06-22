@@ -509,15 +509,11 @@ public:
             }
             if (clangproxy.GetTokenAt( m_TranslId, filename, m_Position, m_TokenIdentifier, m_TokenUSR ))
             {
-                ClTokenIndexDatabase* db = clangproxy.GetTokenIndexDatabase( m_File.GetProject() );
-                if (!db)
-                    db = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
+                ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
                 if (!db)
                     return;
-                CCLogger::Get()->DebugLog(wxT("TokenIdentifier='")+m_TokenIdentifier+wxT("' USR=")+m_TokenUSR);
-                std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, ClTokenType_DefGroup );
+                std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, m_TokenUSR, ClTokenType_DefGroup );
                 std::set<ClFileId> unhandledFileIdList;
-                CCLogger::Get()->DebugLog(F(wxT("LookupTokenFileList returned %d results"), fileIdList.size()));
                 for ( std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
                 {
                     ClTokenPosition pos(0,0);
@@ -533,10 +529,8 @@ public:
                 }
                 if (m_Locations.size() > 0)
                 {
-                    CCLogger::Get()->DebugLog( wxT("Locations found in loaded TU") );
                     return;
                 }
-                CCLogger::Get()->DebugLog( F(wxT("Found %d definitions"), (int)m_Locations.size()) );
             }
         }
         int GetTranslationUnitId() const
@@ -613,12 +607,10 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            CCLogger::Get()->DebugLog(wxT("LookupDefinition"));
             wxString tokenIdentifier;
             wxString usr;
             if (clangproxy.GetTokenAt( m_TranslId, m_File.GetFilename(), m_Position, tokenIdentifier, usr ))
             {
-                CCLogger::Get()->DebugLog( wxT("Finding definition in non-loaded TUs") );
                 CXIndex clangIndex = clang_createIndex(0,0);
 
                 for (std::vector< std::pair<wxString,wxString> >::const_iterator it = m_fileAndCompileCommands.begin(); it != m_fileAndCompileCommands.end(); ++it)
@@ -626,9 +618,7 @@ public:
                     std::vector<wxCharBuffer> argsBuffer;
                     std::vector<const char*> args;
                     clangproxy.BuildCompileArgs( it->first, it->second, argsBuffer, args );
-                    ClTokenIndexDatabase* indexdb = clangproxy.GetTokenIndexDatabase( m_File.GetProject() );
-                    if (!indexdb)
-                        indexdb = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
+                    ClTokenIndexDatabase* indexdb = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
                     if (!indexdb)
                         continue;
                     ClFileId destFileId = indexdb->GetFilenameId(it->first);

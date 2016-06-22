@@ -1459,11 +1459,11 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
     {
         if (dynamic_cast<ClangProxy::LookupDefinitionInFilesJob*>(pJob)== nullptr)
         {
-            ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( pJob->GetProject());
+            ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( pJob->GetProject() );
             if (!db)
                 return;
             // Perform the request again, but now with loading of TU's so we need a compile command for that
-            std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), ClTokenType_DefGroup );
+            std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
             std::vector< std::pair<wxString,wxString> > fileAndCompileCommands;
             EditorManager* edMgr = Manager::Get()->GetEditorManager();
             for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)

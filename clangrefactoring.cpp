@@ -373,7 +373,7 @@ void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
         return;
     cbStyledTextCtrl* stc = ed->GetControl();
     const int pos = stc->GetCurrentPos();
-    wxString filename = ed->GetFilename();
+    ClangFile file(ed->GetProjectFile(), ed->GetFilename());
     int line = stc->LineFromPosition(pos);
     int column = pos - stc->PositionFromLine(line);
     if (stc->GetLine(line).StartsWith(wxT("#include")))
@@ -382,7 +382,7 @@ void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
     ClTranslUnitId translId = GetCurrentTranslationUnitId();
     if(translId == wxNOT_FOUND)
         return;
-    m_pClangPlugin->RequestTokenDefinitionsAt( translId, filename, loc );
+    m_pClangPlugin->RequestTokenDefinitionsAt( translId, file, loc );
 }
 
 void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )

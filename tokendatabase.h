@@ -35,9 +35,12 @@ struct ClAbstractToken
 struct ClIndexToken
 {
     ClFileId fileId;
+    wxString USR;
     ClTokenType tokenTypeMask; // Different token types for the token that can be found in the file
-    ClIndexToken() : fileId(wxID_ANY), tokenTypeMask(ClTokenType_Unknown){}
-    ClIndexToken(const ClFileId fId, const ClTokenType tokTypeMask) : fileId(fId), tokenTypeMask(tokTypeMask){}
+    std::vector< std::pair<ClTokenType,ClTokenPosition> > positionList;
+
+    ClIndexToken() : fileId(wxID_ANY), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
+    ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokTypeMask) : fileId(fId), USR(usr.c_str()), tokenTypeMask(tokTypeMask){}
 
     static bool ReadIn(ClIndexToken& token, wxInputStream& in);
     static bool WriteOut(const ClIndexToken& token,  wxOutputStream& out);
@@ -99,7 +102,7 @@ public:
     wxDateTime GetFilenameTimestamp( const ClFileId fId ) const { return m_FileDB.GetFilenameTimestamp( fId );}
     void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp) { m_FileDB.UpdateFilenameTimestamp( fId, timestamp );}
 
-    std::set<ClFileId> LookupTokenFileList( const wxString& identifier, const ClTokenType typeMask ) const
+    std::set<ClFileId> LookupTokenFileList( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
     {
         std::set<ClFileId> retList;
         std::set<int> idList;
@@ -108,7 +111,7 @@ public:
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
             ClIndexToken& token = m_pIndexTokenMap->GetValue(*it);
-            if ((token.tokenTypeMask&typeMask)==typeMask )
+            if (((token.tokenTypeMask&typeMask)==typeMask )&&((USR.Length() == 0)||(token.USR.Length() == 0)||(USR == token.USR)))
             {
                 CCLogger::Get()->DebugLog( F(wxT("Token mask %x matches criteria %x for file (%d)")+GetFilename( token.fileId ), token.tokenTypeMask, typeMask, token.fileId) );
                 retList.insert( token.fileId );
@@ -126,7 +129,7 @@ public:
         return m_pIndexTokenMap->GetCount();
     }
 
-    void UpdateToken( const wxString& identifier, const ClFileId fileId, const ClTokenType tokType)
+    void UpdateToken( const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokType)
     {
         std::set<int> idList;
         m_pIndexTokenMap->GetIdSet( identifier, idList );
@@ -136,7 +139,7 @@ public:
             if (token.fileId == fileId)
             {
                 ClTokenType tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
-                if (token.tokenTypeMask != tokenTypeMask)
+                if ( (token.fileId == fileId)&&(token.USR == USR))
                 {
                     m_bModified = true;
                     token.tokenTypeMask = tokenTypeMask;
@@ -144,8 +147,17 @@ public:
                 return;
             }
         }
-        m_pIndexTokenMap->Insert( identifier, ClIndexToken(fileId, tokType) );
+        m_pIndexTokenMap->Insert( identifier, ClIndexToken(fileId, USR, tokType) );
         m_bModified = true;
+    }
+
+    void AddToken( const wxString& identifier, const ClIndexToken& token)
+    {
+        if (identifier.Length() > 0)
+        {
+            m_pIndexTokenMap->Insert( identifier, token );
+            m_bModified = true;
+        }
     }
     void Clear()
     {

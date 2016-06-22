@@ -2050,7 +2050,14 @@ ClTokenIndexDatabase* ClangProxy::LoadTokenIndexDatabase( const wxString& projec
             wxString fn = GetTokenIndexDatabaseFilename( projectFileName );
             CCLogger::Get()->DebugLog( wxT("Reading token index database from ")+fn );
             wxFileInputStream in(fn);
-            ClTokenIndexDatabase::ReadIn( *ret, in );
+            if (!ClTokenIndexDatabase::ReadIn( *ret, in ))
+            {
+                CCLogger::Get()->DebugLog( wxT("Reading token index database failed!") );
+            }
+            else
+            {
+                CCLogger::Get()->DebugLog( F(wxT("Loaded token index database: %d tokens"), (int)ret->GetTokenCount()) );
+            }
         }
 
         m_DatabaseMap.insert( std::make_pair( projectFileName, ret ) );

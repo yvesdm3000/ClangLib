@@ -742,7 +742,8 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     case CXCursor_Destructor:
     case CXCursor_FunctionTemplate:
         typ = ClTokenType_Func;
-        ret = CXChildVisit_Continue;
+        //ret = CXChildVisit_Continue;
+        ret = CXChildVisit_Recurse;
         break;
 
     default:
@@ -763,7 +764,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     }
 
     CXSourceLocation loc = clang_getCursorLocation(cursor);
-        CXSourceRange tokenRange = clang_getCursorExtent( cursor );
+    CXSourceRange tokenRange = clang_getCursorExtent( cursor );
     CXFile clFile;
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
@@ -797,9 +798,10 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         //CCLogger::Get()->DebugLog( wxT("Visited symbol ")+identifier );
         wxString displayName;
         wxString scopeName;
-        while (!clang_Cursor_isNull(cursor))
+        CXCursor cursorWalk = cursor;
+        while (!clang_Cursor_isNull(cursorWalk))
         {
-            switch (cursor.kind)
+            switch (cursorWalk.kind)
             {
             case CXCursor_Namespace:
             case CXCursor_StructDecl:
@@ -807,7 +809,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             case CXCursor_ClassTemplate:
             case CXCursor_ClassTemplatePartialSpecialization:
             case CXCursor_CXXMethod:
-                str = clang_getCursorDisplayName(cursor);
+                str = clang_getCursorDisplayName(cursorWalk);
                 if (displayName.Length() == 0)
                     displayName = wxString::FromUTF8(clang_getCString(str));
                 else
@@ -821,7 +823,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             default:
                 break;
             }
-            cursor = clang_getCursorSemanticParent(cursor);
+            cursorWalk = clang_getCursorSemanticParent(cursorWalk);
         }
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);

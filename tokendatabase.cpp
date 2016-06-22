@@ -148,6 +148,14 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
     WriteInt(out, token.fileId);
     WriteInt(out, token.tokenTypeMask);
+    WriteString( out, token.USR.utf8_str() );
+    WriteInt(out, (int)token.positionList.size());
+    for (std::vector<std::pair<ClTokenType, ClTokenPosition> >::const_iterator it = token.positionList.begin(); it != token.positionList.end(); ++it )
+    {
+        WriteInt(out, it->first);
+        WriteInt(out, it->second.line);
+        WriteInt(out, it->second.column);
+    }
     return true;
 }
 
@@ -167,6 +175,23 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
     if (!ReadInt(in, val))
         return false;
     token.fileId = val;
+    if (!ReadString( in, token.USR ))
+        return false;
+    if (!ReadInt(in, val))
+        return false;
+    int typ;
+    int line = 0;
+    int column = 0;
+    for (unsigned int i = 0; i < val; ++i)
+    {
+        if (!ReadInt(in, typ))
+            return false;
+        if (!ReadInt(in, line))
+            return false;
+        if (!ReadInt(in, column))
+            return false;
+        token.positionList.push_back( std::make_pair(static_cast<ClTokenType>(typ), ClTokenPosition(line,column)));
+    }
     return true;
 }
 
@@ -204,7 +229,7 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
     for (i = 0; i < cnt; ++i)
     {
         ClFilenameEntry entry = db.m_pFileEntries->GetValue((ClFileId)i);
-        if (!WriteString(out, entry.filename.mb_str()))
+        if (!WriteString(out, entry.filename.utf8_str()))
             return false;
         if (!WriteLongLong(out, entry.timestamp.GetValue().GetValue()))
             return false;
@@ -423,7 +448,7 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
     if (!ReadInt(in, version))
         return false;
     int i = 0;
-    if (version != 0x01)
+    if (version != 0x02)
     {
         CCLogger::Get()->DebugLog(F(wxT("Wrong version of token database: %d"), version));
         return false;
@@ -468,6 +493,7 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
                 {
                     if (!ClIndexToken::ReadIn( token, in ))
                         return false;
+                    tokenDatabase.AddToken( identifier, token );
                     read_count++;
                 }
             }
@@ -488,7 +514,7 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
 {
     int cnt;
     out.Write("ClDb", 4); // Magic number
-    WriteInt(out, 1); // Version number
+    WriteInt(out, 2); // Version number
 
     WriteInt(out, ClTokenPacketType_filenames);
     if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
@@ -718,13 +744,13 @@ void ClTokenDatabase::StoreIndexes() const
 {
     wxMutexLocker lock(m_Mutex);
     ClTokenId id;
-    uint32_t cnt = m_pTokenIndexDB->GetTokenCount();
+    //uint32_t cnt = m_pTokenIndexDB->GetTokenCount();
     for (id=0; id < m_pTokens->GetCount(); ++id)
     {
         ClAbstractToken& token = m_pTokens->GetValue( id );
-        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.tokenType );
+        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.USR, token.tokenType );
     }
-    uint32_t cnt2 = m_pTokenIndexDB->GetTokenCount();
+    //uint32_t cnt2 = m_pTokenIndexDB->GetTokenCount();
     //CCLogger::Get()->DebugLog( F(wxT("StoreIndexes: Stored %d tokens. %d tokens extra. Total: %d (merged) IndexDb: %p"), (int)m_pTokens->GetCount(), (int)cnt2 - cnt, cnt2, m_pTokenIndexDB) );
 }
 
