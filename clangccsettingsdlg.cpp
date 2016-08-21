@@ -104,6 +104,9 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     XRCCTRL(*this, "chkDetectImpl",         wxCheckBox)->SetValue(cfg->ReadBool(_T("/detect_implementation"),false));
     XRCCTRL(*this, "chkAddDoxgenComment",   wxCheckBox)->SetValue(cfg->ReadBool(_T("/add_doxgen_comment"),   false));
     //XRCCTRL(*this, "chkEnableHeaders",      wxCheckBox)->SetValue(cfg->ReadBool(_T("/enable_headers"),       true));
+    XRCCTRL(*this, "chkIncludeCodePatterns",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cc_include_code_patterns"),true));
+    XRCCTRL(*this, "chkIncludeBriefComments",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cc_include_brief_comments"),true));
+    XRCCTRL(*this, "chkIncludeMacros",      wxCheckBox)->SetValue(cfg->ReadBool(_T("/cc_include_macros"),       false));
     XRCCTRL(*this, "spnMaxMatches",         wxSpinCtrl)->SetValue(cfg->ReadInt(_T("/max_matches"),           1024));
     XRCCTRL(*this, "txtFillupChars",        wxTextCtrl)->SetValue(cfg->Read(_T("/fillup_chars"),             wxEmptyString));
     XRCCTRL(*this, "sldCCDelay",            wxSlider)->SetValue(cfg->ReadInt(_T("/cc_delay"),                300) / 100);
@@ -214,6 +217,9 @@ void ClangSettingsDlg::OnApply()
     //cfg->Write(_T("/auto_add_parentheses"), (bool) XRCCTRL(*this, "chkAutoAddParentheses", wxCheckBox)->GetValue());
     //cfg->Write(_T("/detect_implementation"),(bool) XRCCTRL(*this, "chkDetectImpl",         wxCheckBox)->GetValue());
     //cfg->Write(_T("/add_doxgen_comment"),   (bool) XRCCTRL(*this, "chkAddDoxgenComment",   wxCheckBox)->GetValue());
+    cfg->Write(_T("/cc_include_code_patterns"), (bool) XRCCTRL(*this, "chkIncludeCodePatterns", wxCheckBox)->GetValue());
+    cfg->Write(_T("/cc_include_brief_comments"),(bool) XRCCTRL(*this, "chkIncludeBriefComments", wxCheckBox)->GetValue());
+    cfg->Write(_T("/cc_include_macros"),    (bool) XRCCTRL(*this, "chkIncludeMacros", wxCheckBox)->GetValue());
     //cfg->Write(_T("/enable_headers"),       (bool) XRCCTRL(*this, "chkEnableHeaders",      wxCheckBox)->GetValue());
     cfg->Write(_T("/max_matches"),          (int)  XRCCTRL(*this, "spnMaxMatches",         wxSpinCtrl)->GetValue());
     cfg->Write(_T("/fillup_chars"),                XRCCTRL(*this, "txtFillupChars",        wxTextCtrl)->GetValue());

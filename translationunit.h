@@ -125,7 +125,7 @@ public:
     // note that complete_line and complete_column are 1 index, not 0 index!
     CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,
                                            struct CXUnsavedFile* unsaved_files,
-                                           unsigned num_unsaved_files );
+                                           unsigned num_unsaved_files, unsigned completeOptions );
     const CXCodeCompleteResults* GetCCResults() const;
     const CXCompletionResult* GetCCResult(unsigned index) const;
     bool HasCCContext( CXCompletionContext ctx ) const;

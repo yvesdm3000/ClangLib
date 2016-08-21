@@ -296,6 +296,14 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         }
     }
 
+    ClCodeCompleteOption options = ClCodeCompleteOption_None;
+    if (cfg->ReadBool(wxT("/cc_include_code_patterns")))
+        options = (ClCodeCompleteOption)(options | ClCodeCompleteOption_IncludeCodePatterns);
+    if (cfg->ReadBool(wxT("/cc_include_brief_comments") ))
+        options = (ClCodeCompleteOption)(options | ClCodeCompleteOption_IncludeBriefComments);
+    if (cfg->ReadBool(wxT("/cc_include_macros") ))
+        options = (ClCodeCompleteOption)(options | ClCodeCompleteOption_IncludeMacros);
+
     const wxString& prefix = stc->GetTextRange(tknStart, tknEnd).Lower();
     bool includeCtors = true; // sometimes we get a lot of these
     for (int i = tknStart - 1; i > 0; --i)
@@ -308,6 +316,8 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
             break;
         }
     }
+    if (includeCtors)
+        options = (ClCodeCompleteOption)(options | ClCodeCompleteOption_IncludeCTors);
 
     std::vector<ClToken> tknResults;
     if (m_CCOutstandingResults.empty())
@@ -318,7 +328,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         {
             timeout = 100;
         }
-        if (wxCOND_TIMEOUT == m_pClangPlugin->GetCodeCompletionAt(translUnitId, ed->GetFilename(), loc, includeCtors, timeout, tknResults))
+        if (wxCOND_TIMEOUT == m_pClangPlugin->GetCodeCompletionAt(translUnitId, ed->GetFilename(), loc, timeout, options, tknResults))
         {
             m_CCOutstanding++;
             m_CCOutstandingTokenStart = tknStart;

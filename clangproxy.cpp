@@ -878,6 +878,7 @@ ClTranslUnitId ClangProxy::GetTranslationUnitId( const ClTranslUnitId CtxTranslU
  */
 void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxString& filename,
                                  const ClTokenPosition& location,
+                                 unsigned cc_options,
                                  const std::map<wxString, wxString>& unsavedFiles,
                                  std::vector<ClToken>& out_results,
                                  std::vector<ClDiagnostic>& out_diagnostics )
@@ -909,7 +910,7 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const wxStri
         return;
     CXCodeCompleteResults* clResults = m_TranslUnits[translUnitId].CodeCompleteAt(filename, location,
                                        clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0],
-                                       clUnsavedFiles.size());
+                                       clUnsavedFiles.size(), cc_options);
     if (!clResults)
     {
         return;

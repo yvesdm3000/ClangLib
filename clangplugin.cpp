@@ -1385,7 +1385,7 @@ void ClangPlugin::RequestOccurrencesOf(const ClTranslUnitId translUnitId, const 
 }
 
 wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, const ClangFile& file, const ClTokenPosition& loc,
-                                             bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults)
+                                             unsigned long timeout, const ClCodeCompleteOption complete_options, std::vector<ClToken>& out_tknResults)
 {
     CCLogger::Get()->DebugLog(F(wxT("GetCodeCompletionAt %d,%d"), loc.line, loc.column));
 
@@ -1411,7 +1411,7 @@ wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, 
         if (ed && ed->GetModified())
             unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
     }
-    m_pOutstandingCodeCompletion = new ClangProxy::CodeCompleteAtJob(cbEVT_CLANG_SYNCTASK_FINISHED, idClangCodeComplete, file, loc, translUnitId, unsavedFiles, includeCtors);
+    m_pOutstandingCodeCompletion = new ClangProxy::CodeCompleteAtJob(cbEVT_CLANG_SYNCTASK_FINISHED, idClangCodeComplete, file, loc, translUnitId, unsavedFiles, complete_options);
     m_Proxy.AppendPendingJob(*m_pOutstandingCodeCompletion);
     if( timeout == 0 )
         return wxCOND_TIMEOUT;

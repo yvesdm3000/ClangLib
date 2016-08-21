@@ -149,6 +149,28 @@
 											<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
 											<border>5</border>
 										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkIncludeCodePatterns">
+												<label>Add code patterns to Code Completion results (if/for/while etc) </label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkIncludeBriefComments">
+												<label>Add brief comments to Code Completion result arguments</label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+											<border>5</border>
+										</object>
+										<object class="sizeritem">
+											<object class="wxCheckBox" name="chkIncludeMacros">
+												<label>Add macro's to Code Completion results</label>
+											</object>
+											<flag>wxTOP|wxLEFT|wxRIGHT|wxEXPAND</flag>
+											<border>5</border>
+										</object>
+
 <!--
 										<object class="sizeritem">
 											<object class="wxCheckBox" name="chkEnableHeaders">

@@ -116,9 +116,17 @@ std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
     str<<"]";
     return str;
 }
-
+/** \brief Calculate code completion at a certain position
+ *
+ * \param complete_filename The filename where code-completion is performed in
+ * \param complete_location The location within filename where code-completion is requested. It should always start at the beginning of the word in case a subset is requested.
+ * \param unsaved_files     List of unsaved files
+ * \param num_unsaved_files Amount of element in unsaved_files
+ * \param CompleteOptions   Options passed to clang. See clang_codeCompleteAt for allowed values
+ * \return Pointer to a CXCodeCompleteResults that represents all results from code completion
+ */
 CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complete_filename, const ClTokenPosition& complete_location,
-                                                         struct CXUnsavedFile* unsaved_files, unsigned num_unsaved_files )
+                                                         struct CXUnsavedFile* unsaved_files, unsigned num_unsaved_files, unsigned CompleteOptions )
 {
     if (m_ClTranslUnit == nullptr)
     {
@@ -132,10 +140,7 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
     if (m_LastCC)
         clang_disposeCodeCompleteResults(m_LastCC);
     m_LastCC = clang_codeCompleteAt(m_ClTranslUnit, (const char*)complete_filename.ToUTF8(), complete_location.line, complete_location.column,
-                                    unsaved_files, num_unsaved_files,
-                                    clang_defaultCodeCompleteOptions()
-                                    | CXCodeComplete_IncludeCodePatterns
-                                    | CXCodeComplete_IncludeBriefComments);
+                                    unsaved_files, num_unsaved_files, clang_defaultCodeCompleteOptions() | CompleteOptions );
     m_LastPos.Set(complete_location.line, complete_location.column);
     if (m_LastCC)
     {

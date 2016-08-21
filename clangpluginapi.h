@@ -141,6 +141,15 @@ typedef enum _TokenType
 
 } ClTokenType;
 
+typedef enum _ClCodeCompleteOption
+{
+    ClCodeCompleteOption_None                 = 0,
+    ClCodeCompleteOption_IncludeCTors         = 1<<0,
+    ClCodeCompleteOption_IncludeCodePatterns  = 1<<1,
+    ClCodeCompleteOption_IncludeBriefComments = 1<<2,
+    ClCodeCompleteOption_IncludeMacros        = 1<<3
+} ClCodeCompleteOption;
+
 class ClangFile
 {
     wxString m_Project;
@@ -356,7 +365,7 @@ public:
 
     /** Code completion */
     virtual wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc,
-                                            bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults) = 0;
+                                            unsigned long timeout, const ClCodeCompleteOption complete_options, std::vector<ClToken>& out_tknResults) = 0;
     virtual wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const ClangFile& file,
                                                          const ClTokenPosition& position, const ClTokenId tokenId) = 0;
     virtual wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,

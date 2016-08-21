@@ -741,17 +741,24 @@ public:
         CodeCompleteAtJob( const wxEventType evtType, const int evtId,
                            const ClangFile& file, const ClTokenPosition& position,
                            const ClTranslUnitId translId, const std::map<wxString, wxString>& unsavedFiles,
-                           bool includeCtors ):
+                           const ClCodeCompleteOption complete_options):
             SyncJob(CodeCompleteAtType, evtType, evtId),
             m_SerialNo( ++s_SerialNo ),
             m_File(file),
             m_Position(position),
             m_TranslId(translId),
             m_UnsavedFiles(unsavedFiles),
-            m_IncludeCtors(includeCtors),
+            m_IncludeCtors(complete_options & ClCodeCompleteOption_IncludeCTors),
             m_pResults(new std::vector<ClToken>()),
-            m_Diagnostics()
+            m_Diagnostics(),
+            m_Options(0)
         {
+            if (complete_options&ClCodeCompleteOption_IncludeCodePatterns)
+                m_Options |= CXCodeComplete_IncludeCodePatterns;
+            if (complete_options&ClCodeCompleteOption_IncludeBriefComments)
+                m_Options |= CXCodeComplete_IncludeBriefComments;
+            if (complete_options&ClCodeCompleteOption_IncludeMacros)
+                m_Options |= CXCodeComplete_IncludeMacros;
         }
         bool operator==(CodeCompleteAtJob& other)const
         {
@@ -769,7 +776,7 @@ public:
         {
             std::vector<ClToken> results;
             CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt ")+m_File.GetFilename()+wxT(" pos=%d,%d"), m_Position.line, m_Position.column) );
-            clangproxy.CodeCompleteAt(m_TranslId, m_File.GetFilename(), m_Position, m_UnsavedFiles, results, m_Diagnostics);
+            clangproxy.CodeCompleteAt(m_TranslId, m_File.GetFilename(), m_Position, m_Options, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {
                 switch (tknIt->category)
@@ -835,7 +842,8 @@ public:
             m_TranslId(other.m_TranslId),
             m_IncludeCtors(other.m_IncludeCtors),
             m_pResults(other.m_pResults),
-            m_Diagnostics(other.m_Diagnostics)
+            m_Diagnostics(other.m_Diagnostics),
+            m_Options(other.m_Options)
         {
             for ( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
@@ -850,6 +858,7 @@ public:
         bool m_IncludeCtors;
         std::vector<ClToken>* m_pResults; // Returned value
         std::vector<ClDiagnostic> m_Diagnostics;
+        unsigned m_Options;
     };
 
     /* final */
@@ -1218,7 +1227,7 @@ protected: // jobs that are run only on the thread
      */
     void UpdateTokenDatabase( const ClTranslUnitId translId );
     void GetDiagnostics(  const ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
-    void CodeCompleteAt(  const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location,
+    void CodeCompleteAt(  const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, unsigned cc_options,
                           const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
     wxString DocumentCCToken( ClTranslUnitId translId, int tknId );
     void GetTokensAt(     const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, std::vector<wxString>& results);

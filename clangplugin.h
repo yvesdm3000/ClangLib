@@ -180,7 +180,7 @@ public: // IClangPlugin
                            std::vector<std::pair<wxString, wxString> >& out_scopes);
     void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);
     wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc,
-                                    bool includeCtors, unsigned long timeout, std::vector<ClToken>& out_tknResults);
+                                    unsigned long timeout, const ClCodeCompleteOption complete_options, std::vector<ClToken>& out_tknResults);
     wxString GetCodeCompletionTokenDocumentation(const ClTranslUnitId id, const ClangFile& file,
                                                  const ClTokenPosition& loc, const ClTokenId tokenId);
     wxString GetCodeCompletionInsertSuffix(const ClTranslUnitId translId, int tknId, const wxString& newLine,
