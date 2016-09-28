@@ -1151,7 +1151,6 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
         CCLogger::Get()->DebugLog( wxT("Wrong event detected") );
         return;
     }
-    CCLogger::Get()->DebugLog( F(wxT("OnClangCreateTUFinished current tu=%d ")+pJob->GetFile().GetFilename(), (int)m_TranslUnitId) );
     if (m_TranslUnitId == pJob->GetTranslationUnitId())
     {
         //CCLogger::Get()->DebugLog( _T("FIXME: Double OnClangCreateTUFinished detected") );

@@ -498,12 +498,10 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            CCLogger::Get()->DebugLog(wxT("LookupDefinition"));
             ClTokenPosition pos(0,0);
             wxString filename = GetFile().GetFilename();
             if (clangproxy.ResolveTokenDefinitionAt( m_TranslId, filename, m_Position, pos))
             {
-                CCLogger::Get()->DebugLog(wxT("Token definition found in own TU"));
                 m_Locations.push_back( std::make_pair(filename, pos) );
                 return;
             }
@@ -525,6 +523,38 @@ public:
                     else
                     {
                         unhandledFileIdList.insert( *it );
+                    }
+                }
+                if (m_Locations.size() > 0)
+                {
+                    return;
+                }
+                // Find token in subclasses
+                std::vector<wxString> USRList;
+                clangproxy.GetTokenOverridesAt( m_TranslId, filename, m_Position, USRList);
+                for (std::vector<wxString>::const_iterator it = USRList.begin(); it != USRList.end(); ++it)
+                {
+                    const wxString& USR = *it;
+                    std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, USR, ClTokenType_Unknown );
+                    std::set<ClFileId> unhandledFileIdList;
+                    for ( std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
+                    {
+                        ClTokenPosition pos(0,0);
+
+                        if (clangproxy.LookupTokenDefinition(*it, m_TokenIdentifier, USR, pos) )
+                        {
+                            wxString fn = db->GetFilename( *it );
+                            m_Locations.push_back( std::make_pair( fn, pos ) );
+                        }
+                        else if (db->LookupTokenPosition( m_TokenIdentifier, *it, USR, ClTokenType_DefGroup, pos ))
+                        {
+                            wxString fn = db->GetFilename( *it );
+                            m_Locations.push_back( std::make_pair( fn, pos ) );
+                        }
+                        else
+                        {
+                            unhandledFileIdList.insert( *it );
+                        }
                     }
                 }
                 if (m_Locations.size() > 0)
@@ -1237,6 +1267,8 @@ protected: // jobs that are run only on the thread
                           std::vector< std::pair<int, int> >& results);
     void RefineTokenType( const ClTranslUnitId translId, int tknId, ClTokenCategory& out_tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
     bool GetTokenAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, wxString& out_Identifier, wxString& out_USR );
+    void GetTokenOverridesAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& position, std::vector<wxString>& out_USRList);
+
     bool LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_position);
     void StoreTokenIndexDatabase( const wxString& projectFileName ) const;
 

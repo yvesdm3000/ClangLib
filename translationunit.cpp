@@ -792,7 +792,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         clang_disposeString( str );
     }
     unsigned tokenHash = HashToken(token, identifier);
-
     if (identifier.IsEmpty())
     {
         //str = clang_getCursorDisplayName(cursor);
@@ -833,6 +832,20 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
         ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, usr, tokenHash);
+        {
+            CXCursor* cursorList = NULL;
+            unsigned int cursorNum = 0;
+            clang_getOverriddenCursors( cursor, &cursorList, &cursorNum );
+            for (unsigned int i=0; i < cursorNum; ++i)
+            {
+                str = clang_getCursorUSR( cursorList[i] );
+                wxString usr = wxString::FromUTF8( clang_getCString( str ) );
+                clang_disposeString( str );
+                tok.parentUSRList.push_back( usr );
+            }
+            clang_disposeOverriddenCursors(cursorList);
+        }
+
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
         if (displayName.Length() > 0)
