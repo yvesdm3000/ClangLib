@@ -54,7 +54,7 @@ public:
     {
         using std::swap;
         assert( first.m_Id == second.m_Id );
-        swap(first.m_Database, second.m_Database);
+        swap(first.m_pDatabase, second.m_pDatabase);
         swap(first.m_Id, second.m_Id);
         swap(first.m_FileId, second.m_FileId);
         swap(first.m_Files, second.m_Files);
@@ -105,16 +105,16 @@ public:
 
     const ClTokenDatabase& GetTokenDatabase() const
     {
-        return m_Database;
+        return *m_pDatabase;
     }
 
     const ClTokenIndexDatabase* GetTokenIndexDatabase() const
     {
-        return m_Database.GetTokenIndexDatabase();
+        return m_pDatabase->GetTokenIndexDatabase();
     }
     ClTokenIndexDatabase* GetTokenIndexDatabase()
     {
-        return m_Database.GetTokenIndexDatabase();
+        return m_pDatabase->GetTokenIndexDatabase();
     }
 
     bool Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
@@ -143,7 +143,7 @@ public:
     void GetFunctionScopes( const ClFileId fileId, ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes[fileId]; }
 
 private:
-    ClTokenDatabase m_Database;
+    ClTokenDatabase* m_pDatabase;
     ClTranslUnitId m_Id;
     ClFileId m_FileId; ///< The file that triggered the creation of this TU. Index in the local TokenDatabase.
     std::vector<ClFileId> m_Files; ///< All files linked to this TU

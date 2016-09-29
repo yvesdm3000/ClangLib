@@ -43,7 +43,7 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data);
 
 ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const ClTranslUnitId id, CXIndex clIndex) :
-    m_Database(IndexDatabase),
+    m_pDatabase(new ClTokenDatabase(IndexDatabase)),
     m_Id(id),
     m_FileId(-1),
     m_ClIndex(clIndex),
@@ -54,7 +54,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const 
 {
 }
 ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const ClTranslUnitId id) :
-    m_Database(indexDatabase),
+    m_pDatabase(new ClTokenDatabase(indexDatabase)),
     m_Id(id),
     m_FileId(-1),
     m_ClIndex(nullptr),
@@ -68,7 +68,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const 
 
 #if __cplusplus >= 201103L
 ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
-    m_Database(std::move(other.m_Database)),
+    m_pDatabase(std::move(other.m_pDatabase)),
     m_Id(other.m_Id),
     m_FileId(other.m_FileId),
     m_Files(std::move(other.m_Files)),
@@ -81,7 +81,7 @@ ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
 }
 #else
 ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
-    m_Database(other.m_Database),
+    m_pDatabase(new ClTokenDatabase(nullptr)),
     m_Id(other.m_Id),
     m_FileId( other.m_FileId ),
     m_ClIndex(other.m_ClIndex),
@@ -90,7 +90,7 @@ ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
     m_Diagnostics(other.m_Diagnostics),
     m_LastPos(-1, -1)
 {
-    swap(m_Database, const_cast<ClTranslationUnit&>(other).m_Database);
+    swap(*m_pDatabase, *const_cast<ClTranslationUnit&>(other).m_pDatabase);
     m_Files.swap(const_cast<ClTranslationUnit&>(other).m_Files);
     const_cast<ClTranslationUnit&>(other).m_ClTranslUnit = nullptr;
 }
@@ -104,6 +104,7 @@ ClTranslationUnit::~ClTranslationUnit()
     {
         clang_disposeTranslationUnit(m_ClTranslUnit);
     }
+    delete m_pDatabase;
 }
 
 std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
@@ -267,7 +268,7 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
         m_ClTranslUnit = nullptr;
     }
     m_Diagnostics.clear();
-    wxString viewFilename = m_Database.GetFilename( fileId );
+    wxString viewFilename = m_pDatabase->GetFilename( fileId );
 
     // TODO: check and handle error conditions
     std::vector<CXUnsavedFile> clUnsavedFiles;
@@ -356,7 +357,7 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     {
         return;
     }
-    wxString filename = m_Database.GetFilename( m_FileId );
+    wxString filename = m_pDatabase->GetFilename( m_FileId );
     CCLogger::Get()->DebugLog( F(wxT("Filename for %d: '")+filename+wxT("'"), m_FileId) );
     std::vector<CXUnsavedFile> clUnsavedFiles;
     std::vector<wxCharBuffer> clFileBuffer;
@@ -431,7 +432,7 @@ bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFile
         out_pIncludeFileList->shrink_to_fit();
 #else
         //std::vector<ClFileId>(m_Files).swap(m_Files);
-        std::vector<ClFileId>(out_pIncludeFileList).swap(out_pIncludeFileList);
+        std::vector<ClFileId>(*out_pIncludeFileList).swap(*out_pIncludeFileList);
 #endif
     }
     //m_Files.reserve(1024);
@@ -453,7 +454,7 @@ bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFile
 
 void ClTranslationUnit::SwapTokenDatabase(ClTokenDatabase& other)
 {
-    swap(m_Database, other);
+    swap(*m_pDatabase, other);
 }
 
 void ClTranslationUnit::GetDiagnostics(const wxString& /*filename*/, std::vector<ClDiagnostic>& out_diagnostics)
