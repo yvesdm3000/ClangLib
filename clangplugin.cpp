@@ -85,6 +85,7 @@ ClangPlugin::ClangPlugin() :
     m_UpdateCompileCommand(0),
     m_ReparseNeeded(0),
     m_ReparsingTranslUnitId(wxNOT_FOUND),
+    m_StoreIndexDBJobCount(0),
     m_StoreIndexDBTimer(this, idStoreIndexDBTimer)
 {
     CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger);
@@ -185,6 +186,7 @@ void ClangPlugin::OnAttach()
     Connect(idClangCodeComplete,           cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     Connect(idClangGetCCDocumentation,     cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     Connect(idClangLookupDefinition,       cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangLookupDefinitionFinished),nullptr, this);
+    Connect(idClangStoreTokenIndexDB,      cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangStoreTokenIndexDB),       nullptr, this);
 
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 
@@ -777,6 +779,13 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     }
     else if (evId == idStoreIndexDBTimer)
     {
+        if (m_StoreIndexDBJobCount)
+        {
+            CCLogger::Get()->DebugLog( wxT("Delay storing the Index DB") );
+            m_StoreIndexDBTimer.Stop();
+            m_StoreIndexDBTimer.Start( 1000, wxTIMER_ONE_SHOT);
+            return;
+        }
         std::set<wxString> projectFiles;
         m_Proxy.GetLoadedTokenIndexDatabases( projectFiles );
         for (std::set<wxString>::const_iterator it = projectFiles.begin(); it != projectFiles.end(); ++it)
@@ -786,6 +795,7 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
             {
                 ClangProxy::StoreTokenIndexDBJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangStoreTokenIndexDB, *it);
                 m_Proxy.AppendPendingJob( job );
+                m_StoreIndexDBJobCount++;
             }
         }
     }
@@ -1490,6 +1500,13 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
+
+void ClangPlugin::OnClangStoreTokenIndexDB(wxEvent& /*event*/)
+{
+    if (m_StoreIndexDBJobCount)
+        m_StoreIndexDBJobCount--;
+}
+
 
 bool ClangPlugin::ResolveTokenDeclarationAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc, ClangFile& out_file, ClTokenPosition& out_loc)
 {

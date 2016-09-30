@@ -150,6 +150,8 @@ private:
 
     void OnClangLookupDefinitionFinished(wxEvent& event);
 
+    void OnClangStoreTokenIndexDB(wxEvent& event);
+
 private: // Internal utility functions
     // Builds compile command
     wxString GetCompileCommand(ProjectFile* pf, const wxString& filename);
@@ -223,6 +225,7 @@ private: // Members
     int m_ReparseNeeded;
     ClTranslUnitId m_ReparsingTranslUnitId;
 
+    unsigned int m_StoreIndexDBJobCount;
     wxTimer m_StoreIndexDBTimer;
 
     ClangCodeCompletion m_CodeCompletion;
