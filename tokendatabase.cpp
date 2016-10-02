@@ -765,6 +765,7 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
  */
 void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 {
+    wxMutexLocker lock(m_Mutex);
     ClAbstractToken oldToken = GetToken(tokenId);
     wxString key = wxString::Format(wxT("%d"), oldToken.fileId);
     m_pFileTokens->Remove(key, tokenId);
@@ -775,6 +776,7 @@ void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 
 unsigned long ClTokenDatabase::GetTokenCount()
 {
+    wxMutexLocker lock(m_Mutex);
     return m_pTokens->GetCount();
 }
 

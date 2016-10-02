@@ -23,7 +23,13 @@ struct ClAbstractToken
         tokenType(typ), fileId(fId), location(loc), identifier(name), USR(usr), tokenHash(tknHash) {}
     ClAbstractToken( const ClAbstractToken& other ) :
         tokenType(other.tokenType), fileId(other.fileId), location(other.location),
-        identifier(other.identifier), USR(other.USR), tokenHash(other.tokenHash), parentUSRList(other.parentUSRList) {}
+        identifier(other.identifier), USR(other.USR), tokenHash(other.tokenHash), parentUSRList(other.parentUSRList)
+    {
+        for (std::vector<wxString>::const_iterator it = other.parentUSRList.begin(); it != other.parentUSRList.end(); ++it)
+        {
+            parentUSRList.push_back( *it );
+        }
+    }
 
     ClTokenType tokenType;
     ClFileId fileId;
@@ -44,7 +50,17 @@ struct ClIndexToken
 
     ClIndexToken() : fileId(wxID_ANY), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
     ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokTypeMask, const ClTokenPosition& tokenPosition, const std::vector<wxString>& parentUsrList) : fileId(fId), USR(usr.c_str()), tokenTypeMask(tokTypeMask), parentUSRList(parentUsrList) { positionList.push_back( std::make_pair( tokTypeMask, tokenPosition ) ); }
-    ClIndexToken(const ClIndexToken& other) : fileId(other.fileId), USR(other.USR), tokenTypeMask(other.tokenTypeMask), positionList(other.positionList), parentUSRList(other.parentUSRList){}
+    ClIndexToken(const ClIndexToken& other) : fileId(other.fileId), USR(other.USR), tokenTypeMask(other.tokenTypeMask), positionList(other.positionList), parentUSRList(other.parentUSRList)
+    {
+        for (std::vector< std::pair<ClTokenType,ClTokenPosition> >::const_iterator it = other.positionList.begin(); it != other.positionList.end(); ++it)
+        {
+            positionList.push_back( *it );
+        }
+        for (std::vector<wxString>::const_iterator it = other.parentUSRList.begin(); it != other.parentUSRList.end(); ++it)
+        {
+            parentUSRList.push_back( it->c_str() );
+        }
+    }
 
     static bool ReadIn(ClIndexToken& token, wxInputStream& in);
     static bool WriteOut(const ClIndexToken& token,  wxOutputStream& out);
