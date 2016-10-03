@@ -1290,7 +1290,7 @@ void ClangPlugin::OnClangReindexFinished(wxEvent& event)
     {
         m_StoreIndexDBTimer.Stop();
     }
-    m_StoreIndexDBTimer.Start( 1000, wxTIMER_ONE_SHOT);
+    m_StoreIndexDBTimer.Start( 60000, wxTIMER_ONE_SHOT);
     if (HasEventSink( clEVT_REINDEXFILE_FINISHED ))
     {
         ClangEvent clEvt(clEVT_REINDEXFILE_FINISHED, wxID_ANY, pJob->GetFile());

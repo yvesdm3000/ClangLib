@@ -2099,9 +2099,14 @@ void ClangProxy::StoreTokenIndexDatabase( const wxString& projectFileName ) cons
         CCLogger::Get()->DebugLog(wxT("StoreTokenIndexDatabase: no token index database found"));
         return;
     }
-    wxFileOutputStream out(GetTokenIndexDatabaseFilename(projectFileName));
+    wxString fn = GetTokenIndexDatabaseFilename(projectFileName);
+    wxFileOutputStream out(fn+wxT(".new"));
 
-    ClTokenIndexDatabase::WriteOut( *db, out );
+    if (ClTokenIndexDatabase::WriteOut( *db, out ) )
+    {
+        wxRemoveFile( fn );
+        wxRenameFile(fn+wxT(".new"), fn, true);
+    }
 }
 
 void ClangProxy::SetMaxTranslationUnits( unsigned int Max )
