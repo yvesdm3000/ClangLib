@@ -1286,11 +1286,7 @@ void ClangPlugin::OnClangReindexFinished(wxEvent& event)
 {
     event.Skip();
     ClangProxy::ReindexFileJob* pJob = static_cast<ClangProxy::ReindexFileJob*>(event.GetEventObject());
-    if (m_StoreIndexDBTimer.IsRunning())
-    {
-        m_StoreIndexDBTimer.Stop();
-    }
-    m_StoreIndexDBTimer.Start( 60000, wxTIMER_ONE_SHOT);
+    RequestStoreTokenIndexDB();
     if (HasEventSink( clEVT_REINDEXFILE_FINISHED ))
     {
         ClangEvent clEvt(clEVT_REINDEXFILE_FINISHED, wxID_ANY, pJob->GetFile());
@@ -1309,6 +1305,19 @@ void ClangPlugin::RequestReparse(int millisecs)
     m_ReparseNeeded++;
     m_ReparseTimer.Stop();
     m_ReparseTimer.Start( millisecs, wxTIMER_ONE_SHOT);
+    if (m_StoreIndexDBTimer.IsRunning())
+    {
+        RequestStoreTokenIndexDB();
+    }
+}
+
+void ClangPlugin::RequestStoreTokenIndexDB()
+{
+    if (m_StoreIndexDBTimer.IsRunning())
+    {
+        m_StoreIndexDBTimer.Stop();
+    }
+    m_StoreIndexDBTimer.Start( 60000, wxTIMER_ONE_SHOT);
 }
 
 void ClangPlugin::FlushTranslationUnits()

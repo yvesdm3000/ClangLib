@@ -23,7 +23,7 @@ struct ClAbstractToken
         tokenType(typ), fileId(fId), location(loc), identifier(name), USR(usr), tokenHash(tknHash) {}
     ClAbstractToken( const ClAbstractToken& other ) :
         tokenType(other.tokenType), fileId(other.fileId), location(other.location),
-        identifier(other.identifier), USR(other.USR), tokenHash(other.tokenHash), parentUSRList(other.parentUSRList)
+        identifier(other.identifier), USR(other.USR), tokenHash(other.tokenHash)
     {
         for (std::vector<wxString>::const_iterator it = other.parentUSRList.begin(); it != other.parentUSRList.end(); ++it)
         {
@@ -40,21 +40,40 @@ struct ClAbstractToken
     std::vector<wxString> parentUSRList; // overrides and parent classes
 };
 
+struct ClIndexTokenLocation
+{
+    ClTokenType tokenType;
+    ClFileId fileId;
+    ClTokenPosition position;
+    ClIndexTokenLocation(ClTokenType tokType, ClFileId filId, ClTokenPosition tokPosition) : tokenType(tokType), fileId(filId), position(tokPosition){}
+    bool operator==(const ClIndexTokenLocation& other) const
+    {
+        if (tokenType != other.tokenType)
+            return false;
+        if (fileId != other.fileId)
+            return false;
+        if (position.line != other.position.line)
+            return false;
+        if (position.column != other.position.column)
+            return false;
+        return true;
+    }
+};
+
 struct ClIndexToken
 {
-    ClFileId fileId;
     wxString USR;
     ClTokenType tokenTypeMask; // Different token types for the token that can be found in the file
-    std::vector< std::pair<ClTokenType,ClTokenPosition> > positionList;
+    std::vector< ClIndexTokenLocation > locationList;
     std::vector<wxString> parentUSRList;   // Overrides and parent classes
 
-    ClIndexToken() : fileId(wxID_ANY), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
-    ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokTypeMask, const ClTokenPosition& tokenPosition, const std::vector<wxString>& parentUsrList) : fileId(fId), USR(usr.c_str()), tokenTypeMask(tokTypeMask), parentUSRList(parentUsrList) { positionList.push_back( std::make_pair( tokTypeMask, tokenPosition ) ); }
-    ClIndexToken(const ClIndexToken& other) : fileId(other.fileId), USR(other.USR), tokenTypeMask(other.tokenTypeMask), positionList(other.positionList), parentUSRList(other.parentUSRList)
+    ClIndexToken() : USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
+    ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokType, const ClTokenPosition& tokenPosition, const std::vector<wxString>& parentUsrList) : USR(usr.c_str()), parentUSRList(parentUsrList) { locationList.push_back( ClIndexTokenLocation( tokType, fId, tokenPosition ) ); }
+    ClIndexToken(const ClIndexToken& other) : USR(other.USR), tokenTypeMask(other.tokenTypeMask)
     {
-        for (std::vector< std::pair<ClTokenType,ClTokenPosition> >::const_iterator it = other.positionList.begin(); it != other.positionList.end(); ++it)
+        for (std::vector< ClIndexTokenLocation >::const_iterator it = other.locationList.begin(); it != other.locationList.end(); ++it)
         {
-            positionList.push_back( *it );
+            locationList.push_back( *it );
         }
         for (std::vector<wxString>::const_iterator it = other.parentUSRList.begin(); it != other.parentUSRList.end(); ++it)
         {
@@ -132,7 +151,8 @@ public:
             ClIndexToken& token = m_pIndexTokenMap->GetValue(*it);
             if (((token.tokenTypeMask&typeMask)==typeMask )&&((USR.Length() == 0)||(token.USR.Length() == 0)||(USR == token.USR)))
             {
-                retList.insert( token.fileId );
+                for (std::vector<ClIndexTokenLocation>::const_iterator it2 = token.locationList.begin(); it2 != token.locationList.end(); ++it2)
+                    retList.insert( it2->fileId );
             }
         }
         return retList;
@@ -150,7 +170,8 @@ public:
             {
                 if (std::find( token.parentUSRList.begin(), token.parentUSRList.end(), USR ) != token.parentUSRList.end())
                 {
-                    retList.insert( std::make_pair( token.fileId, token.USR ) );
+                    for (std::vector<ClIndexTokenLocation>::const_iterator it2 = token.locationList.begin(); it2 != token.locationList.end(); ++it2)
+                        retList.insert( std::make_pair( it2->fileId, token.USR ) );
                 }
             }
         }
@@ -169,22 +190,20 @@ public:
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
             ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
-            if (token.fileId == fileId)
+            if ( token.USR == USR )
             {
-                ClTokenType tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
-                if ( (token.fileId == fileId)&&(token.USR == USR))
+                token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
+                ClIndexTokenLocation location(tokType, fileId, tokenPosition);
+                if (std::find(token.locationList.begin(), token.locationList.end(), location) == token.locationList.end())
+                    token.locationList.push_back( location );
+                for (std::vector<wxString>::const_iterator usrIt = overrideUSRList.begin(); usrIt != overrideUSRList.end(); ++usrIt)
                 {
-                    token.tokenTypeMask = tokenTypeMask;
-                    token.positionList.push_back( std::make_pair(tokType, tokenPosition));
-                    for (std::vector<wxString>::const_iterator usrIt = overrideUSRList.begin(); usrIt != overrideUSRList.end(); ++usrIt)
+                    if (std::find( token.parentUSRList.begin(), token.parentUSRList.end(), *usrIt ) == token.parentUSRList.end())
                     {
-                        if (std::find( token.parentUSRList.begin(), token.parentUSRList.end(), *usrIt ) == token.parentUSRList.end())
-                        {
-                            token.parentUSRList.push_back( *usrIt );
-                        }
+                        token.parentUSRList.push_back( *usrIt );
                     }
-                    m_bModified = true;
                 }
+                m_bModified = true;
                 return;
             }
         }
@@ -199,19 +218,16 @@ public:
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
             ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
-            if (token.fileId == fileId)
+            if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
             {
-                if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
+                if ((USR.Length() == 0)||(USR == token.USR))
                 {
-                    if ((USR.Length() == 0)||(USR == token.USR))
+                    for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
                     {
-                        for (std::vector< std::pair< ClTokenType, ClTokenPosition > >::const_iterator it = token.positionList.begin(); it != token.positionList.end(); ++it)
+                        if (((it->tokenType&tokenTypeMask)==tokenTypeMask)&&(it->fileId == fileId) )
                         {
-                            if ((it->first&tokenTypeMask)==tokenTypeMask)
-                            {
-                                out_Position = it->second;
-                                return true;
-                            }
+                            out_Position = it->position;
+                            return true;
                         }
                     }
                 }

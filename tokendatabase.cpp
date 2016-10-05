@@ -147,15 +147,14 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
 bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
 {
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
-    WriteInt(out, token.fileId);
-    WriteInt(out, token.tokenTypeMask);
     WriteString( out, token.USR.utf8_str() );
-    WriteInt(out, (int)token.positionList.size());
-    for (std::vector<std::pair<ClTokenType, ClTokenPosition> >::const_iterator it = token.positionList.begin(); it != token.positionList.end(); ++it )
+    WriteInt(out, (int)token.locationList.size());
+    for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it )
     {
-        WriteInt(out, it->first);
-        WriteInt(out, it->second.line);
-        WriteInt(out, it->second.column);
+        WriteInt(out, it->tokenType);
+        WriteInt(out, it->fileId);
+        WriteInt(out, it->position.line);
+        WriteInt(out, it->position.column);
     }
     WriteInt(out, (int)token.parentUSRList.size());
     for (std::vector<wxString>::const_iterator it = token.parentUSRList.begin(); it != token.parentUSRList.end(); ++it)
@@ -174,33 +173,31 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
  */
 bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
 {
-    token.positionList.clear();
+    token.locationList.clear();
     token.parentUSRList.clear();
     int val = 0;
-    if (!ReadInt(in, val))
-        return false;
-    token.fileId = val;
-    if (!ReadInt(in, val))
-        return false;
-    token.tokenTypeMask = (ClTokenType)val;
     if (!ReadString( in, token.USR ))
         return false;
 
     // Token position list
     if (!ReadInt(in, val))
         return false;
-    int typ;
-    int line = 0;
-    int column = 0;
     for (unsigned int i = 0; i < (unsigned int)val; ++i)
     {
+        int typ = 0;
+        int fileId = 0;
+        int line = 0;
+        int column = 0;
         if (!ReadInt(in, typ))
+            return false;
+        if (!ReadInt(in, fileId))
             return false;
         if (!ReadInt(in, line))
             return false;
         if (!ReadInt(in, column))
             return false;
-        token.positionList.push_back( std::make_pair(static_cast<ClTokenType>(typ), ClTokenPosition(line,column)));
+        token.locationList.push_back( ClIndexTokenLocation(static_cast<ClTokenType>(typ), fileId, ClTokenPosition(line,column)));
+        token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | typ);
     }
 
     // Child USR list
@@ -470,7 +467,7 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
     if (!ReadInt(in, version))
         return false;
     int i = 0;
-    if (version != 0x03)
+    if (version != 0x04)
     {
         CCLogger::Get()->DebugLog(F(wxT("Wrong version of token database: %d"), version));
         return false;
@@ -552,7 +549,7 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
 {
     int cnt;
     out.Write("ClDb", 4); // Magic number
-    WriteInt(out, 3); // Version number
+    WriteInt(out, 4); // Version number
     WriteInt(out, CINDEX_VERSION_MAJOR);
     WriteInt(out, CINDEX_VERSION_MINOR);
 
