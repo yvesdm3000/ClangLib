@@ -145,12 +145,11 @@ void ClangPlugin::OnAttach()
         "macro_use_protected.png", // PARSER_IMG_MACRO_USE_PROTECTED
         "macro_use_public.png",    // PARSER_IMG_MACRO_USE_PUBLIC
         "macro_use_folder.png",    // PARSER_IMG_MACRO_USE_FOLDER
-        "cpp_lang.png",            // tcLangKeyword
+        //"cpp_lang.png",            // tcLangKeyword
         nullptr
     };
     for (const char** itr = imgs; *itr; ++itr)
         m_ImageList.Add(cbLoadBitmap(prefix + wxString::FromUTF8(*itr), wxBITMAP_TYPE_PNG));
-
 
     EditorColourSet* theme = Manager::Get()->GetEditorManager()->GetColourSet();
     wxStringTokenizer tokenizer(theme->GetKeywords(theme->GetHighlightLanguage(wxT("C/C++")), 0));
@@ -1136,7 +1135,7 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 
     if (compileCommand != m_CompileCommand)
     {
-        CCLogger::Get()->DebugLog( F(_T("New compile command arguments: %s"), compileCommand.c_str()) );
+        CCLogger::Get()->DebugLog( _T("New compile command arguments: ")+compileCommand );
         m_CompileCommand = compileCommand;
         return 1;
     }

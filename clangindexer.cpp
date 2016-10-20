@@ -63,7 +63,7 @@ void ClangIndexer::OnProjectOpen(CodeBlocksEvent& evt)
         {
             ProjectFile* f = *it;
             wxDateTime ts = m_pClangPlugin->GetFileIndexingTimestamp( ClangFile(*f) );
-            if ((*it)->file.GetModificationTime() > ts )
+            if ( (!ts.IsValid()) ||((*it)->file.GetModificationTime() > ts ) )
                 m_StagingFiles.insert( ClangFile(*f));
         }
     }

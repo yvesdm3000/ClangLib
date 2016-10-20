@@ -255,7 +255,7 @@ wxString ClTranslationUnit::GetTokenIdentifierAt( const wxString &filename, cons
  */
 bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<wxString, wxString>& unsavedFiles, const bool bReparse )
 {
-    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse %s id=%d"), filename.c_str(), (int)m_Id));
+    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse id=%d"), (int)m_Id));
 
     if (m_LastCC)
     {
