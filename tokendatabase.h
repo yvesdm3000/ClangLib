@@ -112,7 +112,6 @@ public:
     void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp);
 private:
     ClTreeMap<ClFilenameEntry>* m_pFileEntries;
-    mutable wxMutex m_Mutex;
 };
 
 class ClTokenIndexDatabase
@@ -135,16 +134,43 @@ public:
     static bool ReadIn(ClTokenIndexDatabase& tokenDatabase, wxInputStream& in);
     static bool WriteOut(const ClTokenIndexDatabase& tokenDatabase, wxOutputStream& out);
 
-    bool HasFilename( const wxString& filename ) const { return m_FileDB.HasFilename(filename); }
-    ClFileId GetFilenameId( const wxString& filename ) const { return m_FileDB.GetFilenameId( filename ); }
-    wxString GetFilename(ClFileId fId) const { return m_FileDB.GetFilename( fId );}
-    wxDateTime GetFilenameTimestamp( const ClFileId fId ) const { return m_FileDB.GetFilenameTimestamp( fId );}
-    void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp) { m_FileDB.UpdateFilenameTimestamp( fId, timestamp );}
+    bool HasFilename( const wxString& filename ) const
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        return m_FileDB.HasFilename(filename);
+    }
+    ClFileId GetFilenameId( const wxString& filename ) const
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        return m_FileDB.GetFilenameId( filename );
+    }
+    wxString GetFilename(ClFileId fId) const
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        return m_FileDB.GetFilename( fId );
+    }
+    wxDateTime GetFilenameTimestamp( const ClFileId fId ) const
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        return m_FileDB.GetFilenameTimestamp( fId );
+    }
+    void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp)
+    {
+        wxMutexLocker locker(m_Mutex);
+        m_FileDB.UpdateFilenameTimestamp( fId, timestamp );
+    }
 
     std::set<ClFileId> LookupTokenFileList( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
     {
         std::set<ClFileId> retList;
         std::set<int> idList;
+
+        wxMutexLocker locker(m_Mutex);
+
         m_pIndexTokenMap->GetIdSet( identifier, idList );
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
@@ -162,6 +188,9 @@ public:
     {
         std::set<std::pair<ClFileId, wxString> > retList;
         std::set<int> idList;
+
+        wxMutexLocker locker(m_Mutex);
+
         m_pIndexTokenMap->GetIdSet( identifier, idList );
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
@@ -180,12 +209,17 @@ public:
 
     uint32_t GetTokenCount() const
     {
+        wxMutexLocker locker(m_Mutex);
+
         return m_pIndexTokenMap->GetCount();
     }
 
     void UpdateToken( const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokType, const ClTokenPosition& tokenPosition, const std::vector< wxString >& overrideUSRList)
     {
         std::set<int> idList;
+
+        wxMutexLocker locker(m_Mutex);
+
         m_pIndexTokenMap->GetIdSet( identifier, idList );
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
@@ -214,6 +248,9 @@ public:
     bool LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
     {
         std::set<int> idList;
+
+        wxMutexLocker locker(m_Mutex);
+
         m_pIndexTokenMap->GetIdSet( identifier, idList );
         for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
         {
@@ -240,16 +277,25 @@ public:
     {
         if (identifier.Length() > 0)
         {
+            wxMutexLocker locker(m_Mutex);
+
             m_pIndexTokenMap->Insert( identifier, token );
             m_bModified = true;
         }
     }
     void Clear()
     {
+        wxMutexLocker locker(m_Mutex);
+
         delete(m_pIndexTokenMap);
         m_pIndexTokenMap = new ClTreeMap<ClIndexToken>();
     }
-    bool IsModified() const { return m_bModified; }
+    bool IsModified() const
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        return m_bModified;
+    }
 
 private:
     ClFilenameDatabase m_FileDB;

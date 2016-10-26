@@ -219,6 +219,7 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
 ClFilenameDatabase::ClFilenameDatabase() :
     m_pFileEntries(new ClTreeMap<ClFilenameEntry>())
 {
+
 }
 
 ClFilenameDatabase::ClFilenameDatabase(const ClFilenameDatabase& Other) :
@@ -242,7 +243,6 @@ ClFilenameDatabase::~ClFilenameDatabase()
 bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream& out )
 {
     int i;
-    wxMutexLocker l(db.m_Mutex);
     int cnt = db.m_pFileEntries->GetCount();
     WriteInt(out, cnt);
     for (i = 0; i < cnt; ++i)
@@ -250,7 +250,10 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
         ClFilenameEntry entry = db.m_pFileEntries->GetValue((ClFileId)i);
         if (!WriteString(out, entry.filename.utf8_str()))
             return false;
-        if (!WriteLongLong(out, entry.timestamp.GetValue().GetValue()))
+        long long ts = 0;
+        if (entry.timestamp.IsValid())
+            ts = entry.timestamp.GetValue().GetValue();
+        if (!WriteLongLong(out, ts))
             return false;
     }
     return true;
@@ -266,7 +269,6 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
 bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
 {
     int i;
-    wxMutexLocker l(db.m_Mutex);
     int packetCount = 0;
     if (!ReadInt(in, packetCount))
         return false;
@@ -286,7 +288,6 @@ bool ClFilenameDatabase::ReadIn( ClFilenameDatabase& db, wxInputStream& in )
 
 bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
 {
-    wxMutexLocker lock(m_Mutex);
     assert(m_pFileEntries);
     wxFileName fln(filename.c_str());
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
@@ -306,7 +307,6 @@ bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
  */
 ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
 {
-    wxMutexLocker lock(m_Mutex);
     assert(m_pFileEntries);
     wxFileName fln(filename.c_str());
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
@@ -331,8 +331,6 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
  */
 wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
 {
-    wxMutexLocker lock(m_Mutex);
-
     assert(m_pFileEntries);
 
     if (!m_pFileEntries->HasValue(fId))
@@ -359,8 +357,6 @@ wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
  */
 const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) const
 {
-    wxMutexLocker lock(m_Mutex);
-
     assert(m_pFileEntries->HasValue(fId));
 
     ClFilenameEntry entry = m_pFileEntries->GetValue(fId);
@@ -376,8 +372,6 @@ const wxDateTime ClFilenameDatabase::GetFilenameTimestamp( const ClFileId fId ) 
  */
 void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDateTime& timestamp )
 {
-    wxMutexLocker lock(m_Mutex);
-
     assert(m_pFileEntries->HasValue(fId));
 
     ClFilenameEntry& entryRef = m_pFileEntries->GetValue(fId);
@@ -491,7 +485,7 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
     tokenDatabase.Clear();
     int read_count = 0;
 
-    wxMutexLocker(tokenDatabase.m_Mutex);
+    wxMutexLocker locker(tokenDatabase.m_Mutex);
     while (in.CanRead())
     {
         int packetType = 0;
@@ -554,10 +548,10 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
     WriteInt(out, CINDEX_VERSION_MINOR);
 
     WriteInt(out, ClTokenPacketType_filenames);
+    wxMutexLocker locker(tokenDatabase.m_Mutex);
     if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
         return false;
 
-    wxMutexLocker(tokenDatabase.m_Mutex);
 
     WriteInt(out, ClTokenPacketType_tokens);
     std::set<wxString> tokens = tokenDatabase.m_pIndexTokenMap->GetKeySet();

@@ -28,6 +28,7 @@
 				<ExtraCommands>
 					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
+					<Add after="zip -r clanglib.cbplugin images/" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -49,6 +50,7 @@
 				<ExtraCommands>
 					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
+					<Add after="zip -r clanglib.cbplugin images/" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -62,6 +64,7 @@
 		<Compiler>
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
+			<Add option="-std=c++11" />
 			<Add option="-ansi" />
 			<Add option="-fPIC" />
 			<Add option="$(#CB_RELEASE_TYPE)" />

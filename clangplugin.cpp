@@ -101,7 +101,7 @@ void ClangPlugin::OnAttach()
 {
     wxBitmap bmp;
     ConfigManager* cfg = Manager::Get()->GetConfigManager(wxT("ClangLib"));
-    wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/codecompletion/");
+    wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/clanglib/");
     // bitmaps must be added by order of PARSER_IMG_* consts (which are also TokenCategory enums)
     const char* imgs[] =
     {
@@ -122,7 +122,7 @@ void ClangPlugin::OnAttach()
         "var_private.png",         // PARSER_IMG_VAR_PRIVATE
         "var_protected.png",       // PARSER_IMG_VAR_PROTECTED
         "var_public.png",          // PARSER_IMG_VAR_PUBLIC
-        "macro_def.png",           // PARSER_IMG_MACRO_DEF
+        "macro_def.png",           // PARSER_IMG_MACRO_DEF          tcLangMacro
         "enum.png",                // PARSER_IMG_ENUM
         "enum_private.png",        // PARSER_IMG_ENUM_PRIVATE
         "enum_protected.png",      // PARSER_IMG_ENUM_PROTECTED
@@ -145,7 +145,7 @@ void ClangPlugin::OnAttach()
         "macro_use_protected.png", // PARSER_IMG_MACRO_USE_PROTECTED
         "macro_use_public.png",    // PARSER_IMG_MACRO_USE_PUBLIC
         "macro_use_folder.png",    // PARSER_IMG_MACRO_USE_FOLDER
-        //"cpp_lang.png",            // tcLangKeyword
+        "cpp_lang.png",            // tcLangKeyword
         nullptr
     };
     for (const char** itr = imgs; *itr; ++itr)
