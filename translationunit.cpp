@@ -2,9 +2,9 @@
  * Wrapper class around CXTranslationUnit
  */
 
+#include "translationunit.h"
 #include <sdk.h>
 #include <iostream>
-#include "translationunit.h"
 
 #ifndef CB_PRECOMP
 #include <algorithm>
@@ -28,6 +28,7 @@ public:
 struct ClangVisitorContext
 {
     ClangVisitorContext(ClTokenDatabase* pDatabase)
+     : functionScopes()
     {
         database = pDatabase;
         tokenCount = 0;
@@ -49,6 +50,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const 
     m_ClIndex(clIndex),
     m_ClTranslUnit(nullptr),
     m_LastCC(nullptr),
+    m_Diagnostics(),
     m_LastPos(-1, -1),
     m_LastParsed(wxDateTime::Now())
 {
@@ -60,6 +62,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const 
     m_ClIndex(nullptr),
     m_ClTranslUnit(nullptr),
     m_LastCC(nullptr),
+    m_Diagnostics(),
     m_LastPos(-1, -1),
     m_LastParsed(wxDateTime::Now())
 {
@@ -68,15 +71,18 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const 
 
 #if __cplusplus >= 201103L
 ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
-    m_pDatabase(std::move(other.m_pDatabase)),
+    m_pDatabase(nullptr),
     m_Id(other.m_Id),
     m_FileId(other.m_FileId),
     m_Files(std::move(other.m_Files)),
     m_ClIndex(other.m_ClIndex),
     m_ClTranslUnit(other.m_ClTranslUnit),
     m_LastCC(nullptr),
-    m_LastPos(-1, -1)
+    m_Diagnostics(other.m_Diagnostics),
+    m_LastPos(-1, -1),
+    m_LastParsed(other.m_LastParsed)
 {
+	std::swap(m_pDatabase,other.m_pDatabase);
     other.m_ClTranslUnit = nullptr;
 }
 #else
@@ -88,7 +94,8 @@ ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
     m_ClTranslUnit(other.m_ClTranslUnit),
     m_LastCC(nullptr),
     m_Diagnostics(other.m_Diagnostics),
-    m_LastPos(-1, -1)
+    m_LastPos(-1, -1),
+    m_LastParsed(other.m_LastParsed)
 {
     swap(*m_pDatabase, *const_cast<ClTranslationUnit&>(other).m_pDatabase);
     m_Files.swap(const_cast<ClTranslationUnit&>(other).m_Files);
