@@ -49,7 +49,7 @@
 				<Option run_host_application_in_terminal="0" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
-					<Add option="-O3" />
+					<Add option="-O2" />
 					<Add option="-m32" />
 					<Add option="`wx-config --cflags`" />
 					<Add option="-fmessage-length=0" />
@@ -72,10 +72,8 @@
 			<Add alias="All" targets="Debug_32;" />
 		</VirtualTargets>
 		<Compiler>
-			<Add option="-O3" />
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
-			<Add option="-ansi" />
 			<Add option="-fmessage-length=0" />
 			<Add option="-fexceptions" />
 			<Add option="-Winvalid-pch" />
@@ -88,11 +86,12 @@
 			<Add option="-DwxUSE_WCHAR_T" />
 			<Add option="-DBUILDING_PLUGIN" />
 			<Add option="-DwxUSE_GUI=1" />
+			<Add option="-D__WXMSW__" />
 			<Add directory='&quot;$(#CB)/src/include&quot;' />
 			<Add directory='&quot;$(#CB)/src/sdk/wxscintilla/include&quot;' />
 			<Add directory='&quot;$(#WX)/include&quot;' />
 			<Add directory='&quot;$(#CB)/src/include/tinyxml&quot;' />
-			<Add directory='&quot;$(#LLVM)/include&quot;' />
+			<Add directory='&quot;$(#CLANG)/include&quot;' />
 		</Compiler>
 		<Linker>
 			<Add option="-Wl,--no-undefined" />
@@ -100,9 +99,13 @@
 			<Add library="codeblocks" />
 			<Add library="wxmsw28u" />
 			<Add directory='&quot;$(#CB)/src/devel&quot;' />
-			<Add directory='&quot;$(#LLVM)/lib&quot;' />
+			<Add directory='&quot;$(#CLANG)/lib&quot;' />
 			<Add directory='&quot;$(#WX)/lib/gcc_dll&quot;' />
 		</Linker>
+		<ExtraCommands>
+			<Add after="zip -j clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml" />
+			<Mode after="always" />
+		</ExtraCommands>
 		<Unit filename="README.md">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
