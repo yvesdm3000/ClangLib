@@ -2009,7 +2009,19 @@ void ClangProxy::BuildCompileArgs(const wxString& filename, const wxString& comm
     std::sort(unknownOptions.begin(), unknownOptions.end());
     while (tokenizer.HasMoreTokens())
     {
-        const wxString& compilerSwitch = tokenizer.GetNextToken();
+        wxString compilerSwitch = tokenizer.GetNextToken();
+        if (compilerSwitch.Freq('"')%2 == 1)
+        {
+            while (tokenizer.HasMoreTokens())
+            {
+                compilerSwitch = compilerSwitch.Append(tokenizer.GetLastDelimiter());
+                wxString nextTok = tokenizer.GetNextToken();
+                compilerSwitch = compilerSwitch.Append(nextTok);
+                if (nextTok.Freq('"')%2 == 1)
+                    break;
+            }
+        }
+        compilerSwitch.Replace(wxT("\""), wxT(""), true);
         if (std::binary_search(unknownOptions.begin(), unknownOptions.end(), compilerSwitch))
             continue;
         out_argsBuffer.push_back(compilerSwitch.ToUTF8());
