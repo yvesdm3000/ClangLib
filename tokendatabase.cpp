@@ -400,7 +400,6 @@ ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* pIndexDB) :
         m_pTokens(new ClTreeMap<ClAbstractToken>()),
         m_pFileTokens(new ClTreeMap<int>())
 {
-    CCLogger::Get()->DebugLog(F(wxT("Creating ClTokenDatabase with IndexDB %d"), (int)pIndexDB));
     if (!pIndexDB)
     {
         m_pLocalTokenIndexDB = new ClTokenIndexDatabase();
