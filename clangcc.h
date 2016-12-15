@@ -70,12 +70,10 @@ protected: // Code completion for #include
 
 private:
     ClTranslUnitId m_TranslUnitId;
-
-    unsigned int m_CCOutstanding;
     long m_CCOutstandingLastMessageTime;
-    int m_CCOutstandingTokenStart;
     ClTokenPosition m_CCOutstandingLoc;
-    std::vector<ClToken> m_CCOutstandingResults;
+    ClTokenPosition m_CCResultsLoc;
+    std::vector<ClToken> m_CCResults;
     std::vector<wxString> m_TabJumpArguments;
     std::deque<wxString> m_CCHistory;
 };
