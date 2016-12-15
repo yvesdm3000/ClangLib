@@ -244,6 +244,7 @@ bool ClFilenameDatabase::WriteOut( const ClFilenameDatabase& db, wxOutputStream&
 {
     int i;
     int cnt = db.m_pFileEntries->GetCount();
+
     WriteInt(out, cnt);
     for (i = 0; i < cnt; ++i)
     {
@@ -291,8 +292,17 @@ bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
     assert(m_pFileEntries);
     wxFileName fln(filename.c_str());
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
-    const wxString& normFile = fln.GetFullPath(wxPATH_UNIX);
+#ifdef __WXMSW__
+    wxPathFormat pathFormat = wxPATH_WIN;
+#else
+    wxPathFormat pathFormat = wxPATH_UNIX;
+#endif // __WXMSW__
+
+    const wxString& normFile = fln.GetFullPath(pathFormat);
+    if (normFile.Len() <= 0 )
+        return false;
     std::set<int> idList;
+
     m_pFileEntries->GetIdSet(normFile, idList);
     if (idList.empty())
         return false;
@@ -310,8 +320,14 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
     assert(m_pFileEntries);
     wxFileName fln(filename.c_str());
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
-    const wxString& normFile = fln.GetFullPath(wxPATH_UNIX);
+#ifdef __WXMSW__
+    wxPathFormat pathFormat = wxPATH_WIN;
+#else
+    wxPathFormat pathFormat = wxPATH_UNIX;
+#endif // __WXMSW__
+    const wxString& normFile = fln.GetFullPath(pathFormat);
     std::set<int> idList;
+
     m_pFileEntries->GetIdSet(normFile, idList);
     if (idList.empty())
     {
@@ -378,14 +394,14 @@ void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDa
     entryRef.timestamp = timestamp;
 }
 
-ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* IndexDB) :
-        m_pTokenIndexDB( IndexDB ),
+ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* pIndexDB) :
+        m_pTokenIndexDB( pIndexDB ),
         m_pLocalTokenIndexDB( nullptr ),
         m_pTokens(new ClTreeMap<ClAbstractToken>()),
-        m_pFileTokens(new ClTreeMap<int>()),
-        m_Mutex(wxMUTEX_RECURSIVE)
+        m_pFileTokens(new ClTreeMap<int>())
 {
-    if (!IndexDB)
+    CCLogger::Get()->DebugLog(F(wxT("Creating ClTokenDatabase with IndexDB %d"), (int)pIndexDB));
+    if (!pIndexDB)
     {
         m_pLocalTokenIndexDB = new ClTokenIndexDatabase();
         m_pTokenIndexDB = m_pLocalTokenIndexDB;
@@ -398,18 +414,21 @@ ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* IndexDB) :
  *
  */
 ClTokenDatabase::ClTokenDatabase( const ClTokenDatabase& other) :
-    m_pTokenIndexDB(other.m_pTokenIndexDB),
+    m_pTokenIndexDB(nullptr),
     m_pLocalTokenIndexDB(nullptr),
     m_pTokens(nullptr),
-    m_pFileTokens(nullptr),
-    m_Mutex(wxMUTEX_RECURSIVE)
+    m_pFileTokens(nullptr)
 {
+    CCLogger::Get()->DebugLog(wxT("Copying ClTokenDatabase"));
     if (other.m_pLocalTokenIndexDB)
     {
         m_pLocalTokenIndexDB = new ClTokenIndexDatabase(*other.m_pLocalTokenIndexDB);
         m_pTokenIndexDB = m_pLocalTokenIndexDB;
     }
-    wxMutexLocker lock(other.m_Mutex);
+    else
+    {
+        m_pTokenIndexDB = other.m_pTokenIndexDB;
+    }
     m_pTokens = new ClTreeMap<ClAbstractToken>(*other.m_pTokens);
     m_pFileTokens = new ClTreeMap<int>(*other.m_pFileTokens);
 }
@@ -433,10 +452,6 @@ ClTokenDatabase::~ClTokenDatabase()
 void swap( ClTokenDatabase& first, ClTokenDatabase& second )
 {
     using std::swap;
-
-    // Let's assume no inverse swap will be performed at the same time for now
-    wxMutexLocker l1(first.m_Mutex);
-    wxMutexLocker l2(second.m_Mutex);
 
     swap(first.m_pTokenIndexDB, second.m_pTokenIndexDB);
     swap(first.m_pLocalTokenIndexDB, second.m_pLocalTokenIndexDB);
@@ -584,10 +599,9 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
  */
 void ClTokenDatabase::Clear()
 {
-    wxMutexLocker lock(m_Mutex);
     delete m_pTokens;
-    delete m_pFileTokens;
     m_pTokens = new ClTreeMap<ClAbstractToken>(),
+    delete m_pFileTokens;
     m_pFileTokens = new ClTreeMap<int>();
 }
 
@@ -632,8 +646,6 @@ wxDateTime ClTokenDatabase::GetFilenameTimestamp( const ClFileId fId ) const
  */
 ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
 {
-    wxMutexLocker lock(m_Mutex);
-
     ClTokenId tId = GetTokenId(token.identifier, token.fileId, token.tokenType, token.tokenHash);
     if (tId == wxNOT_FOUND)
     {
@@ -655,7 +667,6 @@ ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
  */
 ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId fileId, ClTokenType tokenType, unsigned tokenHash ) const
 {
-    wxMutexLocker lock(m_Mutex);
     std::set<int> ids;
     m_pTokens->GetIdSet(identifier, ids);
     for (std::set<int>::const_iterator itr = ids.begin();
@@ -685,7 +696,6 @@ ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId file
  */
 ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
 {
-    wxMutexLocker lock(m_Mutex);
     assert(m_pTokens->HasValue(tId));
     return m_pTokens->GetValue(tId);
 }
@@ -698,7 +708,6 @@ ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
  */
 void ClTokenDatabase::GetTokenMatches(const wxString& identifier, std::set<ClTokenId>& out_List) const
 {
-    wxMutexLocker lock(m_Mutex);
     m_pTokens->GetIdSet(identifier, out_List);
 }
 
@@ -710,7 +719,6 @@ void ClTokenDatabase::GetTokenMatches(const wxString& identifier, std::set<ClTok
  */
 void ClTokenDatabase::GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out_tokens) const
 {
-    wxMutexLocker lock(m_Mutex);
     wxString key = wxString::Format(wxT("%d"), fId);
     m_pFileTokens->GetIdSet(key, out_tokens);
 }
@@ -722,7 +730,6 @@ void ClTokenDatabase::GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out
  */
 void ClTokenDatabase::Shrink()
 {
-    wxMutexLocker lock(m_Mutex);
     m_pTokens->Shrink();
     m_pFileTokens->Shrink();
 }
@@ -756,7 +763,6 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
  */
 void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 {
-    wxMutexLocker lock(m_Mutex);
     ClAbstractToken oldToken = GetToken(tokenId);
     wxString key = wxString::Format(wxT("%d"), oldToken.fileId);
     m_pFileTokens->Remove(key, tokenId);
@@ -767,13 +773,11 @@ void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 
 unsigned long ClTokenDatabase::GetTokenCount()
 {
-    wxMutexLocker lock(m_Mutex);
     return m_pTokens->GetCount();
 }
 
 void ClTokenDatabase::StoreIndexes() const
 {
-    wxMutexLocker lock(m_Mutex);
     ClTokenId id;
     //uint32_t cnt = m_pTokenIndexDB->GetTokenCount();
     for (id=0; id < m_pTokens->GetCount(); ++id)

@@ -878,7 +878,7 @@ wxString ClangPlugin::GetCompilerInclDirs(const wxString& compId)
     {
         if (errItr->IsSameAs(wxT("End of search list.")))
             break;
-        includeDirs += wxT(" -I") + errItr->Strip(wxString::both);
+        includeDirs += wxT(" -I\"") + errItr->Strip(wxString::both)+wxT("\"");
     }
     return m_compInclDirs.insert(std::pair<wxString, wxString>(compId, includeDirs)).first->second;
 }
@@ -1081,9 +1081,17 @@ wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filenam
         // make all include paths absolute, so clang does not choke if Code::Blocks switches directories
         if (flag.StartsWith(wxT("-I"), &pathStr))
         {
+            if (pathStr.StartsWith(wxT("\""), NULL))
+            {
+                pathStr = pathStr.Mid(1);
+            }
+            if (pathStr.EndsWith(wxT("\""), NULL))
+            {
+                pathStr = pathStr.RemoveLast(1);
+            }
             wxFileName path(pathStr);
             if (path.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE))
-                flag = wxT("-I") + path.GetFullPath();
+                flag = wxT("-I\"") + path.GetFullPath()+wxT("\"");
         }
         compileCommand += flag + wxT(" ");
     }

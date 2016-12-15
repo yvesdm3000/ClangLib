@@ -121,11 +121,15 @@ public:
         m_FileDB(),
         m_pIndexTokenMap( new ClTreeMap<ClIndexToken>() ),
         m_bModified(false),
-        m_Mutex(wxMUTEX_RECURSIVE){}
+        m_Mutex(wxMUTEX_RECURSIVE)
+    {
+    }
     ClTokenIndexDatabase(const ClTokenIndexDatabase& other) :
         m_FileDB(other.m_FileDB),
         m_bModified(other.m_bModified),
-        m_Mutex(wxMUTEX_RECURSIVE){}
+        m_Mutex(wxMUTEX_RECURSIVE)
+    {
+    }
     ~ClTokenIndexDatabase()
     {
         delete m_pIndexTokenMap;
@@ -315,7 +319,7 @@ public:
 
     friend void swap(ClTokenDatabase& first, ClTokenDatabase& second);
 
-    bool HasFilename(const wxString& filename)const { return m_pTokenIndexDB->HasFilename(filename); }
+    bool HasFilename(const wxString& filename) const { return m_pTokenIndexDB->HasFilename(filename); }
     ClFileId GetFilenameId(const wxString& filename) const;
     wxString GetFilename(const ClFileId fId) const;
     wxDateTime GetFilenameTimestamp(const ClFileId fId) const;
@@ -357,7 +361,6 @@ private:
     ClTokenIndexDatabase* m_pLocalTokenIndexDB;
     ClTreeMap<ClAbstractToken>* m_pTokens;
     ClTreeMap<int>* m_pFileTokens;
-    mutable wxMutex m_Mutex;
 };
 
 #endif // TOKENDATABASE_H
