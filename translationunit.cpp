@@ -299,7 +299,6 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
     m_FunctionScopes.clear();
     m_Files.clear();
     m_FileId = wxNOT_FOUND;
-    m_Diagnostics.clear();
 
     if (filename.length() != 0)
     {
@@ -514,92 +513,147 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
     unsigned column;
     CXFile file;
     clang_getSpellingLocation(diagLoc, &file, &line, &column, nullptr);
-    CXString str = clang_getFileName(file);
-    wxString flName = wxString::FromUTF8(clang_getCString(str));
-    clang_disposeString(str);
+    CXString str;
 
-    if (flName == filename)
+    size_t numRnges = clang_getDiagnosticNumRanges(diag);
+    unsigned rgStart = 0;
+    unsigned rgEnd = 0;
+    for (size_t j = 0; j < numRnges; ++j) // often no range data (clang bug?)
     {
-        size_t numRnges = clang_getDiagnosticNumRanges(diag);
-        unsigned rgStart = 0;
-        unsigned rgEnd = 0;
-        for (size_t j = 0; j < numRnges; ++j) // often no range data (clang bug?)
+        RangeToColumns(clang_getDiagnosticRange(diag, j), rgStart, rgEnd);
+        if (rgStart != rgEnd)
+            break;
+    }
+    if (rgStart == rgEnd) // check if there is FixIt data for the range
+    {
+        numRnges = clang_getDiagnosticNumFixIts(diag);
+        for (size_t j = 0; j < numRnges; ++j)
         {
-            RangeToColumns(clang_getDiagnosticRange(diag, j), rgStart, rgEnd);
+            CXSourceRange range;
+            clang_getDiagnosticFixIt(diag, j, &range);
+            RangeToColumns(range, rgStart, rgEnd);
             if (rgStart != rgEnd)
                 break;
         }
-        if (rgStart == rgEnd) // check if there is FixIt data for the range
-        {
-            numRnges = clang_getDiagnosticNumFixIts(diag);
-            for (size_t j = 0; j < numRnges; ++j)
-            {
-                CXSourceRange range;
-                clang_getDiagnosticFixIt(diag, j, &range);
-                RangeToColumns(range, rgStart, rgEnd);
-                if (rgStart != rgEnd)
-                    break;
-            }
-        }
-        if (rgEnd == 0) // still no range -> use the range of the current token
-        {
-            CXCursor token = clang_getCursor(m_ClTranslUnit, diagLoc);
-            RangeToColumns(clang_getCursorExtent(token), rgStart, rgEnd);
-        }
-        if (rgEnd < column || rgStart > column) // out of bounds?
-            rgStart = rgEnd = column;
-        str = clang_formatDiagnostic(diag, 0);
-        wxString diagText = wxString::FromUTF8(clang_getCString(str));
+    }
+    if (rgEnd == 0) // still no range -> use the range of the current token
+    {
+        CXCursor token = clang_getCursor(m_ClTranslUnit, diagLoc);
+        RangeToColumns(clang_getCursorExtent(token), rgStart, rgEnd);
+    }
+    if (rgEnd < column || rgStart > column) // out of bounds?
+        rgStart = rgEnd = column;
+    str = clang_formatDiagnostic(diag, 0);
+    wxString diagText = wxString::FromUTF8(clang_getCString(str));
+    clang_disposeString(str);
+    if (diagText.StartsWith(wxT("warning: ")) )
+    {
+        diagText = diagText.Right( diagText.Length() - 9 );
+    }
+    else if (diagText.StartsWith(wxT("error: ")) )
+    {
+        diagText = diagText.Right( diagText.Length() - 7 );
+    }
+    ClDiagnosticSeverity sev = sWarning;
+    switch ( clang_getDiagnosticSeverity(diag))
+    {
+    case CXDiagnostic_Error:
+    case CXDiagnostic_Fatal:
+        sev = sError;
+        break;
+    case CXDiagnostic_Note:
+        sev = sNote;
+        break;
+    case CXDiagnostic_Warning:
+    case CXDiagnostic_Ignored:
+        sev = sWarning;
+        break;
+    }
+    std::vector<ClDiagnosticFixit> fixitList;
+    unsigned numFixIts = clang_getDiagnosticNumFixIts( diag );
+    for (unsigned fixIdx = 0; fixIdx < numFixIts; ++fixIdx)
+    {
+        CXSourceRange sourceRange;
+        str = clang_getDiagnosticFixIt( diag, fixIdx, &sourceRange );
+        wxString text = wxString::FromUTF8( clang_getCString(str) );
         clang_disposeString(str);
-        if (diagText.StartsWith(wxT("warning: ")) )
-        {
-            diagText = diagText.Right( diagText.Length() - 9 );
-        }
-        else if (diagText.StartsWith(wxT("error: ")) )
-        {
-            diagText = diagText.Right( diagText.Length() - 7 );
-        }
-        ClDiagnosticSeverity sev = sWarning;
-        switch ( clang_getDiagnosticSeverity(diag))
-        {
-        case CXDiagnostic_Error:
-        case CXDiagnostic_Fatal:
-            sev = sError;
-            break;
-        case CXDiagnostic_Note:
-            sev = sNote;
-            break;
-        case CXDiagnostic_Warning:
-        case CXDiagnostic_Ignored:
-            sev = sWarning;
-            break;
-        }
-        std::vector<ClDiagnosticFixit> fixitList;
-        unsigned numFixIts = clang_getDiagnosticNumFixIts( diag );
-        for (unsigned fixIdx = 0; fixIdx < numFixIts; ++fixIdx)
-        {
-            CXSourceRange sourceRange;
-            str = clang_getDiagnosticFixIt( diag, fixIdx, &sourceRange );
-            wxString text = wxString::FromUTF8( clang_getCString(str) );
-            clang_disposeString(str);
-            unsigned fixitStart = rgStart;
-            unsigned fixitEnd = rgEnd;
-            RangeToColumns(sourceRange, fixitStart, fixitEnd);
+        unsigned fixitStart = rgStart;
+        unsigned fixitEnd = rgEnd;
+        RangeToColumns(sourceRange, fixitStart, fixitEnd);
 
-            CXSourceLocation srcLoc = clang_getRangeStart(sourceRange);
-            CXFile file;
-            unsigned line = 0, column = 0, offset1 = 0, offset2 = 0;
-            clang_getFileLocation(srcLoc, &file, &line, &column, NULL);
-            srcLoc = clang_getLocation( m_ClTranslUnit, file, line, 1 );
-            clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset1);
-            srcLoc = clang_getLocation( m_ClTranslUnit, file, line + 1, 1 );
-            clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset2);
-            wxString fixitLine;
-            if (offset2 < srcText.Length())
-                fixitLine = srcText.SubString( offset1, offset2 ).Trim();
-            fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd, fixitLine) );
-        }
-        inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, flName, diagText, fixitList ));
+        CXSourceLocation srcLoc = clang_getRangeStart(sourceRange);
+        CXFile file;
+        unsigned line = 0, column = 0, offset1 = 0, offset2 = 0;
+        clang_getFileLocation(srcLoc, &file, &line, &column, NULL);
+        srcLoc = clang_getLocation( m_ClTranslUnit, file, line, 1 );
+        clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset1);
+        srcLoc = clang_getLocation( m_ClTranslUnit, file, line + 1, 1 );
+        clang_getFileLocation(srcLoc, NULL, NULL, NULL, &offset2);
+        wxString fixitLine;
+        if (offset2 < srcText.Length())
+            fixitLine = srcText.SubString( offset1, offset2 ).Trim();
+        fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd, fixitLine) );
+    }
+    inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, filename, diagText, fixitList ));
+}
+
+/** @brief Structure used to add diagnostics on include statements
+ */
+struct UpdateIncludeDiagnosticsData
+{
+    wxString filename; // Translation unit filename
+    std::vector<ClDiagnostic>& diagnostics;
+    std::set<wxString> warningIncludes;
+    std::set<wxString> errorIncludes;
+    UpdateIncludeDiagnosticsData( const wxString& fName, std::vector<ClDiagnostic>& diags) : filename(fName), diagnostics(diags), warningIncludes(), errorIncludes() {}
+};
+
+
+/** @brief Callback function to visit the children to add diagnostics on #include statements
+ *
+ * @param cursor the cursor to pass
+ * @param parentCursor
+ * @return
+ *
+ */
+void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* inclusion_stack,
+                               unsigned include_len, CXClientData clientData)
+{
+    if (include_len == 0)
+        return;
+    struct UpdateIncludeDiagnosticsData* data = static_cast<struct UpdateIncludeDiagnosticsData*>( clientData );
+    CXString str = clang_getFileName(included_file);
+    wxString includedFileName = wxString::FromUTF8(clang_getCString(str));
+    clang_disposeString(str);
+    CCLogger::Get()->DebugLog( F(wxT("Visit include statement ")+includedFileName) );
+    if (data->errorIncludes.find( includedFileName ) != data->errorIncludes.end())
+    {
+        unsigned int line = 0;
+        unsigned int column = 0;
+        CXFile file;
+        clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
+        str = clang_getFileName( file );
+        wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
+        clang_disposeString( str );
+        data->diagnostics.push_back( ClDiagnostic( line, column, column, sError, srcFilename, wxT("Errors present"), std::vector<ClDiagnosticFixit>() ));
+        CCLogger::Get()->DebugLog( F(wxT("+++ Inserting error at %d,%d"), line, column ) );
+        data->errorIncludes.insert( srcFilename );
+    }
+    else if (data->warningIncludes.find( includedFileName ) != data->warningIncludes.end())
+    {
+        unsigned int line = 0;
+        unsigned int column = 0;
+        CXFile file;
+        clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
+        str = clang_getFileName( file );
+        wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
+        clang_disposeString( str );
+        data->diagnostics.push_back( ClDiagnostic( line, column, column, sWarning, srcFilename, wxT("Warnings present"), std::vector<ClDiagnosticFixit>() ));
+        CCLogger::Get()->DebugLog( F(wxT("+++ Inserting warning at %d,%d"), line, column ) );
+        data->warningIncludes.insert( srcFilename );
+    }
+    else {
+        CCLogger::Get()->DebugLog( wxT("No warnings or errors for this include file") );
     }
 }
 
@@ -614,13 +668,48 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
 void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics)
 {
     size_t numDiags = clang_getNumDiagnosticsInSet(diagSet);
+    struct UpdateIncludeDiagnosticsData includesData(filename, diagnostics);
     for (size_t i = 0; i < numDiags; ++i)
     {
         CXDiagnostic diag = clang_getDiagnosticInSet(diagSet, i);
-        ExpandDiagnostic(diag, filename, srcText, diagnostics);
+        CXSourceLocation diagLoc = clang_getDiagnosticLocation(diag);
+        if (clang_equalLocations(diagLoc, clang_getNullLocation()))
+            continue;
+        unsigned line;
+        unsigned column;
+        CXFile file;
+        clang_getSpellingLocation(diagLoc, &file, &line, &column, nullptr);
+        CXString str = clang_getFileName(file);
+        wxString flName = wxString::FromUTF8(clang_getCString(str));
+        clang_disposeString(str);
+
+        if (flName == filename)
+        {
+            ExpandDiagnostic(diag, filename, srcText, diagnostics);
+        }
+        else
+        {
+            switch ( clang_getDiagnosticSeverity(diag))
+            {
+            case CXDiagnostic_Error:
+            case CXDiagnostic_Fatal:
+                CCLogger::Get()->DebugLog( wxT("+++ Adding ")+flName+wxT(" to errorIncludes, scope: ")+filename );
+                includesData.errorIncludes.insert( flName );
+                break;
+            case CXDiagnostic_Note:
+                break;
+            case CXDiagnostic_Warning:
+            case CXDiagnostic_Ignored:
+                CCLogger::Get()->DebugLog( wxT("+++ Adding ")+flName+wxT(" to warningIncludes, scope: ")+filename );
+                includesData.warningIncludes.insert( flName );
+                break;
+            }
+        }
+
         //ExpandDiagnosticSet(clang_getChildDiagnostics(diag), filename, srcText, diagnostics);
         clang_disposeDiagnostic(diag);
     }
+    clang_getInclusions( m_ClTranslUnit, UpdateIncludeDiagnosticsVisitor, &includesData );
 }
 
 void ClTranslationUnit::UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList &functionScopes )
