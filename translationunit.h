@@ -138,7 +138,7 @@ public:
     void ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
     void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
 
-    void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; }
+    void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; std::sort(m_Files.begin(), m_Files.end()); }
     void UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList& functionScopes );
     void GetFunctionScopes( const ClFileId fileId, ClFunctionScopeList& out_functionScopes ){ out_functionScopes = m_FunctionScopes[fileId]; }
 
