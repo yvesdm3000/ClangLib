@@ -83,7 +83,7 @@ void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed && ed->IsOK())
     {
-        ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+        ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
         wxString indexingType = cfg->Read(wxT("/indexer_indexingtype"), IndexingDefault);
         if (indexingType == wxT("fileopen"))
         {

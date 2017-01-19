@@ -316,7 +316,8 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                                                    );
         if (m_ClTranslUnit == nullptr)
         {
-            CCLogger::Get()->DebugLog( wxT("clang_parseTranslationUnit failed") );
+            CCLogger::Get()->DebugLog( wxT("clang_parseTranslationUnit failed for ")+filename );
+            CCLogger::Get()->LogError( wxT("ClangLib: Parse Translation Unit failed for ")+filename );
             return false;
         }
         if (bReparse)
@@ -326,7 +327,8 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                                                    clang_defaultReparseOptions(m_ClTranslUnit) );
             if (ret != 0)
             {
-                CCLogger::Get()->Log(_T("ReparseTranslationUnit failed"));
+                CCLogger::Get()->DebugLog(wxT("ReparseTranslationUnit failed for ")+filename);
+                CCLogger::Get()->LogError(wxT("ClangLib: Reparse Translation Unit failed for ")+filename);
                 // clang spec specifies that the only valid operation on the translation unit after a failure is to dispose the TU
                 clang_disposeTranslationUnit(m_ClTranslUnit);
                 m_ClTranslUnit = nullptr;
@@ -625,7 +627,7 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
     CXString str = clang_getFileName(included_file);
     wxString includedFileName = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
-    CCLogger::Get()->DebugLog( F(wxT("Visit include statement ")+includedFileName) );
+    //CCLogger::Get()->DebugLog( F(wxT("Visit include statement ")+includedFileName) );
     if (data->errorIncludes.find( includedFileName ) != data->errorIncludes.end())
     {
         unsigned int line = 0;
@@ -653,7 +655,7 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
         data->warningIncludes.insert( srcFilename );
     }
     else {
-        CCLogger::Get()->DebugLog( wxT("No warnings or errors for this include file") );
+        //CCLogger::Get()->DebugLog( wxT("No warnings or errors for this include file") );
     }
 }
 

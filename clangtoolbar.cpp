@@ -299,7 +299,7 @@ bool ClangToolbar::BuildToolBar(wxToolBar* toolBar)
 
 void ClangToolbar::UpdateToolBar()
 {
-    bool showScope = Manager::Get()->GetConfigManager(_T("ClangLib"))->ReadBool(_T("/scope_filter"), true);
+    bool showScope = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER)->ReadBool(_T("/scope_filter"), true);
     if (!m_ToolBar)
         return;
     if (showScope && !m_Scope)

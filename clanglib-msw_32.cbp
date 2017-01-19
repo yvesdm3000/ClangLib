@@ -34,7 +34,7 @@
 					<Add option="-m32" />
 				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9 C:\git\clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -63,7 +63,7 @@
 					<Add option="-m32" />
 				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9 C:\git\clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/codecompletion_toolbar.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/codecompletion_toolbar.xrc clang_project_settings_dlg.xrc resources/clang_project_settings_dlg.xrc" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -103,7 +103,7 @@
 			<Add directory='&quot;$(#WX)/lib/gcc_dll&quot;' />
 		</Linker>
 		<ExtraCommands>
-			<Add after="zip -j clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml" />
+			<Add after="zip -j clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml resources/clang_project_settings_dlg.xrc" />
 			<Mode after="always" />
 		</ExtraCommands>
 		<Unit filename="README.md">
@@ -122,6 +122,8 @@
 		<Unit filename="clangplugin.cpp" />
 		<Unit filename="clangplugin.h" />
 		<Unit filename="clangpluginapi.h" />
+		<Unit filename="clangprojectsettingsdlg.cpp" />
+		<Unit filename="clangprojectsettingsdlg.h" />
 		<Unit filename="clangproxy.cpp" />
 		<Unit filename="clangproxy.h" />
 		<Unit filename="clangrefactoring.cpp" />

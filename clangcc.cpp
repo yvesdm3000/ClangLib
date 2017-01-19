@@ -200,7 +200,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
     CCLogger::Get()->DebugLog( F(_T("ClangCodeCompletion::GetAutocompList isAuto=%d"), (int)isAuto) );
     std::vector<cbCodeCompletionPlugin::CCToken> tokens;
 
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(wxT("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     size_t maxResultCount = cfg->ReadInt(wxT("/max_matches"), 1024);
 
     cbStyledTextCtrl* stc = ed->GetControl();
@@ -517,7 +517,7 @@ bool ClangCodeCompletion::DoAutocomplete( const cbCodeCompletionPlugin::CCToken&
 
 wxString ClangCodeCompletion::GetDocumentation(const cbCodeCompletionPlugin::CCToken &token)
 {
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
 
     if (!cfg->ReadBool( wxT("/documentation_helper"), true ))
         return wxEmptyString;

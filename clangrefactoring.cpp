@@ -83,7 +83,7 @@ void ClangRefactoring::OnRelease(IClangPlugin* pClangPlugin)
 bool ClangRefactoring::ConfigurationChanged()
 {
     bool bReloadEditor = false;
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     bool bShowOccurrences  = cfg->ReadBool(wxT("/occurrence_highlight"),   true);
     if (bShowOccurrences != m_bShowOccurrences)
     {

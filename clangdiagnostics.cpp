@@ -163,7 +163,7 @@ void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
             file = ClangFile(*ed->GetProjectFile());
         }
 
-        ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+        ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
         m_bShowInline  = cfg->ReadBool(wxT("/diagnostics_show_inline"),   true);
         m_bShowWarning = cfg->ReadBool(wxT("/diagnostics_show_warnings"), true);
         m_bShowError   = cfg->ReadBool(wxT("/diagnostics_show_errors"),   true);
@@ -195,7 +195,7 @@ void ClangDiagnostics::OnEditorClose(CodeBlocksEvent& event)
 
 void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
 {
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     if (!cfg->ReadBool(wxT("/diagnostics_enable_fixits"),   true) )
         return;
 
@@ -267,7 +267,7 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
         return;
     }
 
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(_T("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     ClDiagnosticLevel diagLv = dlFull; // TODO
     bool update = false;
 

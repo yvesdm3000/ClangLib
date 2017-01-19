@@ -22,8 +22,11 @@
 					<Add option="-DCB_PRECOMP" />
 					<Add directory="." />
 				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
 					<Add after="zip -r clanglib.cbplugin images/" />
 					<Mode after="always" />
@@ -45,7 +48,7 @@
 					<Add directory="." />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc" />
+					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
 					<Add after="zip -r clanglib.cbplugin images/" />
 					<Mode after="always" />
@@ -72,7 +75,6 @@
 			<Add option="-Winvalid-pch" />
 			<Add option="-pthread" />
 			<Add option="`pkg-config --cflags codeblocks`" />
-			<Add option="-std=c++11" />
 			<Add option="-DcbDEBUG" />
 		</Compiler>
 		<Linker>
@@ -80,7 +82,6 @@
 			<Add option="-L`llvm-config --libdir`" />
 			<Add option="-Wl,--no-undefined" />
 			<Add option="`pkg-config --libs codeblocks`" />
-			<Add library="codeblocks" />
 			<Add library="clang" />
 		</Linker>
 		<ExtraCommands>
@@ -103,6 +104,8 @@
 		<Unit filename="clangplugin.cpp" />
 		<Unit filename="clangplugin.h" />
 		<Unit filename="clangpluginapi.h" />
+		<Unit filename="clangprojectsettingsdlg.cpp" />
+		<Unit filename="clangprojectsettingsdlg.h" />
 		<Unit filename="clangproxy.cpp" />
 		<Unit filename="clangproxy.h" />
 		<Unit filename="clangrefactoring.cpp" />
@@ -110,6 +113,7 @@
 		<Unit filename="clangtoolbar.cpp" />
 		<Unit filename="clangtoolbar.h" />
 		<Unit filename="resources/ccsettings.xrc" />
+		<Unit filename="resources/clang_project_settings_dlg.xrc" />
 		<Unit filename="resources/clangcodecompletion_toolbar.xrc" />
 		<Unit filename="resources/manifest.xml" />
 		<Unit filename="tokendatabase.cpp" />
@@ -122,6 +126,14 @@
 			<code_completion />
 			<envvars />
 			<debugger />
+			<LibClang>
+				<TargetSettings name="debug">
+					<Options compile_command_source="0" />
+				</TargetSettings>
+				<TargetSettings name="release">
+					<Options compile_command_source="0" />
+				</TargetSettings>
+			</LibClang>
 		</Extensions>
 	</Project>
 </CodeBlocks_project_file>

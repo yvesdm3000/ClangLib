@@ -19,11 +19,25 @@
 // milliseconds
 #define CLANG_REPARSE_DELAY 10000
 
+struct ProjectSetting
+{
+    enum CompileCommandSource
+    {
+        CompileCommandSource_project,
+        CompileCommandSource_jsonFile
+    };
+
+    CompileCommandSource compileCommandSource;
+    ProjectSetting() : compileCommandSource(CompileCommandSource_project) {}
+};
+typedef std::map<ProjectBuildTarget*, ProjectSetting> ProjectSettingMap;
+
 
 /* final */
 class ClangPlugin : public cbCodeCompletionPlugin, public IClangPlugin
 {
     friend class ClangSettingsDlg;
+    friend class ClangProjectSettingsDlg;
 public:
     ClangPlugin();
     virtual ~ClangPlugin();
@@ -36,6 +50,7 @@ public:
         return cgEditor;
     }
     virtual cbConfigurationPanel* GetConfigurationPanel(wxWindow* parent);
+    virtual cbConfigurationPanel* GetProjectConfigurationPanel(wxWindow* parent, cbProject* project);
 
 
     // Does this plugin handle code completion for the editor ed?
@@ -74,7 +89,7 @@ private:
      * @param compId The id of the compiler
      * @return Include search flags pointing to said locations
      */
-    wxString GetCompilerInclDirs(const wxString& compId);
+    void AddCompilerInclDirs(const wxString& compId, std::vector<wxString>& inout_CompileCommands);
 
 #if 0
     /**
@@ -105,6 +120,7 @@ private:
 #endif
     void OnCCLogger(CodeBlocksThreadEvent& event);
     void OnCCDebugLogger(CodeBlocksThreadEvent& event);
+    void OnCCErrorLogger(CodeBlocksThreadEvent& event);
 
     /// Start up parsing timers
     void OnEditorOpen(CodeBlocksEvent& event);
@@ -124,6 +140,7 @@ private:
     void OnTimer(wxTimerEvent& event);
     /// Start re-parse
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
+    void OnProjectLoadingHook(cbProject* project, TiXmlElement* elem, bool loading);
 
     // Async
     void OnCreateTranslationUnit(wxCommandEvent& evt);
@@ -154,7 +171,7 @@ private:
 
 private: // Internal utility functions
     // Builds compile command
-    wxString GetCompileCommand(ProjectFile* pf, const wxString& filename);
+    std::vector<wxString> GetCompileCommand(ProjectFile* pf, const wxString& filename);
     int UpdateCompileCommand(cbEditor* ed);
 
     void RequestReparse(int delayMilliseconds = CLANG_REPARSE_DELAY);
@@ -210,18 +227,20 @@ private: // Members
     wxStringVec m_CppKeywords;
     ClangProxy m_Proxy;
     wxImageList m_ImageList;
+    ProjectSettingMap m_ProjectSettingsMap;
 
     ClangProxy::CodeCompleteAtJob* m_pOutstandingCodeCompletion;
 
     wxTimer m_ReparseTimer;
-    std::map<wxString, wxString> m_compInclDirs;
+    std::map<wxString, std::vector<wxString> > m_compInclDirs;
     cbEditor* m_pLastEditor;
     int m_TranslUnitId;
     int m_EditorHookId;
+    int m_ProjectHookId; // project loader hook ID
     int m_LastCallTipPos;
     std::vector<wxStringVec> m_LastCallTips;
 
-    wxString m_CompileCommand;
+    std::vector<wxString> m_CompileCommand;
     int m_UpdateCompileCommand;
     int m_ReparseNeeded;
     ClTranslUnitId m_ReparsingTranslUnitId;

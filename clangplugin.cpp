@@ -7,12 +7,15 @@
 #include <iostream>
 #include "clangplugin.h"
 #include "clangccsettingsdlg.h"
+#include "clangprojectsettingsdlg.h"
 #include "cclogger.h"
 
 #include <cbcolourmanager.h>
 #include <cbstyledtextctrl.h>
 #include <compilercommandgenerator.h>
 #include <editor_hooks.h>
+#include <projectloader_hooks.h>
+#include <clang-c/CXCompilationDatabase.h>
 
 #include <wx/tokenzr.h>
 
@@ -32,6 +35,7 @@
 #include <wx/menu.h>
 #include <wx/tokenzr.h>
 #include <wx/choice.h>
+#include <wx/timer.h>
 #endif // CB_PRECOMP
 
 #define CLANGPLUGIN_TRACE_FUNCTIONS
@@ -82,13 +86,15 @@ ClangPlugin::ClangPlugin() :
     m_ReparseTimer(this, idReparseTimer),
     m_pLastEditor(nullptr),
     m_TranslUnitId(wxNOT_FOUND),
+    m_EditorHookId( -1 ),
+    m_ProjectHookId( -1 ),
     m_UpdateCompileCommand(0),
     m_ReparseNeeded(0),
     m_ReparsingTranslUnitId(wxNOT_FOUND),
     m_StoreIndexDBJobCount(0),
     m_StoreIndexDBTimer(this, idStoreIndexDBTimer)
 {
-    CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger);
+    CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger, g_idCCErrorLogger);
     if (!Manager::LoadResource(wxT("clanglib.zip")))
         NotifyMissingFile(wxT("clanglib.zip"));
 }
@@ -100,7 +106,7 @@ ClangPlugin::~ClangPlugin()
 void ClangPlugin::OnAttach()
 {
     wxBitmap bmp;
-    ConfigManager* cfg = Manager::Get()->GetConfigManager(wxT("ClangLib"));
+    ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
     wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/clanglib/");
     // bitmaps must be added by order of PARSER_IMG_* consts (which are also TokenCategory enums)
     const char* imgs[] =
@@ -158,6 +164,12 @@ void ClangPlugin::OnAttach()
     std::sort(m_CppKeywords.begin(), m_CppKeywords.end());
     wxStringVec(m_CppKeywords).swap(m_CppKeywords);
 
+
+    // hook to project loading procedure
+    ProjectLoaderHooks::HookFunctorBase* myhook = new ProjectLoaderHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnProjectLoadingHook);
+    m_ProjectHookId = ProjectLoaderHooks::RegisterHook(myhook);
+
+
     typedef cbEventFunctor<ClangPlugin, CodeBlocksEvent> CbEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_OPEN,             new CbEvent(this, &ClangPlugin::OnEditorOpen));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED,        new CbEvent(this, &ClangPlugin::OnEditorActivate));
@@ -172,6 +184,7 @@ void ClangPlugin::OnAttach()
 
     Connect(g_idCCLogger,                  wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCLogger));
     Connect(g_idCCDebugLogger,             wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCDebugLogger));
+    Connect(g_idCCErrorLogger,             wxEVT_COMMAND_MENU_SELECTED,    CodeBlocksThreadEventHandler(ClangPlugin::OnCCErrorLogger));
     Connect(idReparseTimer,                wxEVT_TIMER,                    wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idStoreIndexDBTimer,           wxEVT_TIMER,                    wxTimerEventHandler(ClangPlugin::OnTimer));
     Connect(idCreateTU,                    cbEVT_COMMAND_CREATETU,         wxCommandEventHandler(ClangPlugin::OnCreateTranslationUnit), nullptr, this);
@@ -221,6 +234,7 @@ void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
         (*it)->OnRelease(this);
 
+    ProjectLoaderHooks::UnregisterHook(m_ProjectHookId, true);
     EditorHooks::UnregisterHook(m_EditorHookId);
     Disconnect(idClangGetCCDocumentation);
     Disconnect(idClangGetOccurrences);
@@ -231,6 +245,7 @@ void ClangPlugin::OnRelease(bool WXUNUSED(appShutDown))
     Disconnect(idCreateTU);
     Disconnect(idClangCreateTU);
     Disconnect(idReparseTimer);
+    Disconnect(g_idCCErrorLogger);
     Disconnect(g_idCCDebugLogger);
     Disconnect(g_idCCLogger);
 
@@ -337,6 +352,11 @@ ClangPlugin::CCProviderStatus ClangPlugin::GetProviderStatusFor(cbEditor* ed)
 cbConfigurationPanel* ClangPlugin::GetConfigurationPanel(wxWindow* parent)
 {
     return new ClangSettingsDlg(parent, this);
+}
+cbConfigurationPanel* ClangPlugin::GetProjectConfigurationPanel(wxWindow* parent, cbProject* project)
+{
+    CCLogger::Get()->DebugLog( wxT("GetProjectConfigurationPanel") );
+    return new ClangProjectSettingsDlg(parent, project, this);
 }
 
 std::vector<ClangPlugin::CCToken> ClangPlugin::GetAutocompList(bool isAuto, cbEditor* ed, int& tknStart, int& tknEnd)
@@ -516,6 +536,9 @@ void ClangPlugin::DoAutocomplete(const CCToken& token, cbEditor* ed)
 
 void ClangPlugin::BuildMenu(wxMenuBar* menuBar)
 {
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!IsProviderFor(ed))
+        return;
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
     {
         (*it)->BuildMenu(menuBar);
@@ -536,6 +559,8 @@ void ClangPlugin::BuildModuleMenu(const ModuleType type, wxMenu* menu,
         m_pLastEditor = ed;
         m_ReparseNeeded = 0;
     }
+    if (!IsProviderFor(ed))
+        return;
     for (std::vector<ClangPluginComponent*>::iterator it = m_ActiveComponentList.begin(); it != m_ActiveComponentList.end(); ++it)
     {
        (*it)->BuildModuleMenu(type, menu, data);
@@ -573,6 +598,12 @@ void ClangPlugin::OnCCDebugLogger(CodeBlocksThreadEvent& event)
 {
     if (!Manager::IsAppShuttingDown())
         Manager::Get()->GetLogManager()->DebugLog(event.GetString());
+}
+
+void ClangPlugin::OnCCErrorLogger(CodeBlocksThreadEvent& event)
+{
+    if (!Manager::IsAppShuttingDown())
+        Manager::Get()->GetLogManager()->LogError(event.GetString());
 }
 
 void ClangPlugin::OnEditorOpen(CodeBlocksEvent& event)
@@ -720,6 +751,8 @@ void ClangPlugin::OnProjectOptionsChanged(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed && ed->IsOK())
     {
+        m_compInclDirs.clear();
+        m_CompileCommand.clear();
         int compileCommandChanged = UpdateCompileCommand(ed);
         if (compileCommandChanged)
         {
@@ -735,6 +768,8 @@ void ClangPlugin::OnProjectTargetsModified(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed && ed->IsOK())
     {
+        m_compInclDirs.clear();
+        m_CompileCommand.clear();
         int compileCommandChanged = UpdateCompileCommand(ed);
         if (compileCommandChanged)
         {
@@ -747,6 +782,8 @@ void ClangPlugin::OnProjectTargetsModified(CodeBlocksEvent& event)
 void ClangPlugin::OnProjectClose(CodeBlocksEvent& event)
 {
     event.Skip();
+    m_compInclDirs.clear();
+    m_CompileCommand.clear();
 }
 
 void ClangPlugin::OnProjectFileChanged(CodeBlocksEvent& event)
@@ -754,6 +791,8 @@ void ClangPlugin::OnProjectFileChanged(CodeBlocksEvent& event)
     event.Skip();
     if (IsAttached())
     {
+        m_compInclDirs.clear();
+        m_CompileCommand.clear();
         RequestReparse(1);
     }
 }
@@ -843,11 +882,17 @@ void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
     }
 }
 
-wxString ClangPlugin::GetCompilerInclDirs(const wxString& compId)
+void ClangPlugin::AddCompilerInclDirs(const wxString& compId, std::vector<wxString>& inout_CompileCommands)
 {
-    std::map<wxString, wxString>::const_iterator idItr = m_compInclDirs.find(compId);
+    std::map<wxString, std::vector<wxString> >::const_iterator idItr = m_compInclDirs.find(compId);
     if (idItr != m_compInclDirs.end())
-        return idItr->second;
+    {
+        for (std::vector<wxString>::const_iterator it = idItr->second.begin(); it != idItr->second.end(); ++it)
+        {
+            inout_CompileCommands.push_back( wxT("-I\"")+*it+wxT("\"") );
+        }
+        return;
+    }
 
     Compiler* comp = CompilerFactory::GetCompiler(compId);
     wxFileName fn(wxEmptyString, comp->GetPrograms().CPP);
@@ -873,14 +918,17 @@ wxString ClangPlugin::GetCompilerInclDirs(const wxString& compId)
             break;
         }
     }
-    wxString includeDirs;
+    std::vector<wxString> includeDirs;
     for (; errItr != errors.end(); ++errItr)
     {
         if (errItr->IsSameAs(wxT("End of search list.")))
             break;
-        includeDirs += wxT(" -I\"") + errItr->Strip(wxString::both)+wxT("\"");
+        includeDirs.push_back(errItr->Strip(wxString::both));
+        //includeDirs += wxT(" -I\"") + errItr->Strip(wxString::both)+wxT("\"");
+        inout_CompileCommands.push_back(wxT("-I\"") + errItr->Strip(wxString::both)+wxT("\""));
     }
-    return m_compInclDirs.insert(std::pair<wxString, wxString>(compId, includeDirs)).first->second;
+    m_compInclDirs.insert(std::pair<wxString, std::vector<wxString> >(compId, includeDirs));
+    //return m_compInclDirs.insert(std::pair<wxString, wxString>(compId, includeDirs)).first->second;
 }
 #if 0
 wxString ClangPlugin::GetSourceOf(cbEditor* ed)
@@ -1020,15 +1068,17 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
 }
 #endif
 
-wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filename)
+std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filename)
 {
-    wxString compileCommand;
+    CCLogger::Get()->DebugLog( wxT("GetCompileCommand ")+filename);
+    std::vector<wxString> compileCommand;
     m_UpdateCompileCommand++;
     if (m_UpdateCompileCommand > 1)
     {
+        CCLogger::Get()->DebugLog( wxT("GetCompileCommand: skipping re-entry") );
         // Re-entry is not allowed
         m_UpdateCompileCommand--;
-        return wxT("");
+        return std::vector<wxString>();
     }
     ProjectBuildTarget* target = nullptr;
     Compiler* comp = nullptr;
@@ -1037,7 +1087,54 @@ wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filenam
     {
         Manager::Get()->GetProjectManager()->FindProjectForFile( filename, &pf, false, false );
     }
+    target = pf->GetParentProject()->GetBuildTarget( pf->GetParentProject()->GetActiveBuildTarget() );
+    if (target && (m_ProjectSettingsMap.find( target ) != m_ProjectSettingsMap.end())&&(m_ProjectSettingsMap[target].compileCommandSource == ProjectSetting::CompileCommandSource_jsonFile) )
+    {
+        m_UpdateCompileCommand--;
+        CCLogger::Get()->DebugLog(wxT("Using compilecommands.json"));
+        wxString path = pf->file.GetPath();
+        CXCompilationDatabase_Error err;
+        CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
+        if (!db)
+        {
+            Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
+            return compileCommand;
+        }
+        CCLogger::Get()->DebugLog(wxT("Getting compile command for file ")+filename);
+        CXCompileCommands lst = clang_CompilationDatabase_getCompileCommands(db, filename.utf8_str());
+        if (clang_CompileCommands_getSize(lst) < 1)
+        {
+            Manager::Get()->GetLogManager()->LogError( wxT("Lookup of the compile command for ")+filename+wxT(" failed") );
+            return compileCommand;
+        }
+        CXCompileCommand cmd = clang_CompileCommands_getCommand(lst,0);
+        for (unsigned i = 1; i<clang_CompileCommand_getNumArgs(cmd); ++i)
+        {
+            CXString str = clang_CompileCommand_getArg(cmd,i);
+            wxString cmd = wxString::FromUTF8( clang_getCString( str ) );
+            clang_disposeString( str );
+            cmd.Trim(wxString::both);
+            if (cmd.Length() == 0)
+            {
+                continue;
+            }
+            if (cmd == wxT("-c"))
+            {
+                ++i; // skip argument too
+                continue;
+            }
+            if (cmd == wxT("-x"))
+            {
+                ++i; // skip argument too
+                continue;
+            }
+            cmd.Replace(wxT("\""), wxT(""), true);
+            compileCommand.push_back( cmd);
 
+        }
+        CCLogger::Get()->DebugLog(wxT("Returning compile command from json"));
+        return compileCommand;
+    }
     if (pf && pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty())
     {
         target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
@@ -1055,25 +1152,26 @@ wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filenam
     if (!comp)
         comp = CompilerFactory::GetDefaultCompiler();
 
+    wxString compileCommandStr;
     if (pf && (!pf->GetBuildTargets().IsEmpty()) )
     {
         target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
 
         if (pf->GetUseCustomBuildCommand(target->GetCompilerID() ))
-            compileCommand = pf->GetCustomBuildCommand(target->GetCompilerID()).AfterFirst(wxT(' '));
+            compileCommandStr = pf->GetCustomBuildCommand(target->GetCompilerID()).AfterFirst(wxT(' '));
 
     }
 
-    if (compileCommand.IsEmpty())
-        compileCommand = wxT("$options $includes");
+    if (compileCommandStr.IsEmpty())
+        compileCommandStr = wxT("$options $includes");
     CompilerCommandGenerator* gen = comp->GetCommandGenerator(proj);
     if (gen)
-        gen->GenerateCommandLine(compileCommand, target, pf, filename,
+        gen->GenerateCommandLine(compileCommandStr, target, pf, filename,
                                  g_InvalidStr, g_InvalidStr, g_InvalidStr );
     delete gen;
 
-    wxStringTokenizer tokenizer(compileCommand);
-    compileCommand.Empty();
+    wxStringTokenizer tokenizer(compileCommandStr);
+
     wxString pathStr;
     while (tokenizer.HasMoreTokens())
     {
@@ -1093,32 +1191,38 @@ wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filenam
             if (path.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE))
                 flag = wxT("-I\"") + path.GetFullPath()+wxT("\"");
         }
-        compileCommand += flag + wxT(" ");
+        //compileCommand += flag + wxT(" ");
+        compileCommand.push_back(flag);
     }
-    compileCommand += GetCompilerInclDirs(comp->GetID());
+    AddCompilerInclDirs(comp->GetID(), compileCommand);
 
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
 
     if (cfg->ReadBool( _T("/cmdoption_wnoattributes") ))
-        compileCommand += wxT(" -Wno-attributes ");
+        compileCommand.push_back( wxT("-Wno-attributes ") );
     else
-        compileCommand += wxT(" -Wattributes ");
+        compileCommand.push_back( wxT("-Wattributes ") );
 
     if (cfg->ReadBool( _T("/cmdoption_wextratokens") ))
-        compileCommand += wxT(" -Wextra-tokens ");
+        compileCommand.push_back( wxT("-Wextra-tokens ") );
     else
-        compileCommand += wxT(" -Wno-extra-tokens ");
+        compileCommand.push_back( wxT("-Wno-extra-tokens ") );
 
     if (cfg->ReadBool( _T("/cmdoption_fparseallcomments") ))
-        compileCommand += wxT(" -fparse-all-comments ");
+        compileCommand.push_back( wxT("-fparse-all-comments ") );
 
     wxString extraOptions = cfg->Read(_T("/cmdoption_extra"));
     if (extraOptions.length() > 0)
     {
-        extraOptions.Replace( wxT("\r"), wxT(" ") );
-        extraOptions.Replace( wxT("\n"), wxT(" ") );
-        extraOptions.Replace( wxT("\t"), wxT(" ") );
-        compileCommand += wxT(" ") + extraOptions;
+        extraOptions.Replace( wxT("\r"), wxT("\n") );
+        wxStringTokenizer extraTokenizer(extraOptions, wxT("\n"));
+        while (extraTokenizer.HasMoreTokens())
+        {
+            wxString opt = extraTokenizer.NextToken();
+            opt.Trim(wxString::both);
+            if (opt.Length() > 0)
+                compileCommand.push_back( opt );
+        }
     }
     m_UpdateCompileCommand--;
     return compileCommand;
@@ -1136,14 +1240,17 @@ wxString ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filenam
  */
 int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 {
-    wxString compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
+    CCLogger::Get()->DebugLog(wxT("UpdateCompileCommand ") + ed->GetFilename());
+    std::vector<wxString> compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
 
-    if (compileCommand.IsEmpty())
+    if (compileCommand.empty())
         return 0;
 
     if (compileCommand != m_CompileCommand)
     {
-        CCLogger::Get()->DebugLog( _T("New compile command arguments: ")+compileCommand );
+        CCLogger::Get()->DebugLog( _T("New compile command arguments: ") );
+        for (std::vector<wxString>::const_iterator it = compileCommand.begin(); it != compileCommand.end(); ++it)
+            CCLogger::Get()->DebugLog( *it );
         m_CompileCommand = compileCommand;
         return 1;
     }
@@ -1236,6 +1343,64 @@ void ClangPlugin::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
     {
         RequestReparse();
+    }
+}
+
+void ClangPlugin::OnProjectLoadingHook(cbProject* project, TiXmlElement* elem, bool loading)
+{
+    ProjectSettingMap settmap = m_ProjectSettingsMap;
+    if (loading)
+    {
+        settmap.clear();
+
+        // Hook called when loading project file.
+        TiXmlElement* conf = elem->FirstChildElement("LibClang");
+        if (conf)
+        {
+            TiXmlElement* tElem = conf->FirstChildElement("TargetSettings");
+            while (tElem)
+            {
+                wxString targetName = cbC2U(tElem->Attribute("name"));
+                ProjectBuildTarget* bt = project->GetBuildTarget(targetName);
+                ProjectSetting sett;
+                TiXmlElement* opt = tElem->FirstChildElement("Options");
+                while (opt)
+                {
+                    if (opt->Attribute("compile_command_source"))
+                        sett.compileCommandSource = (ProjectSetting::CompileCommandSource)atol( opt->Attribute("compile_command_source") );
+
+                    opt = opt->NextSiblingElement("Options");
+                }
+                settmap.insert(std::make_pair(bt, sett));
+
+                tElem = tElem->NextSiblingElement("TargetSettings");
+            }
+        }
+        m_ProjectSettingsMap = settmap;
+    }
+    else
+    {
+        // Hook called when saving project file.
+
+        TiXmlElement* node = elem->FirstChildElement("LibClang");
+        if (!node)
+            node = elem->InsertEndChild(TiXmlElement("LibClang"))->ToElement();
+        node->Clear();
+
+        if (settmap.size())
+        {
+            for (ProjectSettingMap::iterator it = settmap.begin(); it != settmap.end(); ++it)
+            {
+                if (it->first)
+                {
+                    ProjectSetting& sett = it->second;
+                    TiXmlElement* tnode = node->InsertEndChild(TiXmlElement("TargetSettings"))->ToElement();
+                    tnode->SetAttribute("name", cbU2C(it->first->GetTitle()));
+                    TiXmlElement* optnode = tnode->InsertEndChild(TiXmlElement("Options"))->ToElement();
+                    optnode->SetAttribute("compile_command_source", (int)sett.compileCommandSource);
+                }
+            }
+        }
     }
 }
 
@@ -1364,7 +1529,7 @@ wxDateTime ClangPlugin::GetFileIndexingTimestamp(const ClangFile& file)
 
 void ClangPlugin::BeginReindexFile(const ClangFile& file)
 {
-    wxString compileCommand = GetCompileCommand( NULL, file.GetFilename() );
+    std::vector<wxString> compileCommand = GetCompileCommand( NULL, file.GetFilename() );
     ClangProxy::ReindexFileJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReindex, file, compileCommand);
     m_Proxy.AppendPendingJob( job );
 }
@@ -1489,12 +1654,12 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
                 return;
             // Perform the request again, but now with loading of TU's so we need a compile command for that
             std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
-            std::vector< std::pair<wxString,wxString> > fileAndCompileCommands;
+            std::vector< std::pair<wxString, std::vector<wxString> > > fileAndCompileCommands;
             EditorManager* edMgr = Manager::Get()->GetEditorManager();
             for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
             {
                 wxString filename = db->GetFilename(*it);
-                wxString compileCommand;
+                std::vector<wxString> compileCommand;
                 for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
                 {
                     cbEditor* ed = edMgr->GetBuiltinEditor(i);

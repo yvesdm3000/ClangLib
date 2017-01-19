@@ -637,7 +637,7 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
         ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(m_File.GetFilename());
         std::vector<wxCharBuffer> argsBuffer;
         std::vector<const char*> args;
-        clangproxy.BuildCompileArgs( m_File.GetFilename(), m_Commands, argsBuffer, args );
+        clangproxy.BuildCompileArgs( m_File.GetFilename(), m_CompileCommand, argsBuffer, args );
         const std::map<wxString, wxString> unsavedFiles; // No unsaved files for reindex...
         if (!tu.Parse( m_File.GetFilename(), fileId, args, unsavedFiles, false ))
         {
@@ -706,7 +706,7 @@ ClangProxy::~ClangProxy()
  *
  * This call will choose either a free slot of translation units or free one if all slots are occupied. It then parses the translation unit and when that is successfull, assign it a slot.
  */
-void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& commands, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
+void ClangProxy::CreateTranslationUnit(const ClangFile& file, const std::vector<wxString>& compileCommand, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
 {
     if (file.GetFilename().Length() == 0)
     {
@@ -721,7 +721,7 @@ void ClangProxy::CreateTranslationUnit(const ClangFile& file, const wxString& co
         db = LoadTokenIndexDatabase( file.GetProject() );
     }
 
-    BuildCompileArgs(file.GetFilename(), commands, argsBuffer, args);
+    BuildCompileArgs(file.GetFilename(), compileCommand, argsBuffer, args);
 
     bool newTU = false;
     ClTranslUnitId translId = -1;
@@ -1891,7 +1891,7 @@ void ClangProxy::GetFunctionScopes( const ClTranslUnitId translUnitId, const wxS
  * @return void
  *
  */
-void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const wxString& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
+void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const std::vector<wxString>& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
 {
     if (translUnitId < 0 )
         return;
@@ -1997,30 +1997,23 @@ void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
     return;
 }
 
-void ClangProxy::BuildCompileArgs(const wxString& filename, const wxString& commands, std::vector<wxCharBuffer>& out_argsBuffer, std::vector<const char*>& out_args) const
+void ClangProxy::BuildCompileArgs(const wxString& filename, const std::vector<wxString>& compileCommand, std::vector<wxCharBuffer>& out_argsBuffer, std::vector<const char*>& out_args) const
 {
-    wxString cmd = commands + wxT(" -ferror-limit=0");
-    wxStringTokenizer tokenizer(cmd);
+    std::vector<wxString> cCommand = compileCommand;
+    cCommand.push_back( wxT("-ferror-limit=0") );
+    //wxString cmd = commands + wxT(" -ferror-limit=0");
     if (!filename.EndsWith(wxT(".c"))) // force language reduces chance of error on STL headers
-        tokenizer.SetString(cmd + wxT(" -x c++"));
+    {
+        cCommand.push_back(wxT("-x"));
+        cCommand.push_back(wxT("c++"));
+    }
     std::vector<wxString> unknownOptions;
     unknownOptions.push_back(wxT("-Wno-unused-local-typedefs"));
     unknownOptions.push_back(wxT("-Wzero-as-null-pointer-constant"));
     std::sort(unknownOptions.begin(), unknownOptions.end());
-    while (tokenizer.HasMoreTokens())
+    for (std::vector<wxString>::iterator it = cCommand.begin(); it != cCommand.end(); ++it)
     {
-        wxString compilerSwitch = tokenizer.GetNextToken();
-        if (compilerSwitch.Freq('"')%2 == 1)
-        {
-            while (tokenizer.HasMoreTokens())
-            {
-                compilerSwitch = compilerSwitch.Append(tokenizer.GetLastDelimiter());
-                wxString nextTok = tokenizer.GetNextToken();
-                compilerSwitch = compilerSwitch.Append(nextTok);
-                if (nextTok.Freq('"')%2 == 1)
-                    break;
-            }
-        }
+        wxString compilerSwitch = *it;
         compilerSwitch.Replace(wxT("\""), wxT(""), true);
         if (std::binary_search(unknownOptions.begin(), unknownOptions.end(), compilerSwitch))
             continue;

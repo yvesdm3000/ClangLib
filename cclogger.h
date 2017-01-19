@@ -31,16 +31,18 @@ extern const wxString g_DebugTraceFile;   //!< Trace file name (if above is enab
 extern long           g_idCCAddToken;
 extern long           g_idCCLogger;
 extern long           g_idCCDebugLogger;
+extern long           g_idCCErrorLogger;
 
 class CCLogger
 {
 public:
     static CCLogger* Get();
 
-    void Init(wxEvtHandler* parent, int logId, int debugLogId, int addTokenId = -1);
+    void Init(wxEvtHandler* parent, int logId, int debugLogId, int errorLogId, int addTokenId = -1);
     void AddToken(const wxString& msg);
     void Log(const wxString& msg);
     void DebugLog(const wxString& msg);
+    void LogError(const wxString& msg);
 
 protected:
     CCLogger();
@@ -56,6 +58,7 @@ private:
     wxEvtHandler* m_Parent;
     int           m_LogId;
     int           m_DebugLogId;
+    int           m_ErrorLogId;
     int           m_AddTokenId;
 };
 
