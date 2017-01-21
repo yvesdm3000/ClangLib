@@ -124,6 +124,7 @@ std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
     str<<"]";
     return str;
 }
+
 /** \brief Calculate code completion at a certain position
  *
  * \param complete_filename The filename where code-completion is performed in
@@ -621,35 +622,33 @@ struct UpdateIncludeDiagnosticsData
 void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* inclusion_stack,
                                unsigned include_len, CXClientData clientData)
 {
+    CXString str;
     if (include_len == 0)
         return;
+    unsigned int line = 0;
+    unsigned int column = 0;
+    CXFile file;
+    clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
+    str = clang_getFileName( file );
+    wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
+    clang_disposeString( str );
     struct UpdateIncludeDiagnosticsData* data = static_cast<struct UpdateIncludeDiagnosticsData*>( clientData );
-    CXString str = clang_getFileName(included_file);
+
+    if (data->filename != srcFilename)
+        return;
+
+    str = clang_getFileName(included_file);
     wxString includedFileName = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
     //CCLogger::Get()->DebugLog( F(wxT("Visit include statement ")+includedFileName) );
     if (data->errorIncludes.find( includedFileName ) != data->errorIncludes.end())
     {
-        unsigned int line = 0;
-        unsigned int column = 0;
-        CXFile file;
-        clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
-        str = clang_getFileName( file );
-        wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
-        clang_disposeString( str );
         data->diagnostics.push_back( ClDiagnostic( line, column, column, sError, srcFilename, wxT("Errors present"), std::vector<ClDiagnosticFixit>() ));
         CCLogger::Get()->DebugLog( F(wxT("+++ Inserting error at %d,%d"), line, column ) );
         data->errorIncludes.insert( srcFilename );
     }
     else if (data->warningIncludes.find( includedFileName ) != data->warningIncludes.end())
     {
-        unsigned int line = 0;
-        unsigned int column = 0;
-        CXFile file;
-        clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
-        str = clang_getFileName( file );
-        wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
-        clang_disposeString( str );
         data->diagnostics.push_back( ClDiagnostic( line, column, column, sWarning, srcFilename, wxT("Warnings present"), std::vector<ClDiagnosticFixit>() ));
         CCLogger::Get()->DebugLog( F(wxT("+++ Inserting warning at %d,%d"), line, column ) );
         data->warningIncludes.insert( srcFilename );
