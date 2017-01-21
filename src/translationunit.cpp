@@ -628,7 +628,7 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
     unsigned int line = 0;
     unsigned int column = 0;
     CXFile file;
-    clang_getSpellingLocation( inclusion_stack[include_len-1], &file, &line, &column, NULL );
+    clang_getSpellingLocation( inclusion_stack[0], &file, &line, &column, NULL );
     str = clang_getFileName( file );
     wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
     clang_disposeString( str );
@@ -640,21 +640,13 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
     str = clang_getFileName(included_file);
     wxString includedFileName = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
-    //CCLogger::Get()->DebugLog( F(wxT("Visit include statement ")+includedFileName) );
     if (data->errorIncludes.find( includedFileName ) != data->errorIncludes.end())
     {
         data->diagnostics.push_back( ClDiagnostic( line, column, column, sError, srcFilename, wxT("Errors present"), std::vector<ClDiagnosticFixit>() ));
-        CCLogger::Get()->DebugLog( F(wxT("+++ Inserting error at %d,%d"), line, column ) );
-        data->errorIncludes.insert( srcFilename );
     }
     else if (data->warningIncludes.find( includedFileName ) != data->warningIncludes.end())
     {
         data->diagnostics.push_back( ClDiagnostic( line, column, column, sWarning, srcFilename, wxT("Warnings present"), std::vector<ClDiagnosticFixit>() ));
-        CCLogger::Get()->DebugLog( F(wxT("+++ Inserting warning at %d,%d"), line, column ) );
-        data->warningIncludes.insert( srcFilename );
-    }
-    else {
-        //CCLogger::Get()->DebugLog( wxT("No warnings or errors for this include file") );
     }
 }
 
@@ -694,20 +686,17 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxStr
             {
             case CXDiagnostic_Error:
             case CXDiagnostic_Fatal:
-                CCLogger::Get()->DebugLog( wxT("+++ Adding ")+flName+wxT(" to errorIncludes, scope: ")+filename );
                 includesData.errorIncludes.insert( flName );
                 break;
             case CXDiagnostic_Note:
                 break;
             case CXDiagnostic_Warning:
             case CXDiagnostic_Ignored:
-                CCLogger::Get()->DebugLog( wxT("+++ Adding ")+flName+wxT(" to warningIncludes, scope: ")+filename );
                 includesData.warningIncludes.insert( flName );
                 break;
             }
         }
 
-        //ExpandDiagnosticSet(clang_getChildDiagnostics(diag), filename, srcText, diagnostics);
         clang_disposeDiagnostic(diag);
     }
     clang_getInclusions( m_ClTranslUnit, UpdateIncludeDiagnosticsVisitor, &includesData );
