@@ -208,6 +208,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
     if ((curPos < tknStart)||(curPos > tknEnd))
     {
         CCLogger::Get()->DebugLog( wxT("Code completion request out of scope") );
+        m_CCOutstandingLoc = ClTokenPosition(0,0);
         return tokens;
     }
     const int style = stc->GetStyleAt( tknEnd );
@@ -237,8 +238,10 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         return tokens;
     }
     if (translUnitId != m_TranslUnitId)
+    {
+        m_CCOutstandingLoc = ClTokenPosition(0,0);
         return tokens;
-
+    }
     const wxChar curChar = stc->GetCharAt(tknEnd - 1);
     if (isAuto) // filter illogical cases of auto-launch
     {
@@ -249,6 +252,7 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
             || (   wxString(wxT("<\"/")).Find(curChar) != wxNOT_FOUND // #include directive (TODO: enumerate completable include files)
                 && !stc->IsPreprocessor(style) ) )
         {
+            m_CCOutstandingLoc = ClTokenPosition(0,0);
             return tokens;
         }
     }
@@ -287,15 +291,17 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         if ( loc == m_CCOutstandingLoc )
         {
             // same cc allready requested
+            CCLogger::Get()->DebugLog( wxT("CC request allready requested") );
             return tokens;
         }
         if ((m_CCResultsLoc == m_CCOutstandingLoc)&&(m_CCOutstandingLoc.line > 0))
         {
             // This is when the cc was delivered by the thread but between the message hanling and now the position has changed
+            CCLogger::Get()->DebugLog( wxT("Position changed since CC request") );
+            m_CCOutstandingLoc = ClTokenPosition(0,0);
             return tokens;
         }
         m_CCOutstandingLoc = ClTokenPosition(0,0);
-
 
         ClCodeCompleteOption options = ClCodeCompleteOption_None;
         if (cfg->ReadBool(wxT("/cc_include_code_patterns")))
