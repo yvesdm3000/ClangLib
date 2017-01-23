@@ -16,9 +16,6 @@
 #include "clangrefactoring.h"
 #include "clangindexer.h"
 
-// milliseconds
-#define CLANG_REPARSE_DELAY 10000
-
 struct ProjectSetting
 {
     enum CompileCommandSource
@@ -174,7 +171,7 @@ private: // Internal utility functions
     std::vector<wxString> GetCompileCommand(ProjectFile* pf, const wxString& filename);
     int UpdateCompileCommand(cbEditor* ed);
 
-    void RequestReparse(int delayMilliseconds = CLANG_REPARSE_DELAY);
+    void RequestReparse(int delayMilliseconds = 0);
     void RequestStoreTokenIndexDB();
     void FlushTranslationUnits();
 

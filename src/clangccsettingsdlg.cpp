@@ -98,6 +98,7 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     // -----------------------------------------------------------------------
 
     // Page "Code Completion"
+    XRCCTRL(*this, "chkWhileTyping",        wxCheckBox)->SetValue(cfg->ReadBool( _T("/while_typing"), true ));
     //XRCCTRL(*this, "chkNoSemantic",         wxCheckBox)->SetValue(!cfg->ReadBool(_T("/semantic_keywords"),   false));
     XRCCTRL(*this, "chkCodeCompletion",     wxCheckBox)->SetValue(cfg->ReadBool(ClangCodeCompletion::SettingName,   true));
     XRCCTRL(*this, "chkAutoAddParentheses", wxCheckBox)->SetValue(cfg->ReadBool(_T("/auto_add_parentheses"), true));
@@ -131,6 +132,7 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
 
     // Page "Diagnostics"
     XRCCTRL(*this, "chkDiagnostics",            wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics"),               true));
+    XRCCTRL(*this, "spnReparseIdle",            wxSpinCtrl)->SetValue(cfg->ReadInt(_T("/reparse_idle_time"),            10));
     XRCCTRL(*this, "chkInlineDiagnostics",      wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_inline"),   true));
     XRCCTRL(*this, "chkDiagnosticWarnings",     wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_warnings"), true));
     XRCCTRL(*this, "chkDiagnosticErrors",       wxCheckBox)->SetValue(cfg->ReadBool(_T("/diagnostics_show_errors"),   true));
@@ -167,7 +169,6 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
 #if 0
     // Page "Code Completion"
     XRCCTRL(*this, "chkUseSmartSense",      wxCheckBox)->SetValue(!m_Parser.Options().useSmartSense);
-    XRCCTRL(*this, "chkWhileTyping",        wxCheckBox)->SetValue(m_Parser.Options().whileTyping);
 
     // Page "C / C++ parser"
     XRCCTRL(*this, "chkLocals",             wxCheckBox)->SetValue(m_Parser.Options().followLocalIncludes);
@@ -213,7 +214,6 @@ void ClangSettingsDlg::OnApply()
     //cfg->Write(_T("/semantic_keywords"),    (bool)!XRCCTRL(*this, "chkNoSemantic",         wxCheckBox)->GetValue());
     //cfg->Write(_T("/use_SmartSense"),       (bool) XRCCTRL(*this, "chkUseSmartSense",      wxCheckBox)->GetValue());
     cfg->Write(ClangCodeCompletion::SettingName,       (bool) XRCCTRL(*this, "chkCodeCompletion",        wxCheckBox)->GetValue());
-    cfg->Write(_T("/while_typing"),         (bool) XRCCTRL(*this, "chkWhileTyping",        wxCheckBox)->GetValue());
     //cfg->Write(_T("/auto_add_parentheses"), (bool) XRCCTRL(*this, "chkAutoAddParentheses", wxCheckBox)->GetValue());
     //cfg->Write(_T("/detect_implementation"),(bool) XRCCTRL(*this, "chkDetectImpl",         wxCheckBox)->GetValue());
     //cfg->Write(_T("/add_doxgen_comment"),   (bool) XRCCTRL(*this, "chkAddDoxgenComment",   wxCheckBox)->GetValue());
@@ -268,6 +268,8 @@ void ClangSettingsDlg::OnApply()
 
     // Page "Diagnostics"
     cfg->Write(_T("/diagnostics"),              (bool) XRCCTRL(*this, "chkDiagnostics",        wxCheckBox)->GetValue());
+    cfg->Write(_T("/while_typing"),             (bool) XRCCTRL(*this, "chkWhileTyping",        wxCheckBox)->GetValue());
+    cfg->Write(_T("/reparse_idle_time"),        (int)  XRCCTRL(*this, "spnReparseIdle",        wxSpinCtrl)->GetValue());
     cfg->Write(_T("/diagnostics_show_inline"),  (bool) XRCCTRL(*this, "chkInlineDiagnostics",  wxCheckBox)->GetValue());
     cfg->Write(_T("/diagnostics_show_warnings"),(bool) XRCCTRL(*this, "chkDiagnosticWarnings", wxCheckBox)->GetValue());
     cfg->Write(_T("/diagnostics_show_errors"),  (bool) XRCCTRL(*this, "chkDiagnosticErrors",   wxCheckBox)->GetValue());
@@ -379,6 +381,20 @@ void ClangSettingsDlg::OnUpdateUI(cb_unused wxUpdateUIEvent& event)
     XRCCTRL(*this, "lblFillupChars",                wxStaticText)->Enable(en);
     XRCCTRL(*this, "txtFillupChars",                wxTextCtrl)->Enable(en);
     XRCCTRL(*this, "sldCCDelay",                    wxSlider)->Enable(en);
+
+    // Page "Diagnostics"
+    en = ccmcfg->ReadBool(ClangDiagnostics::SettingName, true);
+    XRCCTRL(*this, "chkWhileTyping",                wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "spnReparseIdle",                wxSpinCtrl)->Enable(en);
+    XRCCTRL(*this, "chkInlineDiagnostics",          wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkDiagnosticWarnings",         wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkDiagnosticErrors",           wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkDiagnosticNotes",            wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkDiagnosticFixits",           wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkDiagnosticAutoFixit",        wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkClangOptionNoAttributes",    wxCheckBox)->Enable(en);
+    XRCCTRL(*this, "chkClangOptionExtraTokens",     wxCheckBox)->Enable(en);
+
 
     // keyword sets
     //XRCCTRL(*this, "chkKL_1",                 wxCheckBox)->Enable(en);

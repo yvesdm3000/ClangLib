@@ -353,6 +353,7 @@ cbConfigurationPanel* ClangPlugin::GetConfigurationPanel(wxWindow* parent)
 {
     return new ClangSettingsDlg(parent, this);
 }
+
 cbConfigurationPanel* ClangPlugin::GetProjectConfigurationPanel(wxWindow* parent, cbProject* project)
 {
     CCLogger::Get()->DebugLog( wxT("GetProjectConfigurationPanel") );
@@ -805,10 +806,18 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     const int evId = event.GetId();
     if (evId == idReparseTimer)
     {
+        ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
+        if (!cfg->ReadBool(_T("/while_typing")))
+        {
+            return;
+        }
         if (m_ReparsingTranslUnitId == m_TranslUnitId)
             return;
         if (m_ReparseNeeded > 0)
         {
+            int idle_time = cfg->ReadInt( wxT("/reparse_idle_time") );
+            if ( (wxDateTime::Now() - ed->GetLastModificationTime() < idle_time) )
+                return;
             ClangFile file(ed->GetFilename());
             if (ed->GetProjectFile())
                 file = ClangFile(*ed->GetProjectFile());
@@ -1474,6 +1483,13 @@ bool ClangPlugin::IsProviderFor(cbEditor* ed)
 
 void ClangPlugin::RequestReparse(int millisecs)
 {
+    if (millisecs == 0)
+    {
+        ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
+        millisecs = cfg->ReadInt( wxT("/reparse_idle_time") ) * 1000;
+        if (millisecs < 1000)
+            millisecs = 10000;
+    }
     m_ReparseNeeded++;
     m_ReparseTimer.Stop();
     m_ReparseTimer.Start( millisecs, wxTIMER_ONE_SHOT);
