@@ -23,6 +23,19 @@ class ClangProxy;
 typedef void* CXIndex;
 typedef int ClFileId;
 
+namespace {
+static std::vector<wxString> DeepCopy(const std::vector<wxString>& src)
+{
+    std::vector<wxString> ret;
+    for (std::vector<wxString>::const_iterator it = src.begin(); it != src.end(); ++it)
+    {
+        ret.push_back( it->c_str() );
+    }
+    return ret;
+}
+
+};
+
 class ClangProxy
 {
 public:
@@ -181,7 +194,7 @@ public:
         CreateTranslationUnitJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<wxString>& commands, const std::map<wxString, wxString>& unsavedFiles ) :
             EventJob(CreateTranslationUnitType, evtType, evtId),
             m_File(file),
-            m_CompileCommand(commands),
+            m_CompileCommand(DeepCopy(commands)),
             m_TranslationUnitId(-1),
             m_UnsavedFiles(unsavedFiles)
         {
@@ -288,7 +301,7 @@ public:
             : EventJob(ReparseType, evtType, evtId),
               m_TranslId(translId),
               m_UnsavedFiles(unsavedFiles),
-              m_CompileCommand(compileCommand),
+              m_CompileCommand(DeepCopy(compileCommand)),
               m_File(file),
               m_Parents(parents)
         {
@@ -1143,7 +1156,7 @@ public:
         ReindexFileJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<wxString>& commands ):
             EventJob(ReindexFileType, evtType, evtId),
             m_File(file),
-            m_CompileCommand(commands) {}
+            m_CompileCommand(DeepCopy(commands)) {}
         ClangJob* Clone() const
         {
             ReindexFileJob* pJob = new ReindexFileJob(*this);

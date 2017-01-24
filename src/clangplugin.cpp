@@ -1079,7 +1079,6 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
 
 std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filename)
 {
-    CCLogger::Get()->DebugLog( wxT("GetCompileCommand ")+filename);
     std::vector<wxString> compileCommand;
     m_UpdateCompileCommand++;
     if (m_UpdateCompileCommand > 1)
@@ -1100,7 +1099,6 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
     if (target && (m_ProjectSettingsMap.find( target ) != m_ProjectSettingsMap.end())&&(m_ProjectSettingsMap[target].compileCommandSource == ProjectSetting::CompileCommandSource_jsonFile) )
     {
         m_UpdateCompileCommand--;
-        CCLogger::Get()->DebugLog(wxT("Using compilecommands.json"));
         wxString path = pf->file.GetPath();
         CXCompilationDatabase_Error err;
         CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
@@ -1109,7 +1107,6 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
             return compileCommand;
         }
-        CCLogger::Get()->DebugLog(wxT("Getting compile command for file ")+filename);
         CXCompileCommands lst = clang_CompilationDatabase_getCompileCommands(db, filename.utf8_str());
         if (clang_CompileCommands_getSize(lst) < 1)
         {
@@ -1141,7 +1138,6 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             compileCommand.push_back( cmd);
 
         }
-        CCLogger::Get()->DebugLog(wxT("Returning compile command from json"));
         return compileCommand;
     }
     if (pf && pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty())

@@ -266,6 +266,7 @@ static wxString GetEnumValStr(CXCursor token)
     else
         return val.ToString();
 }
+
 }
 
 namespace HTML_Writer
