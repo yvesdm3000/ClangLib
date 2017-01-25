@@ -44,17 +44,23 @@ struct ClIndexTokenLocation
 {
     ClTokenType tokenType;
     ClFileId fileId;
-    ClTokenPosition position;
-    ClIndexTokenLocation(ClTokenType tokType, ClFileId filId, ClTokenPosition tokPosition) : tokenType(tokType), fileId(filId), position(tokPosition){}
+    ClTokenPosition beginPosition;
+    ClTokenPosition endPosition;
+    ClIndexTokenLocation(ClTokenType tokType, ClFileId filId, ClTokenPosition tokPosition) : tokenType(tokType), fileId(filId), beginPosition(tokPosition), endPosition(tokPosition){}
+    ClIndexTokenLocation(ClTokenType tokType, ClFileId filId, ClTokenPosition beginTokPosition, ClTokenPosition endTokPosition) : tokenType(tokType), fileId(filId), beginPosition(beginTokPosition), endPosition(endTokPosition){}
     bool operator==(const ClIndexTokenLocation& other) const
     {
         if (tokenType != other.tokenType)
             return false;
         if (fileId != other.fileId)
             return false;
-        if (position.line != other.position.line)
+        if (beginPosition.line != other.beginPosition.line)
             return false;
-        if (position.column != other.position.column)
+        if (beginPosition.column != other.beginPosition.column)
+            return false;
+        if (endPosition.line != other.endPosition.line)
+            return false;
+        if (endPosition.column != other.endPosition.column)
             return false;
         return true;
     }
@@ -68,7 +74,7 @@ struct ClIndexToken
     std::vector<wxString> parentUSRList;   // Overrides and parent classes
 
     ClIndexToken() : USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
-    ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokType, const ClTokenPosition& tokenPosition, const std::vector<wxString>& parentUsrList) : USR(usr.c_str()), parentUSRList(parentUsrList) { locationList.push_back( ClIndexTokenLocation( tokType, fId, tokenPosition ) ); }
+    ClIndexToken(const ClFileId fId, const wxString& usr, const ClTokenType tokType, const ClTokenPosition& beginTokenPosition, const ClTokenPosition& endTokenPosition, const std::vector<wxString>& parentUsrList) : USR(usr.c_str()), parentUSRList(parentUsrList) { locationList.push_back( ClIndexTokenLocation( tokType, fId, beginTokenPosition, endTokenPosition ) ); }
     ClIndexToken(const ClIndexToken& other) : USR(other.USR), tokenTypeMask(other.tokenTypeMask)
     {
         for (std::vector< ClIndexTokenLocation >::const_iterator it = other.locationList.begin(); it != other.locationList.end(); ++it)
@@ -218,7 +224,7 @@ public:
         return m_pIndexTokenMap->GetCount();
     }
 
-    void UpdateToken( const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokType, const ClTokenPosition& tokenPosition, const std::vector< wxString >& overrideUSRList)
+    void UpdateToken( const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokType, const ClTokenPosition& beginTokenPosition, const ClTokenPosition& endTokenPosition, const std::vector< wxString >& overrideUSRList)
     {
         std::set<int> idList;
 
@@ -231,7 +237,7 @@ public:
             if ( token.USR == USR )
             {
                 token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
-                ClIndexTokenLocation location(tokType, fileId, tokenPosition);
+                ClIndexTokenLocation location(tokType, fileId, beginTokenPosition, endTokenPosition);
                 if (std::find(token.locationList.begin(), token.locationList.end(), location) == token.locationList.end())
                     token.locationList.push_back( location );
                 for (std::vector<wxString>::const_iterator usrIt = overrideUSRList.begin(); usrIt != overrideUSRList.end(); ++usrIt)
@@ -245,7 +251,7 @@ public:
                 return;
             }
         }
-        m_pIndexTokenMap->Insert( identifier, ClIndexToken(fileId, USR, tokType, tokenPosition, overrideUSRList) );
+        m_pIndexTokenMap->Insert( identifier, ClIndexToken(fileId, USR, tokType, beginTokenPosition, endTokenPosition, overrideUSRList) );
         m_bModified = true;
     }
 
@@ -267,7 +273,7 @@ public:
                     {
                         if (((it->tokenType&tokenTypeMask)==tokenTypeMask)&&(it->fileId == fileId) )
                         {
-                            out_Position = it->position;
+                            out_Position = it->beginPosition;
                             return true;
                         }
                     }

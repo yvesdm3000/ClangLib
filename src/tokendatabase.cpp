@@ -153,8 +153,10 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
     {
         WriteInt(out, it->tokenType);
         WriteInt(out, it->fileId);
-        WriteInt(out, it->position.line);
-        WriteInt(out, it->position.column);
+        WriteInt(out, it->beginPosition.line);
+        WriteInt(out, it->beginPosition.column);
+        WriteInt(out, it->endPosition.line);
+        WriteInt(out, it->endPosition.column);
     }
     WriteInt(out, (int)token.parentUSRList.size());
     for (std::vector<wxString>::const_iterator it = token.parentUSRList.begin(); it != token.parentUSRList.end(); ++it)
@@ -186,17 +188,23 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
     {
         int typ = 0;
         int fileId = 0;
-        int line = 0;
-        int column = 0;
+        int beginLine = 0;
+        int beginColumn = 0;
+        int endLine = 0;
+        int endColumn = 0;
         if (!ReadInt(in, typ))
             return false;
         if (!ReadInt(in, fileId))
             return false;
-        if (!ReadInt(in, line))
+        if (!ReadInt(in, beginLine))
             return false;
-        if (!ReadInt(in, column))
+        if (!ReadInt(in, beginColumn))
             return false;
-        token.locationList.push_back( ClIndexTokenLocation(static_cast<ClTokenType>(typ), fileId, ClTokenPosition(line,column)));
+        if (!ReadInt(in, endLine))
+            return false;
+        if (!ReadInt(in, endColumn))
+            return false;
+        token.locationList.push_back( ClIndexTokenLocation(static_cast<ClTokenType>(typ), fileId, ClTokenPosition(beginLine,beginColumn), ClTokenPosition(endLine, endColumn)));
         token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | typ);
     }
 
@@ -475,7 +483,7 @@ bool ClTokenIndexDatabase::ReadIn( ClTokenIndexDatabase& tokenDatabase, wxInputS
     if (!ReadInt(in, version))
         return false;
     int i = 0;
-    if (version != 0x04)
+    if (version != 0x05)
     {
         CCLogger::Get()->DebugLog(F(wxT("Wrong version of token database: %d"), version));
         return false;
@@ -557,7 +565,7 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
 {
     int cnt;
     out.Write("ClDb", 4); // Magic number
-    WriteInt(out, 4); // Version number
+    WriteInt(out, 0x5); // Version number
     WriteInt(out, CINDEX_VERSION_MAJOR);
     WriteInt(out, CINDEX_VERSION_MINOR);
 
@@ -565,7 +573,6 @@ bool ClTokenIndexDatabase::WriteOut( const ClTokenIndexDatabase& tokenDatabase, 
     wxMutexLocker locker(tokenDatabase.m_Mutex);
     if (!ClFilenameDatabase::WriteOut(tokenDatabase.m_FileDB, out))
         return false;
-
 
     WriteInt(out, ClTokenPacketType_tokens);
     std::set<wxString> tokens = tokenDatabase.m_pIndexTokenMap->GetKeySet();
@@ -782,7 +789,7 @@ void ClTokenDatabase::StoreIndexes() const
     for (id=0; id < m_pTokens->GetCount(); ++id)
     {
         ClAbstractToken& token = m_pTokens->GetValue( id );
-        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.USR, token.tokenType, token.location, token.parentUSRList );
+        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.USR, token.tokenType, token.location, token.location, token.parentUSRList );
     }
     //uint32_t cnt2 = m_pTokenIndexDB->GetTokenCount();
     //CCLogger::Get()->DebugLog( F(wxT("StoreIndexes: Stored %d tokens. %d tokens extra. Total: %d (merged) IndexDb: %p"), (int)m_pTokens->GetCount(), (int)cnt2 - cnt, cnt2, m_pTokenIndexDB) );
