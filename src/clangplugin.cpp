@@ -1104,6 +1104,14 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
         CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
         if (!db)
         {
+            if (pf->GetParentProject())
+            {
+                path = pf->GetParentProject()->GetCommonTopLevelPath();
+                db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
+            }
+        }
+        if (!db)
+        {
             Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
             return compileCommand;
         }
