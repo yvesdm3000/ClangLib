@@ -669,6 +669,8 @@ void ClangPlugin::OnEditorSave(CodeBlocksEvent& event)
 {
     event.Skip();
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
+    if (!edMgr)
+        return;
     cbEditor* ed = edMgr->GetBuiltinEditor(event.GetEditor());
     if (!ed)
         return;
@@ -1095,63 +1097,67 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
     {
         Manager::Get()->GetProjectManager()->FindProjectForFile( filename, &pf, false, false );
     }
-    target = pf->GetParentProject()->GetBuildTarget( pf->GetParentProject()->GetActiveBuildTarget() );
-    if (target && (m_ProjectSettingsMap.find( target ) != m_ProjectSettingsMap.end())&&(m_ProjectSettingsMap[target].compileCommandSource == ProjectSetting::CompileCommandSource_jsonFile) )
+    if (pf)
     {
-        m_UpdateCompileCommand--;
-        wxString path = pf->file.GetPath();
-        CXCompilationDatabase_Error err;
-        CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
-        if (!db)
+        target = pf->GetParentProject()->GetBuildTarget( pf->GetParentProject()->GetActiveBuildTarget() );
+        if (target && (m_ProjectSettingsMap.find( target ) != m_ProjectSettingsMap.end())&&(m_ProjectSettingsMap[target].compileCommandSource == ProjectSetting::CompileCommandSource_jsonFile) )
         {
-            if (pf->GetParentProject())
+            m_UpdateCompileCommand--;
+            wxString path = pf->file.GetPath();
+            CXCompilationDatabase_Error err;
+            CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
+            if (!db)
             {
-                path = pf->GetParentProject()->GetCommonTopLevelPath();
-                db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
+                if (pf->GetParentProject())
+                {
+                    path = pf->GetParentProject()->GetCommonTopLevelPath();
+                    db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
+                }
             }
-        }
-        if (!db)
-        {
-            Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
-            return compileCommand;
-        }
-        CXCompileCommands lst = clang_CompilationDatabase_getCompileCommands(db, filename.utf8_str());
-        if (clang_CompileCommands_getSize(lst) < 1)
-        {
-            Manager::Get()->GetLogManager()->LogError( wxT("Lookup of the compile command for ")+filename+wxT(" failed") );
-            return compileCommand;
-        }
-        CXCompileCommand cmd = clang_CompileCommands_getCommand(lst,0);
-        for (unsigned i = 1; i<clang_CompileCommand_getNumArgs(cmd); ++i)
-        {
-            CXString str = clang_CompileCommand_getArg(cmd,i);
-            wxString cmd = wxString::FromUTF8( clang_getCString( str ) );
-            clang_disposeString( str );
-            cmd.Trim(wxString::both);
-            if (cmd.Length() == 0)
+            if (!db)
             {
-                continue;
+                Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
+                return compileCommand;
             }
-            if (cmd == wxT("-c"))
+            CXCompileCommands lst = clang_CompilationDatabase_getCompileCommands(db, filename.utf8_str());
+            if (clang_CompileCommands_getSize(lst) < 1)
             {
-                ++i; // skip argument too
-                continue;
+                Manager::Get()->GetLogManager()->LogError( wxT("Lookup of the compile command for ")+filename+wxT(" failed") );
+                return compileCommand;
             }
-            if (cmd == wxT("-x"))
+            CXCompileCommand cmd = clang_CompileCommands_getCommand(lst,0);
+            for (unsigned i = 1; i<clang_CompileCommand_getNumArgs(cmd); ++i)
             {
-                ++i; // skip argument too
-                continue;
-            }
-            cmd.Replace(wxT("\""), wxT(""), true);
-            compileCommand.push_back( cmd);
+                CXString str = clang_CompileCommand_getArg(cmd,i);
+                wxString cmd = wxString::FromUTF8( clang_getCString( str ) );
+                clang_disposeString( str );
+                cmd.Trim(wxString::both);
+                if (cmd.Length() == 0)
+                {
+                    continue;
+                }
+                if (cmd == wxT("-c"))
+                {
+                    ++i; // skip argument too
+                    continue;
+                }
+                if (cmd == wxT("-x"))
+                {
+                    ++i; // skip argument too
+                    continue;
+                }
+                cmd.Replace(wxT("\""), wxT(""), true);
+                compileCommand.push_back( cmd);
 
+            }
+            return compileCommand;
         }
-        return compileCommand;
-    }
-    if (pf && pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty())
-    {
-        target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
-        comp = CompilerFactory::GetCompiler(target->GetCompilerID());
+        if (pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty())
+        {
+            target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
+            comp = CompilerFactory::GetCompiler(target->GetCompilerID());
+        }
+
     }
     cbProject* proj = (pf ? pf->GetParentProject() : nullptr);
     if (!comp && proj)
