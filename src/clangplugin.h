@@ -189,12 +189,9 @@ public: // IClangPlugin
     void RequestReparse(const ClTranslUnitId id, const ClangFile& file);
     wxDateTime GetFileIndexingTimestamp(const ClangFile& file);
     void BeginReindexFile(const ClangFile& file);
-    std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
-                                                     const ClTokenPosition& position);
-    void GetFunctionScopePosition(const ClTranslUnitId id, const wxString& filename,
-                                             const wxString& scope, const wxString& functioname, ClTokenPosition& out_Position);
-    void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
-                           std::vector<std::pair<wxString, wxString> >& out_scopes);
+    void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes);
+
+
     void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);
     wxCondError GetCodeCompletionAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc,
                                     unsigned long timeout, const ClCodeCompleteOption complete_options, std::vector<ClToken>& out_tknResults);

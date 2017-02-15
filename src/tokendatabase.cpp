@@ -147,22 +147,27 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
 bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
 {
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
+    WriteString( out, token.identifier.utf8_str());
+    WriteString( out, token.displayName.utf8_str());
     WriteString( out, token.USR.utf8_str() );
     WriteInt(out, (int)token.locationList.size());
     for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it )
     {
         WriteInt(out, it->tokenType);
         WriteInt(out, it->fileId);
-        WriteInt(out, it->beginPosition.line);
-        WriteInt(out, it->beginPosition.column);
-        WriteInt(out, it->endPosition.line);
-        WriteInt(out, it->endPosition.column);
+        WriteInt(out, it->range.beginLocation.line);
+        WriteInt(out, it->range.beginLocation.column);
+        WriteInt(out, it->range.endLocation.line);
+        WriteInt(out, it->range.endLocation.column);
     }
-    WriteInt(out, (int)token.parentUSRList.size());
-    for (std::vector<wxString>::const_iterator it = token.parentUSRList.begin(); it != token.parentUSRList.end(); ++it)
+    WriteInt(out, (int)token.parentTokenList.size());
+    for (std::vector< std::pair<wxString, wxString> >::const_iterator it = token.parentTokenList.begin(); it != token.parentTokenList.end(); ++it)
     {
-        WriteString( out, it->utf8_str() );
+        WriteString( out, it->first.utf8_str() );
+        WriteString( out, it->second.utf8_str() );
     }
+    WriteString( out, token.scope.first.utf8_str() );
+    WriteString( out, token.scope.second.utf8_str() );
     return true;
 }
 
@@ -176,8 +181,12 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
 bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
 {
     token.locationList.clear();
-    token.parentUSRList.clear();
+    token.parentTokenList.clear();
     int val = 0;
+    if (!ReadString( in, token.identifier) )
+        return false;
+    if (!ReadString( in, token.displayName) )
+        return false;
     if (!ReadString( in, token.USR ))
         return false;
 
@@ -204,7 +213,7 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
             return false;
         if (!ReadInt(in, endColumn))
             return false;
-        token.locationList.push_back( ClIndexTokenLocation(static_cast<ClTokenType>(typ), fileId, ClTokenPosition(beginLine,beginColumn), ClTokenPosition(endLine, endColumn)));
+        token.locationList.push_back( ClIndexTokenLocation(static_cast<ClTokenType>(typ), fileId, ClTokenRange(ClTokenPosition(beginLine,beginColumn), ClTokenPosition(endLine, endColumn))));
         token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | typ);
     }
 
@@ -214,11 +223,19 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
 
     for (unsigned int i = 0; i< (unsigned int)val; ++i)
     {
+        wxString identifier;
+        if (!ReadString( in, identifier ))
+            return false;
         wxString USR;
         if (!ReadString( in, USR ))
             return false;
-        token.parentUSRList.push_back( USR );
+        token.parentTokenList.push_back( std::make_pair( identifier, USR ) );
     }
+    if (!ReadString( in, token.scope.first ))
+        return false;
+    if (!ReadString( in, token.scope.second ))
+        return false;
+
     return true;
 }
 
@@ -402,11 +419,16 @@ void ClFilenameDatabase::UpdateFilenameTimestamp( const ClFileId fId, const wxDa
     entryRef.timestamp = timestamp;
 }
 
+/** @brief Constructor
+ *
+ * @param pIndexDB ClTokenIndexDatabase*
+ *
+ */
 ClTokenDatabase::ClTokenDatabase(ClTokenIndexDatabase* pIndexDB) :
         m_pTokenIndexDB( pIndexDB ),
         m_pLocalTokenIndexDB( nullptr ),
         m_pTokens(new ClTreeMap<ClAbstractToken>()),
-        m_pFileTokens(new ClTreeMap<int>())
+        m_pFileTokens(new ClTreeMap<ClTokenId>())
 {
     if (!pIndexDB)
     {
@@ -465,6 +487,241 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
     swap(first.m_pTokens, second.m_pTokens);
     swap(first.m_pFileTokens, second.m_pFileTokens);
 }
+
+std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
+{
+    std::set<ClFileId> retList;
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue(*it);
+        if (((token.tokenTypeMask&typeMask)==typeMask )&&((USR.Length() == 0)||(token.USR.Length() == 0)||(USR == token.USR)))
+        {
+            for (std::vector<ClIndexTokenLocation>::const_iterator it2 = token.locationList.begin(); it2 != token.locationList.end(); ++it2)
+                retList.insert( it2->fileId );
+        }
+    }
+    return retList;
+}
+
+std::set< std::pair<ClFileId, wxString> > ClTokenIndexDatabase::LookupTokenOverrides( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
+{
+    std::set<std::pair<ClFileId, wxString> > retList;
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue(*it);
+        if ((token.tokenTypeMask&typeMask)==typeMask)
+        {
+            if (std::find( token.parentTokenList.begin(), token.parentTokenList.end(), std::make_pair(identifier,USR) ) != token.parentTokenList.end())
+            {
+                for (std::vector<ClIndexTokenLocation>::const_iterator it2 = token.locationList.begin(); it2 != token.locationList.end(); ++it2)
+                    retList.insert( std::make_pair( it2->fileId, token.USR ) );
+            }
+        }
+    }
+    return retList;
+}
+
+void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxString& displayName, const ClFileId fileId, const wxString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<wxString,wxString> >& overrideTokenList, const std::pair<wxString,wxString>& scope)
+{
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
+        if ( token.USR == USR )
+        {
+            token.tokenTypeMask = static_cast<ClTokenType>(token.tokenTypeMask | tokType);
+            ClIndexTokenLocation location(tokType, fileId, tokenRange);
+            if (std::find(token.locationList.begin(), token.locationList.end(), location) == token.locationList.end())
+                token.locationList.push_back( location );
+            for (std::vector<std::pair<wxString,wxString> >::const_iterator usrIt = overrideTokenList.begin(); usrIt != overrideTokenList.end(); ++usrIt)
+            {
+                if (std::find( token.parentTokenList.begin(), token.parentTokenList.end(), *usrIt ) == token.parentTokenList.end())
+                {
+                    token.parentTokenList.push_back( *usrIt );
+                }
+            }
+            wxString fid = wxString::Format( wxT("%d"), fileId );
+            m_pFileTokens->Remove( fid, *it );
+            m_pFileTokens->Insert( fid, *it );
+            m_bModified = true;
+            return;
+        }
+    }
+    ClTokenId id = m_pIndexTokenMap->Insert( identifier, ClIndexToken(identifier, displayName, fileId, USR, tokType, tokenRange, overrideTokenList, scope) );
+    wxString fid = wxString::Format( wxT("%d"), fileId );
+    m_pFileTokens->Insert( fid, id );
+    m_bModified = true;
+}
+
+/** @brief Removes all token references that refer to the specified file
+ *
+ * @param fileId const ClFileId
+ * @return void
+ *
+ */
+void ClTokenIndexDatabase::RemoveFileTokens(const ClFileId fileId)
+{
+    wxString key = wxString::Format(wxT("%d"), fileId);
+    std::set<ClTokenId> tokenList;
+
+    wxMutexLocker locker(m_Mutex);
+    m_pFileTokens->GetIdSet(key, tokenList);
+    for (std::set<ClTokenId>::iterator it = tokenList.begin(); it != tokenList.end(); ++it)
+    {
+        if (!m_pIndexTokenMap->HasValue( *it ))
+            continue;
+        ClIndexToken& tok = m_pIndexTokenMap->GetValue( m_pFileTokens->GetValue( *it ) );
+        for ( std::vector< ClIndexTokenLocation >::iterator itLoc = tok.locationList.begin(); itLoc != tok.locationList.end(); ++itLoc )
+        {
+            if (itLoc->fileId == fileId)
+            {
+                itLoc = tok.locationList.erase( itLoc );
+                if (itLoc == tok.locationList.end())
+                    break;
+            }
+        }
+    }
+    m_pFileTokens->Remove(key);
+}
+
+
+bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
+{
+    std::set<int> idList;
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
+        if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
+        {
+            if ((USR.Length() == 0)||(USR == token.USR))
+            {
+                for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
+                {
+                    if (((it->tokenType&tokenTypeMask)==tokenTypeMask)&&(it->fileId == fileId) )
+                    {
+                        out_Position = it->range.beginLocation;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const
+{
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
+        if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
+        {
+            if ((USR.Length() == 0)||(USR == token.USR))
+            {
+                for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
+                {
+                    if (((it->tokenType&tokenTypeMask)==tokenTypeMask)&&(it->fileId == fileId) )
+                    {
+                        out_Range = it->range;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, const wxString& USR, wxString& out_DisplayName) const
+{
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
+        if ((USR.Length() == 0)||(USR == token.USR))
+        {
+            out_DisplayName = token.displayName;
+            wxString parentScopeDisplayName;
+            if (LookupTokenDisplayName( token.scope.first, token.scope.second, parentScopeDisplayName ))
+            {
+                out_DisplayName = parentScopeDisplayName + wxT("::")+out_DisplayName;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+
+/** @brief Get all tokens linked to a file ID
+ *
+ * @param fId const ClFileId
+ * @return std::vector<ClTokenId>
+ *
+ */
+void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenTypeMask, std::vector<ClIndexToken>& out_tokens) const
+{
+    wxString key = wxString::Format(wxT("%d"), fId);
+    std::set<int> tokenList;
+
+    wxMutexLocker locker(m_Mutex);
+    m_pFileTokens->GetIdSet(key, tokenList);
+    CCLogger::Get()->DebugLog( F(wxT(" file %d tok: %d from total %d in %p"), (int)fId, (int)tokenList.size(), (int)m_pFileTokens->GetCount(), m_pFileTokens) );
+    for (std::set<int>::const_iterator it = tokenList.begin(); it != tokenList.end(); ++it)
+    {
+        const ClIndexToken& tok = m_pIndexTokenMap->GetValue( m_pFileTokens->GetValue( *it ) );
+        if ( (tokenTypeMask==0)||(tok.tokenTypeMask&tokenTypeMask) )
+        {
+            //CCLogger::Get()->DebugLog( F(wxT("Adding token ")+tok.identifier+wxT(" with mask %x USR=")+tok.USR, (int)tok.tokenTypeMask) );
+            out_tokens.push_back(tok);
+        }
+    }
+}
+
+void ClTokenIndexDatabase::AddToken( const wxString& identifier, const ClIndexToken& token)
+{
+    if (identifier.Length() > 0)
+    {
+        wxMutexLocker locker(m_Mutex);
+
+        ClTokenId id = m_pIndexTokenMap->Insert( identifier, token );
+        for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
+        {
+            wxString fid = wxString::Format( wxT("%d"), it->fileId );
+            m_pFileTokens->Remove( fid, id );
+            m_pFileTokens->Insert( fid, id );
+//            CCLogger::Get()->DebugLog( F(wxT("Mapped token %d to file %d tot %d in %p"), (int)id, (int)it->fileId, (int)m_pFileTokens->GetCount(), m_pFileTokens) );
+        }
+        m_bModified = true;
+    }
+}
+
 
 
 /** @brief Read a tokendatabase from disk
@@ -667,11 +924,11 @@ ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
  * @param identifier const wxString&
  * @param fileId ClFileId
  * @param tokenType ClTokenType
- * @param tokenHash unsigned
+ * @param USR wxString
  * @return ClTokenId
  *
  */
-ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, ClFileId fileId, ClTokenType tokenType, unsigned tokenHash ) const
+ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, const ClFileId fileId, const ClTokenType tokenType, const int tokenHash ) const
 {
     std::set<int> ids;
     m_pTokens->GetIdSet(identifier, ids);
@@ -729,6 +986,23 @@ void ClTokenDatabase::GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out
     m_pFileTokens->GetIdSet(key, out_tokens);
 }
 
+void ClTokenDatabase::GetTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const
+{
+    std::set<ClTokenId> tokenIds;
+    wxString key = wxString::Format(wxT("%d"), fileId);
+    m_pFileTokens->GetIdSet(key, tokenIds);
+    for (std::set<ClTokenId>::const_iterator it = tokenIds.begin(); it != tokenIds.end(); ++it)
+    {
+        ClAbstractToken token = GetToken( *it );
+        if (token.tokenType&TokenTypeMask)
+        {
+            wxString scopeName = token.scope.first;
+            out_Scopes.push_back( ClTokenScope(token.displayName, scopeName, token.range) );
+        }
+    }
+}
+
+
 /** @brief Shrink the database to reclaim some memory
  *
  * @return void
@@ -753,7 +1027,7 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
     assert((tokenRef.fileId == wxNOT_FOUND) && "Only an unused token can be updated");
     tokenRef.fileId = token.fileId;
     tokenRef.identifier = token.identifier;
-    tokenRef.location = token.location;
+    tokenRef.range = token.range;
     tokenRef.tokenHash = token.tokenHash;
     tokenRef.tokenType = token.tokenType;
     wxString filen = wxString::Format(wxT("%d"), token.fileId);
@@ -785,11 +1059,17 @@ unsigned long ClTokenDatabase::GetTokenCount()
 void ClTokenDatabase::StoreIndexes() const
 {
     ClTokenId id;
+    std::set<wxString> keySet = m_pFileTokens->GetKeySet();
+    for (std::set<wxString>::const_iterator it = keySet.begin(); it != keySet.end(); ++it)
+    {
+        ClFileId fId = wxAtoi( *it );
+        m_pTokenIndexDB->RemoveFileTokens( fId );
+    }
     //uint32_t cnt = m_pTokenIndexDB->GetTokenCount();
     for (id=0; id < m_pTokens->GetCount(); ++id)
     {
         ClAbstractToken& token = m_pTokens->GetValue( id );
-        m_pTokenIndexDB->UpdateToken( token.identifier, token.fileId, token.USR, token.tokenType, token.location, token.location, token.parentUSRList );
+        m_pTokenIndexDB->UpdateToken( token.identifier, token.displayName, token.fileId, token.USR, token.tokenType, token.range, token.parentTokenList, token.scope );
     }
     //uint32_t cnt2 = m_pTokenIndexDB->GetTokenCount();
     //CCLogger::Get()->DebugLog( F(wxT("StoreIndexes: Stored %d tokens. %d tokens extra. Total: %d (merged) IndexDb: %p"), (int)m_pTokens->GetCount(), (int)cnt2 - cnt, cnt2, m_pTokenIndexDB) );
@@ -809,7 +1089,7 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
             {
                 if( (usr.Length() == 0)||(tok.USR == usr))
                 {
-                    out_Position = tok.location;
+                    out_Position = tok.range.beginLocation;
                     return true;
                 }
             }
@@ -818,4 +1098,26 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
     return false;
 }
 
+bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenRange& out_Range) const
+{
+    std::set<ClTokenId> tokenIdList;
+    GetTokenMatches(identifier, tokenIdList);
+
+    for (std::set<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
+    {
+        ClAbstractToken tok = GetToken( *it );
+        if (tok.fileId == fileId)
+        {
+            if ( (tok.tokenType&ClTokenType_DefGroup) == ClTokenType_DefGroup ) // We only want token definitions
+            {
+                if( (usr.Length() == 0)||(tok.USR == usr))
+                {
+                    out_Range = tok.range;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
 

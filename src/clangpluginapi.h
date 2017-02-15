@@ -67,16 +67,63 @@ struct ClTokenPosition
         line = ln;
         column = col;
     }
-    bool operator==(const ClTokenPosition& other) const
+    bool operator==(const ClTokenPosition other) const
     {
         return ((line == other.line)&&(column == other.column));
     }
-    bool operator!=(const ClTokenPosition& other) const
+    bool operator!=(const ClTokenPosition other) const
     {
         return !(*this == other);
     }
+    bool operator<(const ClTokenPosition other) const
+    {
+        if (line < other.line)
+            return true;
+        if (line > other.line)
+            return false;
+        if (column < other.column)
+            return true;
+        return false;
+    }
+    bool operator>(const ClTokenPosition other) const
+    {
+        if (line > other.line)
+            return true;
+        if (line < other.line)
+            return false;
+        if (column > other.column)
+            return true;
+        return false;
+    }
     unsigned int line;
     unsigned int column;
+};
+
+struct ClTokenRange
+{
+    ClTokenRange() : beginLocation(0,0), endLocation(0,0) {}
+    ClTokenRange(const ClTokenPosition beginPos, const ClTokenPosition endPos) : beginLocation(beginPos), endLocation(endPos) {}
+
+    bool InRange(const ClTokenPosition pos) const
+    {
+        if (pos < beginLocation)
+            return false;
+        if (pos > endLocation)
+            return false;
+        return true;
+    }
+
+    ClTokenPosition beginLocation;
+    ClTokenPosition endLocation;
+};
+
+struct ClTokenScope
+{
+    wxString tokenName;
+    wxString scopeName;
+    ClTokenRange range;
+    ClTokenScope() : tokenName(), scopeName(), range() {}
+    ClTokenScope(const wxString& tokName, const wxString& symanticScopeName, ClTokenRange scopeRange) : tokenName(tokName), scopeName(symanticScopeName), range(scopeRange){}
 };
 
 /** @brief Level of diagnostic
@@ -353,12 +400,8 @@ public:
     virtual void BeginReindexFile(const ClangFile& file) = 0;
 
     /** Retrieve function scope */
-    virtual std::pair<wxString, wxString> GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename,
-                                                             const ClTokenPosition& position) = 0;
-    virtual void GetFunctionScopePosition(const ClTranslUnitId id, const wxString& filename,
-                                                     const wxString& scope, const wxString& functioname, ClTokenPosition& out_Position) = 0;
-    virtual void GetFunctionScopes(const ClTranslUnitId, const wxString& filename,
-                                   std::vector<std::pair<wxString, wxString> >& out_scopes) = 0;
+    virtual void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes) = 0;
+
     /** Occurrences highlighting
      *  Performs an asynchronous request for occurences highlight. Will send an event with */
     virtual void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc) = 0;

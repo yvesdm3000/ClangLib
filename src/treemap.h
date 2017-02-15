@@ -17,6 +17,7 @@ public:
     ~ClTreeMap();
     int Insert(const wxString& key, int value); // returns value
     void Remove(const wxString& key, int value);
+    void Remove(const wxString& key);
     void Shrink();
     void GetIdSet(const wxString& key, std::set<int>& out_ids) const;
     int GetValue(int id) const; // returns id
@@ -54,6 +55,10 @@ public:
     void RemoveIdKey( const wxString& key, int id )
     {
         m_Tree.Remove(key, id);
+    }
+    void Remove( const wxString& key )
+    {
+        m_Tree.Remove(key);
     }
 
     bool HasValue(int id)

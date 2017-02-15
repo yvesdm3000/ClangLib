@@ -445,57 +445,6 @@ public:
         ClangFile m_File;
         std::vector<ClDiagnostic> m_Results; // Returned value
     };
-
-    /** @brief Find the function scope of a code position job
-     */
-    class GetFunctionScopeAtJob : public EventJob
-    {
-    public:
-        /** @brief Constructor
-         *
-         * @param evtType wxEventType to use when the job is completed
-         * @param evtId Event ID to use when the job is completed
-         *
-         */
-        GetFunctionScopeAtJob( const wxEventType evtType, const int evtId, int translId, const ClangFile& file, const ClTokenPosition& position) :
-            EventJob(GetFunctionScopeAtType, evtType, evtId),
-            m_TranslId(translId),
-            m_File(file),
-            m_Position(position) {}
-        ClangJob* Clone() const
-        {
-            GetFunctionScopeAtJob* pJob = new GetFunctionScopeAtJob(*this);
-            return static_cast<ClangJob*>(pJob);
-        }
-        void Execute(ClangProxy& clangproxy)
-        {
-            clangproxy.GetFunctionScopeAt(m_TranslId, m_File.GetFilename(), m_Position, m_ScopeName, m_MethodName);
-        }
-
-    protected:
-        /** @brief Copy constructor
-         *
-         * @param other To copy from
-         *
-         *  Performs a deep copy for multi-threaded use
-         */
-        GetFunctionScopeAtJob( const GetFunctionScopeAtJob& other ) :
-            EventJob(other),
-            m_TranslId(other.m_TranslId),
-            m_File(other.m_File),
-            m_Position(other.m_Position),
-            m_ScopeName(other.m_ScopeName.c_str()),
-            m_MethodName(other.m_MethodName.c_str())
-        {
-        }
-    public:
-        ClTranslUnitId m_TranslId;
-        ClangFile m_File;
-        ClTokenPosition m_Position;
-        wxString m_ScopeName;
-        wxString m_MethodName;
-    };
-
     class LookupDefinitionJob : public EventJob
     {
     public:
@@ -1297,9 +1246,8 @@ public: // Tokens
     bool ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
 
 public: // Function scopes
-    void GetFunctionScopeAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, wxString &out_ClassName, wxString &out_FunctionName );
-    void GetFunctionScopes( const ClTranslUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_Scopes  );
-    void GetFunctionScopePosition( const ClTranslUnitId id, const wxString& filename, const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Position);
+    void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes);
+
 
 private: // Utility functions
     void BuildCompileArgs(const wxString& filename, const std::vector<wxString>& compileCommands, std::vector<wxCharBuffer>& argsBuffer, std::vector<const char*>& out_args) const;

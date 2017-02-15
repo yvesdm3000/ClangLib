@@ -35,7 +35,7 @@ struct ClangVisitorContext
     }
     ClTokenDatabase* database;
     unsigned long long tokenCount;
-    ClFunctionScopeMap functionScopes;
+    ClTokenScopeMap functionScopes;
 };
 
 static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion_stack,
@@ -297,7 +297,6 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
         clUnsavedFiles.push_back(unit);
     }
     m_LastParsed = wxDateTime::Now();
-    m_FunctionScopes.clear();
     m_Files.clear();
     m_FileId = wxNOT_FOUND;
 
@@ -425,7 +424,7 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d finished. Diagnostics: %d"), (int)m_Id, (int)m_Diagnostics.size()));
 }
 
-bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClFunctionScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const
+bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const
 {
     if (m_ClTranslUnit == nullptr)
         return false;
@@ -702,36 +701,6 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxStr
     clang_getInclusions( m_ClTranslUnit, UpdateIncludeDiagnosticsVisitor, &includesData );
 }
 
-void ClTranslationUnit::UpdateFunctionScopes( const ClFileId fileId, const ClFunctionScopeList &functionScopes )
-{
-    m_FunctionScopes.erase(fileId);
-    m_FunctionScopes.insert(std::make_pair(fileId, functionScopes));
-}
-#if 0
-bool ClTranslationUnit::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_Position)
-{
-    std::set<ClTokenId> tokenIdList;
-    m_Database.GetTokenMatches(identifier, tokenIdList);
-
-    for (std::set<ClTokenId>::const_iterator it = tokenIdList.begin(); it != tokenIdList.end(); ++it)
-    {
-        ClAbstractToken tok = m_Database.GetToken( *it );
-        if (tok.fileId == fileId)
-        {
-            if ( (tok.tokenType&ClTokenType_DefGroup) == ClTokenType_DefGroup ) // We only want token definitions
-            {
-                CCLogger::Get()->DebugLog( wxT("Candidate: ")+tok.identifier+wxT(" USR=")+tok.USR );
-                if( (usr.Length() == 0)||(tok.USR == usr))
-                {
-                    out_Position = tok.location;
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-#endif
 /** @brief Calculate a hash from a Clang token
  *
  * @param token CXCompletionString
@@ -739,7 +708,7 @@ bool ClTranslationUnit::LookupTokenDefinition( const ClFileId fileId, const wxSt
  * @return unsigned
  *
  */
-unsigned HashToken(CXCompletionString token, wxString& identifier)
+unsigned HashToken(CXCompletionString token, wxString& out_identifier)
 {
     unsigned hVal = 2166136261u;
     size_t upperBound = clang_getNumCompletionChunks(token);
@@ -748,7 +717,7 @@ unsigned HashToken(CXCompletionString token, wxString& identifier)
         CXString str = clang_getCompletionChunkText(token, i);
         const char* pCh = clang_getCString(str);
         if (clang_getCompletionChunkKind(token, i) == CXCompletionChunk_TypedText)
-            identifier = wxString::FromUTF8(*pCh =='~' ? pCh + 1 : pCh);
+            out_identifier = wxString::FromUTF8(*pCh =='~' ? pCh + 1 : pCh);
         for (; *pCh; ++pCh)
         {
             hVal ^= *pCh;
@@ -868,6 +837,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 
     CXCompletionString token = clang_getCursorCompletionString(cursor);
     wxString identifier;
+    int tokenHash = HashToken( token, identifier );
     str = clang_getCursorUSR( cursor );
     wxString usr = wxString::FromUTF8( clang_getCString( str ) );
     clang_disposeString( str );
@@ -878,7 +848,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         usr = wxString::FromUTF8( clang_getCString( str ) );
         clang_disposeString( str );
     }
-    unsigned tokenHash = HashToken(token, identifier);
     if (identifier.IsEmpty())
     {
         //str = clang_getCursorDisplayName(cursor);
@@ -889,8 +858,9 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
         //CCLogger::Get()->DebugLog( wxT("Visited symbol ")+identifier );
         wxString displayName;
         wxString scopeName;
+        wxString scopeUSR;
         CXCursor cursorWalk = cursor;
-        while (!clang_Cursor_isNull(cursorWalk))
+        while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeName.IsEmpty()) )
         {
             switch (cursorWalk.kind)
             {
@@ -905,9 +875,10 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
                     displayName = wxString::FromUTF8(clang_getCString(str));
                 else
                 {
-                    if (scopeName.Length() > 0)
-                        scopeName = scopeName.Prepend(wxT("::"));
-                    scopeName = scopeName.Prepend(wxString::FromUTF8(clang_getCString(str)));
+                    scopeName = wxString::FromUTF8(clang_getCString(str));
+                    CXString str2 = clang_getCursorUSR( cursorWalk );
+                    scopeUSR = wxString::FromUTF8( clang_getCString( str2 ) );
+                    clang_disposeString( str2 );
                 }
                 clang_disposeString(str);
                 break;
@@ -916,9 +887,12 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             }
             cursorWalk = clang_getCursorSemanticParent(cursorWalk);
         }
+        unsigned endLine = line;
+        unsigned endCol = col;
+        clang_getSpellingLocation(clang_getRangeEnd(tokenRange), nullptr, &endLine, &endCol, nullptr);
         struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
-        ClAbstractToken tok(typ, fileId, ClTokenPosition(line, col), identifier, usr, tokenHash);
+        ClAbstractToken tok(typ, fileId, ClTokenRange(ClTokenPosition(line, col),ClTokenPosition(endLine, endCol)), identifier, displayName, usr, tokenHash);
         {
             CXCursor* cursorList = NULL;
             unsigned int cursorNum = 0;
@@ -928,31 +902,32 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
                 str = clang_getCursorUSR( cursorList[i] );
                 wxString usr = wxString::FromUTF8( clang_getCString( str ) );
                 clang_disposeString( str );
-                tok.parentUSRList.push_back( usr );
+                str = clang_getCursorSpelling( cursorList[i] );
+                wxString identifier = wxString::FromUTF8( clang_getCString(str) );
+                clang_disposeString( str );
+                tok.parentTokenList.push_back( std::make_pair( identifier, usr ) );
             }
             clang_disposeOverriddenCursors(cursorList);
         }
+        tok.scope = std::make_pair(scopeName,scopeUSR);
 
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
         if (displayName.Length() > 0)
         {
-            unsigned endLine = line;
-            unsigned endCol = col;
-            clang_getSpellingLocation(clang_getRangeEnd(tokenRange), nullptr, &endLine, &endCol, nullptr);
             if (ctx->functionScopes[fileId].size() > 0)
             {
                 // Save some memory
                 if (ctx->functionScopes[fileId].back().scopeName.IsSameAs( scopeName ) )
                 {
                     scopeName = ctx->functionScopes[fileId].back().scopeName;
-                    if (ctx->functionScopes[fileId].back().functionName.IsSameAs( displayName ))
+                    if (ctx->functionScopes[fileId].back().tokenName.IsSameAs( displayName ))
                     {
                         return ret; // Duplicate...
                     }
                 }
             }
-            ctx->functionScopes[fileId].push_back( ClFunctionScope(displayName, scopeName, ClTokenPosition(line, col), ClTokenPosition(endLine, endCol)) );
+            ctx->functionScopes[fileId].push_back( ClTokenScope(displayName, scopeName, ClTokenRange(ClTokenPosition(line, col), ClTokenPosition(endLine, endCol))) );
         }
     }
     return ret;

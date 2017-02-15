@@ -1259,7 +1259,6 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
  */
 int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 {
-    CCLogger::Get()->DebugLog(wxT("UpdateCompileCommand ") + ed->GetFilename());
     std::vector<wxString> compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
 
     if (compileCommand.empty())
@@ -1267,9 +1266,6 @@ int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 
     if (compileCommand != m_CompileCommand)
     {
-        CCLogger::Get()->DebugLog( _T("New compile command arguments: ") );
-        for (std::vector<wxString>::const_iterator it = compileCommand.begin(); it != compileCommand.end(); ++it)
-            CCLogger::Get()->DebugLog( *it );
         m_CompileCommand = compileCommand;
         return 1;
     }
@@ -1571,24 +1567,11 @@ ClTranslUnitId ClangPlugin::GetTranslationUnitId(const ClangFile& file)
     return m_Proxy.GetTranslationUnitId(m_TranslUnitId, file);
 }
 
-std::pair<wxString,wxString> ClangPlugin::GetFunctionScopeAt(const ClTranslUnitId id, const wxString& filename, const ClTokenPosition& location)
+void ClangPlugin::GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes)
 {
-    wxString scope;
-    wxString func;
-    m_Proxy.GetFunctionScopeAt(id, filename, location, scope, func);
-    return std::make_pair(scope,func);
+    m_Proxy.GetAllTokenScopes(id, file, out_Scopes);
 }
 
-void ClangPlugin::GetFunctionScopePosition(const ClTranslUnitId translUnitId, const wxString& filename,
-                                                      const wxString& scopeName, const wxString& functionName, ClTokenPosition& out_Location)
-{
-    m_Proxy.GetFunctionScopePosition(translUnitId, filename, scopeName, functionName, out_Location);
-}
-
-void ClangPlugin::GetFunctionScopes(const ClTranslUnitId translUnitId, const wxString& filename, std::vector<std::pair<wxString, wxString> >& out_scopes)
-{
-    m_Proxy.GetFunctionScopes( translUnitId, filename, out_scopes );
-}
 
 void ClangPlugin::RequestOccurrencesOf(const ClTranslUnitId translUnitId, const ClangFile& file, const ClTokenPosition& loc)
 {
