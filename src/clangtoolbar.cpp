@@ -66,7 +66,6 @@ void ClangToolbar::OnAttach(IClangPlugin* pClangPlugin)
 
     wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
     AddPendingEvent(evt);
-    CCLogger::Get()->DebugLog( wxT("OnAttach: Posting Update toolbar selection") );
 
     wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
     AddPendingEvent(evt2);
@@ -102,7 +101,6 @@ void ClangToolbar::OnEditorActivate(CodeBlocksEvent& event)
         m_CurrentState.m_TranslUnitId = id;
         wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
         AddPendingEvent(evt);
-        CCLogger::Get()->DebugLog( wxT("ed activate: Posting Update toolbar selection") );
         wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
         AddPendingEvent(evt2);
     }
@@ -144,7 +142,6 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
                     wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
                     AddPendingEvent(evt);
                 }
-                CCLogger::Get()->DebugLog( wxT("line change: Posting Update toolbar selection") );
                 wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
                 AddPendingEvent(evt2);
             }
@@ -158,7 +155,6 @@ void ClangToolbar::OnTokenDatabaseUpdated( ClangEvent& event )
         return;
     wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
     AddPendingEvent(evt);
-    CCLogger::Get()->DebugLog( wxT("db update: Posting Update toolbar selection") );
     wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
     AddPendingEvent(evt2);
 }
@@ -209,7 +205,6 @@ void ClangToolbar::OnUpdateSelection( wxCommandEvent& event )
                 m_Scope->Append(scopeName);
                 line = m_Scope->FindString(scopeName);
             }
-            CCLogger::Get()->DebugLog( F(wxT("OnUpdateSelection: setting scope sel to %d"), line) );
             m_Scope->SetSelection(line);
         }
         line = m_Function->FindString( tokScope.tokenName );
@@ -299,7 +294,6 @@ void ClangToolbar::OnScope( wxCommandEvent& /*evt*/ )
     if (sel == -1)
         return;
     wxString selStr = m_Scope->GetString(sel);
-    CCLogger::Get()->DebugLog( wxT("OnScope sel=")+selStr );
 
     UpdateFunctions(selStr);
 }
