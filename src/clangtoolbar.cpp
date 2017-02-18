@@ -243,7 +243,7 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
         file = ClangFile(*ed->GetProjectFile());
     }
     m_CurrentState.m_TokenScopes.clear();
-    m_pClangPlugin->GetAllTokenScopes( m_CurrentState.m_TranslUnitId, file, m_CurrentState.m_TokenScopes );
+    m_pClangPlugin->GetTokenScopes( m_CurrentState.m_TranslUnitId, file, ClTokenType_DeclGroup|ClTokenType_DefGroup, m_CurrentState.m_TokenScopes );
     if (m_CurrentState.m_TokenScopes.empty())
     {
         EnableToolbarTools(false);

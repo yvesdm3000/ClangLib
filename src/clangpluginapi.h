@@ -124,6 +124,19 @@ struct ClTokenScope
     ClTokenRange range;
     ClTokenScope() : tokenName(), scopeName(), range() {}
     ClTokenScope(const wxString& tokName, const wxString& symanticScopeName, ClTokenRange scopeRange) : tokenName(tokName), scopeName(symanticScopeName), range(scopeRange){}
+
+    bool operator==(const ClTokenScope& other) const
+    {
+        if (other.tokenName != tokenName)
+            return false;
+        if (other.scopeName != scopeName)
+            return false;
+        if (other.range.beginLocation != range.beginLocation)
+            return false;
+        if (other.range.endLocation != range.endLocation)
+            return false;
+        return true;
+    }
 };
 
 /** @brief Level of diagnostic
@@ -400,7 +413,7 @@ public:
     virtual void BeginReindexFile(const ClangFile& file) = 0;
 
     /** Retrieve function scope */
-    virtual void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes) = 0;
+    virtual void GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes) = 0;
 
     /** Occurrences highlighting
      *  Performs an asynchronous request for occurences highlight. Will send an event with */

@@ -1567,9 +1567,9 @@ ClTranslUnitId ClangPlugin::GetTranslationUnitId(const ClangFile& file)
     return m_Proxy.GetTranslationUnitId(m_TranslUnitId, file);
 }
 
-void ClangPlugin::GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes)
+void ClangPlugin::GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes)
 {
-    m_Proxy.GetAllTokenScopes(id, file, out_Scopes);
+    m_Proxy.GetTokenScopes(id, file, tokenMask, out_Scopes);
 }
 
 

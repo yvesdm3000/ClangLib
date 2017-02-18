@@ -75,9 +75,9 @@ struct ClIndexToken
     std::vector< std::pair<wxString,wxString> > parentTokenList;   // Overrides and parent classes, first=identifier, second=USR
     std::pair<wxString,wxString> scope; // namespaces, outer class in case of inner class, first=identifier, second=USR
 
-    ClIndexToken() : identifier( wxEmptyString ), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
+    ClIndexToken(const wxString& ident) : identifier(ident.c_str()), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
     ClIndexToken( const wxString& ident, const wxString& name, const ClFileId fId, const wxString& usr, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector<std::pair<wxString,wxString> >& parentTokList, const std::pair<wxString,wxString>& parentScope )
-        : identifier( ident ), displayName( name.c_str() ), USR(usr.c_str()), parentTokenList(parentTokList),
+        : identifier( ident.c_str() ), displayName( name.c_str() ), USR(usr.c_str()), parentTokenList(parentTokList),
           scope(std::make_pair( parentScope.first.c_str(), parentScope.second.c_str()))
     {
         locationList.push_back( ClIndexTokenLocation( tokType, fId, tokenRange ) );
@@ -109,26 +109,51 @@ public:
     wxDateTime timestamp;
 };
 
-class ClFilenameDatabase
+class IPersistentFilenameDatabase
+{
+public:
+    virtual void AddFilename(const ClFilenameEntry& filename) = 0;
+    virtual std::vector<ClFilenameEntry> GetFilenames() const = 0;
+};
+
+class IPersistentTokenIndexDatabase
+{
+public:
+    virtual IPersistentFilenameDatabase* GetFilenameDatabase() = 0;
+    virtual void AddToken(const ClIndexToken& token) = 0;
+    virtual const IPersistentFilenameDatabase* GetFilenameDatabase() const = 0;
+    virtual std::vector<ClIndexToken> GetTokens() const = 0;
+};
+
+class CTokenIndexDatabasePersistence
+{
+public:
+    static bool ReadIn(IPersistentTokenIndexDatabase& tokenDatabase, wxInputStream& in);
+    static bool WriteOut(const IPersistentTokenIndexDatabase& tokenDatabase, wxOutputStream& out);
+};
+
+class ClFilenameDatabase : public IPersistentFilenameDatabase
 {
 public:
     ClFilenameDatabase();
     ClFilenameDatabase(const ClFilenameDatabase& Other);
     ~ClFilenameDatabase();
 
-    static bool ReadIn(ClFilenameDatabase& tokenDatabase, wxInputStream& in);
-    static bool WriteOut(const ClFilenameDatabase& db, wxOutputStream& out);
-
     bool HasFilename( const wxString& filename )const;
     ClFileId GetFilenameId(const wxString& filename) const;
     wxString GetFilename(const ClFileId fId) const;
     const wxDateTime GetFilenameTimestamp(const ClFileId fId) const;
     void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp);
+
+public: // IPersistentFilenameDatabase
+    void AddFilename(const ClFilenameEntry& filename);
+    std::vector<ClFilenameEntry> GetFilenames() const;
+
 private:
     ClTreeMap<ClFilenameEntry>* m_pFileEntries;
 };
 
-class ClTokenIndexDatabase
+class ClTokenIndexDatabase : public IPersistentTokenIndexDatabase, public IPersistentFilenameDatabase
 {
 public:
     ClTokenIndexDatabase() :
@@ -145,14 +170,11 @@ public:
         m_Mutex(wxMUTEX_RECURSIVE)
     {
     }
-    ~ClTokenIndexDatabase()
+    virtual ~ClTokenIndexDatabase()
     {
         delete m_pFileTokens;
         delete m_pIndexTokenMap;
     }
-
-    static bool ReadIn(ClTokenIndexDatabase& tokenDatabase, wxInputStream& in);
-    static bool WriteOut(const ClTokenIndexDatabase& tokenDatabase, wxOutputStream& out);
 
     bool HasFilename( const wxString& filename ) const
     {
@@ -206,8 +228,6 @@ public:
 
     void GetFileTokens(const ClFileId fId, const int tokenTypeMask, std::vector<ClIndexToken>& out_tokens) const;
 
-    void AddToken( const wxString& identifier, const ClIndexToken& token);
-
     void Clear()
     {
         wxMutexLocker locker(m_Mutex);
@@ -220,6 +240,24 @@ public:
         wxMutexLocker locker(m_Mutex);
 
         return m_bModified;
+    }
+
+private: // IPersistentTokenIndexDatabase
+    virtual IPersistentFilenameDatabase* GetFilenameDatabase() { return this; }
+    void AddToken(const ClIndexToken& token);
+    virtual const IPersistentFilenameDatabase* GetFilenameDatabase() const { return this; }
+    std::vector<ClIndexToken> GetTokens() const;
+
+private: // IPersistentFilenameDatabase
+    void AddFilename(const ClFilenameEntry& filename)
+    {
+        wxMutexLocker locker(m_Mutex);
+        m_FileDB.AddFilename(filename);
+    }
+    std::vector<ClFilenameEntry> GetFilenames() const
+    {
+        wxMutexLocker locker(m_Mutex);
+        return m_FileDB.GetFilenames();
     }
 
 private:

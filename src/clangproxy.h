@@ -1246,7 +1246,7 @@ public: // Tokens
     bool ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
 
 public: // Function scopes
-    void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes);
+    void GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes);
 
 
 private: // Utility functions

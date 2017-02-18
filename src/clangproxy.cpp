@@ -1777,7 +1777,7 @@ bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const wxString& i
     return false;
 }
 
-void ClangProxy::GetAllTokenScopes(const ClTranslUnitId translUnitId, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes)
+void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes)
 {
     if (file.GetFilename().Length() == 0)
     {
@@ -1792,7 +1792,7 @@ void ClangProxy::GetAllTokenScopes(const ClTranslUnitId translUnitId, const Clan
                 return;
             }
             ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( file.GetFilename() );
-            m_TranslUnits[translUnitId].GetAllTokenScopes(fId,out_Scopes);
+            m_TranslUnits[translUnitId].GetTokenScopes(fId, tokenMask, out_Scopes);
         }
         if (!out_Scopes.empty())
         {
@@ -1804,7 +1804,7 @@ void ClangProxy::GetAllTokenScopes(const ClTranslUnitId translUnitId, const Clan
     {
         ClFileId fileId = pTokenIndexDB->GetFilenameId( file.GetFilename() );
         std::vector<ClIndexToken> tokens;
-        pTokenIndexDB->GetFileTokens( fileId, ClTokenType_DeclGroup|ClTokenType_DefGroup, tokens );
+        pTokenIndexDB->GetFileTokens( fileId, tokenMask, tokens );
         CCLogger::Get()->DebugLog( F(wxT("Found %d tokens in indexdb for file ")+file.GetFilename(), tokens.size()) );
 
         wxString scopeName;
@@ -1821,7 +1821,7 @@ void ClangProxy::GetAllTokenScopes(const ClTranslUnitId translUnitId, const Clan
                     {
                         if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
                             pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName );
-                        //if (std::find( out_Scopes.begin(), out_Scopes.end(), std::make_pair( scopeName, it->displayName ) ) == out_Scopes.end())
+                        if (std::find( out_Scopes.begin(), out_Scopes.end(), ClTokenScope(it->displayName, scopeName, itLoc->range) ) == out_Scopes.end())
                         {
                             out_Scopes.push_back( ClTokenScope(it->displayName, scopeName, itLoc->range) );
                         }
@@ -1830,7 +1830,7 @@ void ClangProxy::GetAllTokenScopes(const ClTranslUnitId translUnitId, const Clan
                     {
                         if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
                             pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName );
-                        //if (std::find( out_Scopes.begin(), out_Scopes.end(), std::make_pair( scopeName, it->displayName ) ) == out_Scopes.end())
+                        if (std::find( out_Scopes.begin(), out_Scopes.end(), ClTokenScope(it->displayName, scopeName, itLoc->range) ) == out_Scopes.end())
                         {
                             out_Scopes.push_back( ClTokenScope(it->displayName, scopeName, itLoc->range) );
                         }
@@ -2071,7 +2071,7 @@ ClTokenIndexDatabase* ClangProxy::LoadTokenIndexDatabase( const wxString& projec
             wxFileInputStream in(fn);
             if (in.IsOk())
             {
-                if (!ClTokenIndexDatabase::ReadIn( *ret, in ))
+                if (!CTokenIndexDatabasePersistence::ReadIn( *ret, in ))
                 {
                     CCLogger::Get()->DebugLog( wxT("Reading token index database failed!") );
                 }
@@ -2110,7 +2110,7 @@ void ClangProxy::StoreTokenIndexDatabase( const wxString& projectFileName ) cons
     wxString fn = GetTokenIndexDatabaseFilename(projectFileName);
     wxFileOutputStream out(fn+wxT(".new"));
 
-    if (ClTokenIndexDatabase::WriteOut( *db, out ) )
+    if (CTokenIndexDatabasePersistence::WriteOut( *db, out ) )
     {
         wxRemoveFile( fn );
         wxRenameFile(fn+wxT(".new"), fn, true);

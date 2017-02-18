@@ -189,7 +189,7 @@ public: // IClangPlugin
     void RequestReparse(const ClTranslUnitId id, const ClangFile& file);
     wxDateTime GetFileIndexingTimestamp(const ClangFile& file);
     void BeginReindexFile(const ClangFile& file);
-    void GetAllTokenScopes(const ClTranslUnitId id, const ClangFile& file, std::vector<ClTokenScope>& out_Scopes);
+    void GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes);
 
 
     void RequestOccurrencesOf(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);

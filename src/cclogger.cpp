@@ -78,7 +78,7 @@ void CCLogger::Init(wxEvtHandler* parent, int logId, int debugLogId, int errorLo
 void CCLogger::AddToken(const wxString& msg)
 {
     if (!m_Parent || m_AddTokenId<1) return;
-
+#ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_AddTokenId);
     evt.SetString(msg);
 #if CC_PROCESS_LOG_EVENT_TO_PARENT
@@ -86,12 +86,18 @@ void CCLogger::AddToken(const wxString& msg)
 #else
     wxPostEvent(m_Parent, evt);
 #endif
+#endif
 }
 
 void CCLogger::Log(const wxString& msg)
 {
+    if (!m_Parent)
+    {
+        std::cout<<msg.c_str()<<std::endl;
+        return;
+    }
     if (!m_Parent || m_LogId<1) return;
-
+#ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_LogId);
     evt.SetString(msg);
 #if CC_PROCESS_LOG_EVENT_TO_PARENT
@@ -99,12 +105,18 @@ void CCLogger::Log(const wxString& msg)
 #else
     wxPostEvent(m_Parent, evt);
 #endif
+#endif
 }
 
 void CCLogger::DebugLog(const wxString& msg)
 {
+    if (!m_Parent)
+    {
+        std::cout<<msg.c_str()<<std::endl;
+        return;
+    }
     if (!m_Parent || m_DebugLogId<1) return;
-
+#ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_DebugLogId);
     evt.SetString(msg);
 #if CC_PROCESS_LOG_EVENT_TO_PARENT
@@ -112,17 +124,24 @@ void CCLogger::DebugLog(const wxString& msg)
 #else
     wxPostEvent(m_Parent, evt);
 #endif
+#endif
 }
 
 void CCLogger::LogError(const wxString& msg)
 {
+    if (!m_Parent)
+    {
+        std::cout<<msg.c_str()<<std::endl;
+        return;
+    }
     if (!m_Parent || m_DebugLogId<1) return;
-
+#ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_ErrorLogId);
     evt.SetString(msg);
 #if CC_PROCESS_LOG_EVENT_TO_PARENT
     m_Parent->ProcessEvent(evt);
 #else
     wxPostEvent(m_Parent, evt);
+#endif
 #endif
 }

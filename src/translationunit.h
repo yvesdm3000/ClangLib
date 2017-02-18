@@ -124,9 +124,9 @@ public:
     void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
 
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; std::sort(m_Files.begin(), m_Files.end()); }
-    void GetAllTokenScopes( const ClFileId fileId, ClTokenScopeList& out_functionScopes )
+    void GetTokenScopes( const ClFileId fileId, unsigned int tokenMask, ClTokenScopeList& out_functionScopes )
     {
-        m_pDatabase->GetTokenScopes(fileId, ClTokenType_DeclGroup|ClTokenType_DefGroup, out_functionScopes);
+        m_pDatabase->GetTokenScopes(fileId, tokenMask, out_functionScopes);
     }
 
 private:
