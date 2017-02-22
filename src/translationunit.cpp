@@ -13,29 +13,20 @@
 #include "tokendatabase.h"
 #include "cclogger.h"
 
-#if 0
-class ClangVisitorContext
+struct ClAST_VisitorContext
 {
-public:
-    ClangVisitorContext(ClTranslationUnit* pTranslationUnit) :
-        m_pTranslationUnit(pTranslationUnit)
-    { }
-    std::deque<wxString> m_ScopeStack;
-    std::deque<CXCursor> m_CursorSt
-};
-#endif
-
-struct ClangVisitorContext
-{
-    ClangVisitorContext(ClTokenDatabase* pDatabase)
-     : functionScopes()
+    ClAST_VisitorContext(ClTokenDatabase* pDatabase)
     {
         database = pDatabase;
+        if (pDatabase)
+        {
+            pDatabase->GetAllTokenFiles(unprocessedFileIds);
+        }
         tokenCount = 0;
     }
     ClTokenDatabase* database;
+    std::set<ClFileId> unprocessedFileIds;
     unsigned long long tokenCount;
-    ClTokenScopeMap functionScopes;
 };
 
 static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion_stack,
@@ -55,6 +46,7 @@ ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const 
     m_LastParsed(wxDateTime::Now())
 {
 }
+
 ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* indexDatabase, const ClTranslUnitId id) :
     m_pDatabase(new ClTokenDatabase(indexDatabase)),
     m_Id(id),
@@ -424,7 +416,7 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d finished. Diagnostics: %d"), (int)m_Id, (int)m_Diagnostics.size()));
 }
 
-bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const
+bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenDatabase* out_pTokenDatabase) const
 {
     if (m_ClTranslUnit == nullptr)
         return false;
@@ -449,12 +441,10 @@ bool ClTranslationUnit::ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFile
     //std::unique(m_Files.begin(), m_Files.end());
     if (out_pTokenDatabase)
     {
-        struct ClangVisitorContext ctx(out_pTokenDatabase);
+        struct ClAST_VisitorContext ctx(out_pTokenDatabase);
         //unsigned rc =
         clang_visitChildren(clang_getTranslationUnitCursor(m_ClTranslUnit), ClAST_Visitor, &ctx);
-        CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed, %d function scopes"), (int)m_Id, (int)ctx.tokenCount, (int)ctx.functionScopes.size()));
-        if (out_pFunctionScopes)
-            *out_pFunctionScopes = ctx.functionScopes;
+        CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::UpdateTokenDatabase %d finished: %d tokens processed"), (int)m_Id, (int)ctx.tokenCount));
     }
 
     return true;
@@ -749,83 +739,28 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
     clang_disposeString(filename);
 }
 
-/** @brief Static function used in the Clang AST visitor functions
- *
- * @param parent
- * @return CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor
- *
- */
-static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(parent), CXClientData client_data)
+bool debug = false;
+
+static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenType typ, CXClientData client_data)
 {
-    ClTokenType typ = ClTokenType_Unknown;
-    CXChildVisitResult ret = CXChildVisit_Break; // should never happen
-    switch (cursor.kind)
+    if (typ < ClTokenType_DeclGroup)
     {
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-    case CXCursor_ClassDecl:
-    case CXCursor_EnumDecl:
-    case CXCursor_Namespace:
-    case CXCursor_ClassTemplate:
-        typ = ClTokenType_Scope;
-        ret = CXChildVisit_Recurse;
-        break;
-
-    case CXCursor_FieldDecl:
-        typ = ClTokenType_Var;
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_EnumConstantDecl:
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_FunctionDecl:
-        typ = ClTokenType_Func;
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_VarDecl:
-        typ = ClTokenType_Var;
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_ParmDecl:
-        typ = ClTokenType_Parm;
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_TypedefDecl:
-        //case CXCursor_MacroDefinition: // this can crash Clang on Windows
-        ret = CXChildVisit_Continue;
-        break;
-//    case CXCursor_TypeRef:
-//        typ = ClTokenType_VarDef;
-//        ret = CXChildVisit_Continue;
-//        break;
-    case CXCursor_CXXMethod:
-    case CXCursor_Constructor:
-    case CXCursor_Destructor:
-    case CXCursor_FunctionTemplate:
-        typ = ClTokenType_Func;
-        //ret = CXChildVisit_Continue;
-        ret = CXChildVisit_Recurse;
-        break;
-
-    default:
-//        CCLogger::Get()->DebugLog( F(wxT("Unhandled cursor type: %d"), (int)cursor.kind) );
-        return CXChildVisit_Recurse;
-    }
-    if (clang_isCursorDefinition( cursor ))
-    {
-        typ = (ClTokenType)(typ | ClTokenType_DefGroup);
-    }
-    else if (clang_isDeclaration( cursor.kind ))
-    {
-        typ = (ClTokenType)(typ | ClTokenType_DeclGroup);
-    }
-    else if (clang_isExpression( cursor.kind ))
-    {
-        typ = (ClTokenType)(typ | ClTokenType_RefGroup);
+        if (clang_isCursorDefinition( cursor ))
+        {
+            typ = (ClTokenType)(typ | ClTokenType_DefGroup);
+        }
+        else if (clang_isDeclaration( cursor.kind ))
+        {
+            typ = (ClTokenType)(typ | ClTokenType_DeclGroup);
+        }
+        else if (clang_isExpression( cursor.kind ))
+        {
+            typ = (ClTokenType)(typ | ClTokenType_RefGroup);
+        }
     }
 
     CXSourceLocation loc = clang_getCursorLocation(cursor);
-    CXSourceRange tokenRange = clang_getCursorExtent( cursor );
+    CXSourceRange tokenRange = clang_getCursorExtent( scopeCursor );
     CXFile clFile;
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
@@ -833,7 +768,12 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     wxString filename = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
     if (filename.IsEmpty())
-        return ret;
+    {
+        if (typ == ClTokenType_FuncDecl)
+            CCLogger::Get()->DebugLog( wxT("no filename") );
+
+        return;
+    }
 
     CXCompletionString token = clang_getCursorCompletionString(cursor);
     wxString identifier;
@@ -850,6 +790,8 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     }
     if (identifier.IsEmpty())
     {
+        if (typ == ClTokenType_FuncDecl)
+            CCLogger::Get()->DebugLog( wxT("Identifier is empty usr=")+usr );
         //str = clang_getCursorDisplayName(cursor);
         //wxString displayName = wxString::FromUTF8( clang_getCString( str ) );
         //CCLogger::Get()->DebugLog( F(wxT("Skipping symbol %d,%d")+displayName, line, col ));
@@ -857,9 +799,17 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
     }else{
         //CCLogger::Get()->DebugLog( wxT("Visited symbol ")+identifier );
         wxString displayName;
+        str = clang_getCursorDisplayName(cursor);
+        displayName = wxString::FromUTF8(clang_getCString(str));
+        clang_disposeString(str);
+        if (displayName.IsEmpty())
+        {
+            displayName = identifier;
+        }
+
         wxString scopeName;
         wxString scopeUSR;
-        CXCursor cursorWalk = cursor;
+        CXCursor cursorWalk = clang_getCursorSemanticParent(cursor);
         while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeName.IsEmpty()) )
         {
             switch (cursorWalk.kind)
@@ -870,28 +820,40 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
             case CXCursor_ClassTemplate:
             case CXCursor_ClassTemplatePartialSpecialization:
             case CXCursor_CXXMethod:
+            case CXCursor_FunctionDecl:
+            case CXCursor_FunctionTemplate:
                 str = clang_getCursorDisplayName(cursorWalk);
-                if (displayName.Length() == 0)
-                    displayName = wxString::FromUTF8(clang_getCString(str));
-                else
-                {
-                    scopeName = wxString::FromUTF8(clang_getCString(str));
-                    CXString str2 = clang_getCursorUSR( cursorWalk );
-                    scopeUSR = wxString::FromUTF8( clang_getCString( str2 ) );
-                    clang_disposeString( str2 );
-                }
+                scopeName = wxString::FromUTF8(clang_getCString(str));
                 clang_disposeString(str);
+                str = clang_getCursorUSR( cursorWalk );
+                scopeUSR = wxString::FromUTF8( clang_getCString( str ) );
+                clang_disposeString( str );
+                break;
+            case CXCursor_TranslationUnit:
+                cursorWalk = clang_getNullCursor();
                 break;
             default:
+                if (debug)
+                    CCLogger::Get()->DebugLog( F(wxT("skipping cursor type %d dn=")+displayName+wxT(" sn=")+scopeName, (int)cursorWalk.kind ) );
                 break;
             }
-            cursorWalk = clang_getCursorSemanticParent(cursorWalk);
+            if (!clang_Cursor_isNull( cursorWalk ))
+                cursorWalk = clang_getCursorSemanticParent(cursorWalk);
         }
         unsigned endLine = line;
         unsigned endCol = col;
         clang_getSpellingLocation(clang_getRangeEnd(tokenRange), nullptr, &endLine, &endCol, nullptr);
-        struct ClangVisitorContext* ctx = static_cast<struct ClangVisitorContext*>(client_data);
+        struct ClAST_VisitorContext* ctx = static_cast<struct ClAST_VisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
+        if (debug)
+        {
+            CCLogger::Get()->DebugLog( wxT("inserting ")+identifier+wxT(" ")+usr );
+        }
+        if (ctx->unprocessedFileIds.find( fileId ) != ctx->unprocessedFileIds.end())
+        {
+            ctx->database->RemoveFileTokens(fileId);
+            ctx->unprocessedFileIds.erase( fileId );
+        }
         ClAbstractToken tok(typ, fileId, ClTokenRange(ClTokenPosition(line, col),ClTokenPosition(endLine, endCol)), identifier, displayName, usr, tokenHash);
         {
             CXCursor* cursorList = NULL;
@@ -913,22 +875,116 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor WXUNUSED(paren
 
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
-        if (displayName.Length() > 0)
-        {
-            if (ctx->functionScopes[fileId].size() > 0)
-            {
-                // Save some memory
-                if (ctx->functionScopes[fileId].back().scopeName.IsSameAs( scopeName ) )
-                {
-                    scopeName = ctx->functionScopes[fileId].back().scopeName;
-                    if (ctx->functionScopes[fileId].back().tokenName.IsSameAs( displayName ))
-                    {
-                        return ret; // Duplicate...
-                    }
-                }
-            }
-            ctx->functionScopes[fileId].push_back( ClTokenScope(displayName, scopeName, ClTokenRange(ClTokenPosition(line, col), ClTokenPosition(endLine, endCol))) );
-        }
     }
+}
+
+/** @brief Static function used in the Clang AST visitor functions
+ *
+ * @param parent
+ * @return CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor
+ *
+ */
+static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
+{
+    bool isTU=false;
+    {
+        CXSourceLocation loc = clang_getCursorLocation(cursor);
+        CXFile clFile;
+        unsigned line = 1, col = 1;
+        clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
+        CXString str = clang_getFileName(clFile);
+        wxString filename = wxString::FromUTF8(clang_getCString(str));
+        clang_disposeString(str);
+        if (filename.Find( wxT("translationunit.cpp") )!= wxNOT_FOUND)
+            isTU=true;
+    }
+
+    CXCursor scopeCursor = cursor; // Cursor that points to the scope e.g the { }
+    ClTokenType typ = ClTokenType_Unknown;
+    CXChildVisitResult ret = CXChildVisit_Break; // should never happen
+    switch (cursor.kind)
+    {
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+    case CXCursor_ClassDecl:
+    case CXCursor_EnumDecl:
+        typ = ClTokenType_ScopeDecl;
+        ret = CXChildVisit_Recurse;
+        break;
+    case CXCursor_Namespace:
+    case CXCursor_ClassTemplate:
+        typ = ClTokenType_Scope;
+        ret = CXChildVisit_Recurse;
+        break;
+
+    case CXCursor_FieldDecl:
+        typ = ClTokenType_VarDecl;
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_EnumConstantDecl:
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_FunctionDecl:
+        typ = ClTokenType_FuncDecl;
+        ret = CXChildVisit_Recurse;
+        break;
+    case CXCursor_CompoundStmt:
+        switch (parent.kind)
+        {
+        case CXCursor_FunctionDecl:
+            typ = ClTokenType_FuncDef;
+            cursor = parent;
+            if (isTU)
+                debug = true;
+            break;
+        case CXCursor_Namespace:
+        case CXCursor_ClassDecl:
+        case CXCursor_ClassTemplate:
+        case CXCursor_ClassTemplatePartialSpecialization:
+        case CXCursor_CXXMethod:
+            typ = ClTokenType_ScopeDef;
+            cursor = parent;
+            break;
+        default:
+            break;
+        }
+        ret = CXChildVisit_Recurse;
+        break;
+    case CXCursor_VarDecl:
+        typ = ClTokenType_VarDecl;
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_ParmDecl:
+        typ = ClTokenType_ParmDecl;
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_TypedefDecl:
+        //case CXCursor_MacroDefinition: // this can crash Clang on Windows
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_TypeRef:
+        typ = ClTokenType_VarDecl;
+        ret = CXChildVisit_Continue;
+        break;
+    case CXCursor_MemberRef:
+        typ = ClTokenType_FuncRef;
+        ret = CXChildVisit_Recurse;
+        break;
+    case CXCursor_CXXMethod:
+    case CXCursor_Constructor:
+    case CXCursor_Destructor:
+    case CXCursor_FunctionTemplate:
+        typ = ClTokenType_Func;
+        //ret = CXChildVisit_Continue;
+        ret = CXChildVisit_Recurse;
+        break;
+
+    case CXCursor_CXXBaseSpecifier:
+    default:
+//        CCLogger::Get()->DebugLog( F(wxT("Unhandled cursor type: %d"), (int)cursor.kind) );
+        return CXChildVisit_Recurse;
+    }
+    ClImportClangToken(cursor, scopeCursor, typ, client_data);
+    debug=false;
     return ret;
 }

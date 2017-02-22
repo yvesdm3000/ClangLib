@@ -647,9 +647,8 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
         else
         {
             std::vector<ClFileId> includeFileList;
-            ClTokenScopeMap functionScopes;
             ClTokenDatabase tokenDatabase(database);
-            tu.ProcessAllTokens( &includeFileList, &functionScopes, &tokenDatabase );
+            tu.ProcessAllTokens( &includeFileList, &tokenDatabase );
             tokenDatabase.StoreIndexes();
             database->UpdateFilenameTimestamp(fileId, timestamp);
         }
@@ -1026,7 +1025,6 @@ wxString ClangProxy::DocumentCCToken( const ClTranslUnitId translUnitId, int tkn
         const CXCompletionResult* token = m_TranslUnits[translUnitId].GetCCResult(tknId);
         if (!token)
             return wxEmptyString;
-        CCLogger::Get()->DebugLog( F(_T("getdocumentation: ccresult cursor kind: %d"), (int)token->CursorKind));
         int upperBound = clang_getNumCompletionChunks(token->CompletionString);
         if (token->CursorKind == CXCursor_Namespace)
             doc = wxT("namespace ");
@@ -1805,7 +1803,7 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
         ClFileId fileId = pTokenIndexDB->GetFilenameId( file.GetFilename() );
         std::vector<ClIndexToken> tokens;
         pTokenIndexDB->GetFileTokens( fileId, tokenMask, tokens );
-        CCLogger::Get()->DebugLog( F(wxT("Found %d tokens in indexdb for file ")+file.GetFilename(), tokens.size()) );
+        CCLogger::Get()->DebugLog( F(wxT("Found %d tokens matching one of 0x%x in indexdb for file %d ")+file.GetFilename()+wxT(" proj=")+file.GetProject(), (int)tokens.size(), (int)tokenMask, (int)fileId) );
 
         wxString scopeName;
         wxString lastScopeIdent;
@@ -1893,9 +1891,8 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
     if ( tu.IsValid() )
     {
         std::vector<ClFileId> includeFiles;
-        ClTokenScopeMap functionScopes;
         ClTokenDatabase tokenDatabase(tu.GetTokenIndexDatabase());
-        if (tu.ProcessAllTokens( &includeFiles, &functionScopes, &tokenDatabase ) )
+        if (tu.ProcessAllTokens( &includeFiles, &tokenDatabase ) )
         {
             tu.SetFiles(includeFiles);
             tu.SwapTokenDatabase( tokenDatabase );

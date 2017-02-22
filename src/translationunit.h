@@ -105,7 +105,7 @@ public:
     bool Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
                 const std::map<wxString, wxString>& unsavedFiles, const bool bReparse = true );
     void Reparse(const std::map<wxString, wxString>& unsavedFiles);
-    bool ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenScopeMap* out_pFunctionScopes, ClTokenDatabase* out_pTokenDatabase) const;
+    bool ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenDatabase* out_pTokenDatabase) const;
     void SwapTokenDatabase(ClTokenDatabase& other);
     // note that complete_line and complete_column are 1 index, not 0 index!
     CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,

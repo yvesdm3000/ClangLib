@@ -77,7 +77,11 @@ struct ClIndexToken
 
     ClIndexToken(const wxString& ident) : identifier(ident.c_str()), USR(wxEmptyString), tokenTypeMask(ClTokenType_Unknown){}
     ClIndexToken( const wxString& ident, const wxString& name, const ClFileId fId, const wxString& usr, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector<std::pair<wxString,wxString> >& parentTokList, const std::pair<wxString,wxString>& parentScope )
-        : identifier( ident.c_str() ), displayName( name.c_str() ), USR(usr.c_str()), parentTokenList(parentTokList),
+        : identifier( ident.c_str() ),
+          displayName( name.c_str() ),
+          USR(usr.c_str()),
+          tokenTypeMask( tokType ),
+          parentTokenList(parentTokList),
           scope(std::make_pair( parentScope.first.c_str(), parentScope.second.c_str()))
     {
         locationList.push_back( ClIndexTokenLocation( tokType, fId, tokenRange ) );
@@ -288,6 +292,7 @@ public:
 
     ClTokenId InsertToken(const ClAbstractToken& token); // duplicate tokens are discarded
     void RemoveToken(const ClTokenId tokenId);
+    void RemoveFileTokens( const ClFileId fileId );
 
     void GetTokenMatches(const wxString& identifier, std::set<ClTokenId>& out_tokenList) const;
 
@@ -295,6 +300,7 @@ public:
     bool LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenRange& out_Range) const;
 
     void GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out_tokens) const;
+    void GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const;
     void GetTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const;
 
     void Clear();

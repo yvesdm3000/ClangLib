@@ -178,13 +178,11 @@ typedef enum _TokenType
 
     ClTokenType_Func  = 1<<0,
     ClTokenType_Var   = 1<<1,
-    ClTokenType_Member= 1<<2,
-    ClTokenType_Parm  = 1<<3,
-    ClTokenType_Scope = 1<<4,
+    ClTokenType_Parm  = 1<<2,
+    ClTokenType_Scope = 1<<3,
 
     ClTokenType_FuncDecl  = ClTokenType_Func  | ClTokenType_DeclGroup,
     ClTokenType_VarDecl   = ClTokenType_Var   | ClTokenType_DeclGroup,
-    ClTokenType_MemberDecl= ClTokenType_Member| ClTokenType_DeclGroup,
     ClTokenType_ParmDecl  = ClTokenType_Parm  | ClTokenType_DeclGroup,
     ClTokenType_ScopeDecl = ClTokenType_Scope | ClTokenType_DeclGroup,
 
@@ -195,7 +193,6 @@ typedef enum _TokenType
 
     ClTokenType_FuncRef   = ClTokenType_Func  | ClTokenType_RefGroup,
     ClTokenType_VarRef    = ClTokenType_Var   | ClTokenType_RefGroup,
-    ClTokenType_MemberRef = ClTokenType_Member| ClTokenType_RefGroup,
     ClTokenType_ParmRef   = ClTokenType_Parm  | ClTokenType_RefGroup,
     ClTokenType_ScopeRef  = ClTokenType_Scope | ClTokenType_RefGroup,
 

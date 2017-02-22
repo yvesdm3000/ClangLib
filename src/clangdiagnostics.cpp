@@ -281,12 +281,10 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
     const std::vector<ClDiagnostic>& diagnostics = event.GetDiagnosticResults();
     if ( (diagLv == dlFull)&&(event.GetPosition().line != 0) && (event.GetPosition().column != 0) )
     {
-        CCLogger::Get()->DebugLog( wxT("OnDiagnostics: Doing partial update") );
         update = true;
     }
     else
     {
-        CCLogger::Get()->DebugLog( wxT("OnDiagnostics: Doing full update") );
         m_Diagnostics = diagnostics;
     }
 

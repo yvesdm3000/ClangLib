@@ -631,7 +631,7 @@ public:
                         {
                             CCLogger::Get()->DebugLog(wxT("Building tokendatabase from TU"));
                             ClTokenDatabase db(indexdb);
-                            if (tu.ProcessAllTokens( NULL, NULL, &db ))
+                            if (tu.ProcessAllTokens( NULL, &db ))
                             {
                                 ClTokenPosition pos(0,0);
                                 CCLogger::Get()->DebugLog(wxT("Looking up token definition in db"));

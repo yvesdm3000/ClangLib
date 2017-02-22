@@ -197,7 +197,6 @@ static wxString GetActualName(const wxString& name)
 
 std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompList(bool isAuto, cbEditor* ed, int& tknStart, int& tknEnd)
 {
-    CCLogger::Get()->DebugLog( F(_T("ClangCodeCompletion::GetAutocompList isAuto=%d"), (int)isAuto) );
     std::vector<cbCodeCompletionPlugin::CCToken> tokens;
 
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);

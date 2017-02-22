@@ -94,7 +94,6 @@ void CCLogger::Log(const wxString& msg)
     if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
-        return;
     }
     if (!m_Parent || m_LogId<1) return;
 #ifdef BUILDING_PLUGIN
@@ -110,10 +109,9 @@ void CCLogger::Log(const wxString& msg)
 
 void CCLogger::DebugLog(const wxString& msg)
 {
-    if (!m_Parent)
+//    if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
-        return;
     }
     if (!m_Parent || m_DebugLogId<1) return;
 #ifdef BUILDING_PLUGIN
@@ -132,7 +130,6 @@ void CCLogger::LogError(const wxString& msg)
     if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
-        return;
     }
     if (!m_Parent || m_DebugLogId<1) return;
 #ifdef BUILDING_PLUGIN
