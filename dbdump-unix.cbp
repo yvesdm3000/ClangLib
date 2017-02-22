@@ -81,6 +81,8 @@
 		<Unit filename="dbdump/dbdump.cpp" />
 		<Unit filename="dbdump/dbdump.h" />
 		<Unit filename="resources/manifest.xml" />
+		<Unit filename="src/cclogger.cpp" />
+		<Unit filename="src/cclogger.h" />
 		<Unit filename="src/tokendatabase.cpp" />
 		<Unit filename="src/tokendatabase.h" />
 		<Unit filename="src/treemap.cpp" />
