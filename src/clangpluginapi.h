@@ -176,15 +176,19 @@ typedef enum _TokenType
     ClTokenType_DefGroup  = 1<<9,   // Token definition
     ClTokenType_RefGroup  = 1<<10,  // Token reference (function call, type of a variable declaration etc
 
-    ClTokenType_Func  = 1<<0,
-    ClTokenType_Var   = 1<<1,
-    ClTokenType_Parm  = 1<<2,
-    ClTokenType_Scope = 1<<3,
+    ClTokenType_Func    = 1<<0,
+    ClTokenType_Var     = 1<<1,
+    ClTokenType_Parm    = 1<<2,
+    ClTokenType_Scope   = 1<<3,
+    ClTokenType_Typedef = 1<<4,
+    ClTokenType_Value   = 1<<5,
 
-    ClTokenType_FuncDecl  = ClTokenType_Func  | ClTokenType_DeclGroup,
-    ClTokenType_VarDecl   = ClTokenType_Var   | ClTokenType_DeclGroup,
-    ClTokenType_ParmDecl  = ClTokenType_Parm  | ClTokenType_DeclGroup,
-    ClTokenType_ScopeDecl = ClTokenType_Scope | ClTokenType_DeclGroup,
+    ClTokenType_FuncDecl    = ClTokenType_Func    | ClTokenType_DeclGroup,
+    ClTokenType_VarDecl     = ClTokenType_Var     | ClTokenType_DeclGroup,
+    ClTokenType_ParmDecl    = ClTokenType_Parm    | ClTokenType_DeclGroup,
+    ClTokenType_ScopeDecl   = ClTokenType_Scope   | ClTokenType_DeclGroup,
+    ClTokenType_TypedefDecl = ClTokenType_Typedef | ClTokenType_DeclGroup,
+    ClTokenType_ValueDecl   = ClTokenType_Value   | ClTokenType_DeclGroup,
 
     ClTokenType_FuncDef   = ClTokenType_Func  | ClTokenType_DefGroup,
     ClTokenType_VarDef    = ClTokenType_Var   | ClTokenType_DefGroup,

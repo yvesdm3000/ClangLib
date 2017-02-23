@@ -230,6 +230,8 @@ public:
 
     bool LookupTokenDisplayName(const wxString& identifier, const wxString& USR, wxString& out_DisplayName) const;
 
+    bool LookupTokenType(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const;
+
     void GetFileTokens(const ClFileId fId, const int tokenTypeMask, std::vector<ClIndexToken>& out_tokens) const;
 
     void Clear()

@@ -739,10 +739,26 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
     clang_disposeString(filename);
 }
 
-bool debug = false;
-
 static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenType typ, CXClientData client_data)
 {
+    CXString str;
+    CXCompletionString token = clang_getCursorCompletionString(cursor);
+    wxString identifier;
+    int tokenHash = HashToken( token, identifier );
+    str = clang_getCursorUSR( cursor );
+    wxString usr = wxString::FromUTF8( clang_getCString( str ) );
+    clang_disposeString( str );
+    if (usr.Length() == 0)
+    {
+        CXCursor declCursor = clang_getCursorDefinition( cursor );
+        str = clang_getCursorUSR( declCursor );
+        usr = wxString::FromUTF8( clang_getCString( str ) );
+        clang_disposeString( str );
+    }
+    if (typ == 0)
+    {
+        CCLogger::Get()->DebugLog( F(wxT("Unknown token type: %d for token ")+identifier, cursor.kind) );
+    }
     if (typ < ClTokenType_DeclGroup)
     {
         if (clang_isCursorDefinition( cursor ))
@@ -759,12 +775,13 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         }
     }
 
+
     CXSourceLocation loc = clang_getCursorLocation(cursor);
     CXSourceRange tokenRange = clang_getCursorExtent( scopeCursor );
     CXFile clFile;
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
-    CXString str = clang_getFileName(clFile);
+    str = clang_getFileName(clFile);
     wxString filename = wxString::FromUTF8(clang_getCString(str));
     clang_disposeString(str);
     if (filename.IsEmpty())
@@ -775,19 +792,6 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         return;
     }
 
-    CXCompletionString token = clang_getCursorCompletionString(cursor);
-    wxString identifier;
-    int tokenHash = HashToken( token, identifier );
-    str = clang_getCursorUSR( cursor );
-    wxString usr = wxString::FromUTF8( clang_getCString( str ) );
-    clang_disposeString( str );
-    if (usr.Length() == 0)
-    {
-        CXCursor declCursor = clang_getCursorDefinition( cursor );
-        str = clang_getCursorUSR( declCursor );
-        usr = wxString::FromUTF8( clang_getCString( str ) );
-        clang_disposeString( str );
-    }
     if (identifier.IsEmpty())
     {
         if (typ == ClTokenType_FuncDecl)
@@ -822,6 +826,8 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             case CXCursor_CXXMethod:
             case CXCursor_FunctionDecl:
             case CXCursor_FunctionTemplate:
+            case CXCursor_EnumDecl:
+            case CXCursor_EnumConstantDecl:
                 str = clang_getCursorDisplayName(cursorWalk);
                 scopeName = wxString::FromUTF8(clang_getCString(str));
                 clang_disposeString(str);
@@ -833,8 +839,6 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
                 cursorWalk = clang_getNullCursor();
                 break;
             default:
-                if (debug)
-                    CCLogger::Get()->DebugLog( F(wxT("skipping cursor type %d dn=")+displayName+wxT(" sn=")+scopeName, (int)cursorWalk.kind ) );
                 break;
             }
             if (!clang_Cursor_isNull( cursorWalk ))
@@ -845,10 +849,6 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         clang_getSpellingLocation(clang_getRangeEnd(tokenRange), nullptr, &endLine, &endCol, nullptr);
         struct ClAST_VisitorContext* ctx = static_cast<struct ClAST_VisitorContext*>(client_data);
         ClFileId fileId = ctx->database->GetFilenameId(filename);
-        if (debug)
-        {
-            CCLogger::Get()->DebugLog( wxT("inserting ")+identifier+wxT(" ")+usr );
-        }
         if (ctx->unprocessedFileIds.find( fileId ) != ctx->unprocessedFileIds.end())
         {
             ctx->database->RemoveFileTokens(fileId);
@@ -886,19 +886,6 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
  */
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data)
 {
-    bool isTU=false;
-    {
-        CXSourceLocation loc = clang_getCursorLocation(cursor);
-        CXFile clFile;
-        unsigned line = 1, col = 1;
-        clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
-        CXString str = clang_getFileName(clFile);
-        wxString filename = wxString::FromUTF8(clang_getCString(str));
-        clang_disposeString(str);
-        if (filename.Find( wxT("translationunit.cpp") )!= wxNOT_FOUND)
-            isTU=true;
-    }
-
     CXCursor scopeCursor = cursor; // Cursor that points to the scope e.g the { }
     ClTokenType typ = ClTokenType_Unknown;
     CXChildVisitResult ret = CXChildVisit_Break; // should never happen
@@ -922,11 +909,16 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_EnumConstantDecl:
+        typ = ClTokenType_ValueDecl;
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_FunctionDecl:
         typ = ClTokenType_FuncDecl;
         ret = CXChildVisit_Recurse;
+        break;
+    case CXCursor_TypedefDecl:
+        typ = ClTokenType_TypedefDecl;
+        ret = CXChildVisit_Continue;
         break;
     case CXCursor_CompoundStmt:
         switch (parent.kind)
@@ -934,8 +926,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         case CXCursor_FunctionDecl:
             typ = ClTokenType_FuncDef;
             cursor = parent;
-            if (isTU)
-                debug = true;
             break;
         case CXCursor_Namespace:
         case CXCursor_ClassDecl:
@@ -946,7 +936,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
             cursor = parent;
             break;
         default:
-            break;
+            return CXChildVisit_Recurse;
         }
         ret = CXChildVisit_Recurse;
         break;
@@ -956,10 +946,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         break;
     case CXCursor_ParmDecl:
         typ = ClTokenType_ParmDecl;
-        ret = CXChildVisit_Continue;
-        break;
-    case CXCursor_TypedefDecl:
-        //case CXCursor_MacroDefinition: // this can crash Clang on Windows
         ret = CXChildVisit_Continue;
         break;
     case CXCursor_TypeRef:
@@ -985,6 +971,5 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         return CXChildVisit_Recurse;
     }
     ClImportClangToken(cursor, scopeCursor, typ, client_data);
-    debug=false;
     return ret;
 }

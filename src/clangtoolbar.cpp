@@ -186,11 +186,6 @@ void ClangToolbar::OnUpdateSelection( wxCommandEvent& event )
             }
         }
 
-        if (tokScope.tokenName.IsEmpty() )
-        {
-            EnableToolbarTools(false);
-            return;
-        }
         wxString scopeName = tokScope.scopeName;
         if (scopeName.IsEmpty())
         {
@@ -270,7 +265,6 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
                 m_Scope->Append(scope);
             }
         }
-
         UpdateFunctions(selScope);
         m_Scope->Thaw();
     }

@@ -1808,26 +1808,33 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
         wxString scopeName;
         wxString lastScopeIdent;
         wxString lastScopeUSR;
+        ClTokenType scopeTokenType = ClTokenType_Unknown;
 
         for (std::vector<ClIndexToken>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
         {
-            for (std::vector<ClIndexTokenLocation>::const_iterator itLoc = it->locationList.begin(); itLoc != it->locationList.end(); ++itLoc)
+            if (it->tokenTypeMask&(ClTokenType_DeclGroup-1))
             {
-                if (itLoc->fileId == fileId)
+                for (std::vector<ClIndexTokenLocation>::const_iterator itLoc = it->locationList.begin(); itLoc != it->locationList.end(); ++itLoc)
                 {
-                    if (itLoc->tokenType&ClTokenType_DefGroup)
+                    if (itLoc->fileId == fileId)
                     {
                         if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
-                            pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName );
-                        if (std::find( out_Scopes.begin(), out_Scopes.end(), ClTokenScope(it->displayName, scopeName, itLoc->range) ) == out_Scopes.end())
                         {
-                            out_Scopes.push_back( ClTokenScope(it->displayName, scopeName, itLoc->range) );
+                            if (!pTokenIndexDB->LookupTokenType( it->scope.first, fileId, it->scope.second, itLoc->range.beginLocation, scopeTokenType))
+                                scopeTokenType = ClTokenType_Unknown;
+                            if( !pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName ) )
+                                scopeName = wxT("");
+                            lastScopeIdent = it->scope.first;
+                            lastScopeUSR = it->scope.second;
                         }
-                    }
-                    else if (itLoc->tokenType&ClTokenType_DeclGroup)
-                    {
-                        if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
-                            pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName );
+                        if (scopeTokenType == ClTokenType_FuncDef)
+                        {
+                            continue;
+                        }
+                        else if (scopeTokenType == ClTokenType_TypedefDecl)
+                        {
+                            continue;
+                        }
                         if (std::find( out_Scopes.begin(), out_Scopes.end(), ClTokenScope(it->displayName, scopeName, itLoc->range) ) == out_Scopes.end())
                         {
                             out_Scopes.push_back( ClTokenScope(it->displayName, scopeName, itLoc->range) );

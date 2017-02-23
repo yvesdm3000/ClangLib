@@ -651,6 +651,33 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, co
     return false;
 }
 
+bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
+{
+    std::set<int> idList;
+
+    wxMutexLocker locker(m_Mutex);
+
+    m_pIndexTokenMap->GetIdSet( identifier, idList );
+    for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
+    {
+        ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
+        if ((USR.Length() == 0)||(USR == token.USR))
+        {
+            for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
+            {
+                if (it->fileId == fileId)
+                {
+                    if (it->range.InRange( Position ))
+                    {
+                        out_TokenType = it->tokenType;
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
 
 /** @brief Get all tokens linked to a file ID
  *

@@ -91,10 +91,12 @@ void CCLogger::AddToken(const wxString& msg)
 
 void CCLogger::Log(const wxString& msg)
 {
+#ifndef BUILDING_PLUGIN
     if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
     }
+#endif
     if (!m_Parent || m_LogId<1) return;
 #ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_LogId);
@@ -109,10 +111,12 @@ void CCLogger::Log(const wxString& msg)
 
 void CCLogger::DebugLog(const wxString& msg)
 {
-//    if (!m_Parent)
+#ifndef BUILDING_PLUGIN
+    if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
     }
+#endif
     if (!m_Parent || m_DebugLogId<1) return;
 #ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_DebugLogId);
@@ -127,10 +131,12 @@ void CCLogger::DebugLog(const wxString& msg)
 
 void CCLogger::LogError(const wxString& msg)
 {
+#ifndef BUILDING_PLUGIN
     if (!m_Parent)
     {
         std::cout<<msg.c_str()<<std::endl;
     }
+#endif
     if (!m_Parent || m_DebugLogId<1) return;
 #ifdef BUILDING_PLUGIN
     CodeBlocksThreadEvent evt(wxEVT_COMMAND_MENU_SELECTED, m_ErrorLogId);
