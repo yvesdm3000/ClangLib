@@ -204,9 +204,11 @@ void ClTreeMap<int>::Remove(const wxString& key)
 {
     typedef std::multimap<wxString, int>::iterator leafItr;
     std::pair<leafItr, leafItr> rg = m_Root->leaves.equal_range(key);
-    for (leafItr itr = rg.first; itr != rg.second; ++itr)
+    for (leafItr itr = rg.first; itr != rg.second; )
     {
-        m_Root->leaves.erase(itr);
+        leafItr eraseItr = itr;
+        ++itr;
+        m_Root->leaves.erase(eraseItr);
     }
 }
 
