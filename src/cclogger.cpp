@@ -13,10 +13,12 @@
 #include <wx/textfile.h>
 #include <wx/utils.h> // wxNewId
 
+#include <iostream>
+
 #include <logmanager.h> // F()
 #include <globals.h>    // cbC2U for cbAssert macro
 
-std::auto_ptr<CCLogger> CCLogger::s_Inst;
+CCLogger* CCLogger::s_Inst;
 
 bool           g_EnableDebugTrace     = false;
 bool           g_EnableDebugTraceFile = false; // true
@@ -55,14 +57,21 @@ CCLogger::CCLogger() :
     m_ErrorLogId(-1),
     m_AddTokenId(-1)
 {
+    assert(CCLogger::s_Inst == nullptr);
+}
+
+CCLogger::~CCLogger()
+{
+    delete s_Inst;
+    s_Inst = nullptr;
 }
 
 /*static*/ CCLogger* CCLogger::Get()
 {
-    if (!s_Inst.get())
-        s_Inst.reset(new CCLogger);
+    if (s_Inst == nullptr)
+        s_Inst = new CCLogger();
 
-    return s_Inst.get();
+    return s_Inst;
 }
 
 // Initialized from plugin constructor

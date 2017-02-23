@@ -9,8 +9,6 @@
 #include <wx/string.h>
 #include <wx/thread.h>
 
-#include <memory> // auto_ptr
-
 #include <cbexception.h> // cbAssert
 #include <logmanager.h>  // F()
 #include <prep.h>        // nullptr
@@ -46,13 +44,12 @@ public:
 
 protected:
     CCLogger();
-    virtual ~CCLogger()                  { ; }
+    virtual ~CCLogger();
     CCLogger(const CCLogger&)            { ; }
     CCLogger& operator=(const CCLogger&) { return *this; }
 
     // static member variables (instance and critical section for Parser)
-    friend class std::auto_ptr<CCLogger>;
-    static std::auto_ptr<CCLogger> s_Inst;
+    static CCLogger* s_Inst;
 
 private:
     wxEvtHandler* m_Parent;
