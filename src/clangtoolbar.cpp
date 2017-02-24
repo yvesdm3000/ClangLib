@@ -125,27 +125,81 @@ void ClangToolbar::OnEditorClose(CodeBlocksEvent& event)
     event.Skip();
 }
 
+
 void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 {
     event.Skip();
-    if (event.GetEventType() == wxEVT_SCI_UPDATEUI)
+    bool updateLine = false;
+    if (event.GetEventType() == wxEVT_SCI_MODIFIED)
+    {
+        if (event.GetModificationType() & (wxSCI_MOD_INSERTTEXT | wxSCI_MOD_DELETETEXT))
+        {
+            cbStyledTextCtrl* stc = ed->GetControl();
+            const unsigned int line = stc->GetCurrentLine();
+            if (line < m_CurrentState.m_CurrentEditorLine)
+            {
+                for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
+                {
+                    if (it->range.beginLocation.line >= line)
+                    {
+                        it->range.beginLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        if (it->range.beginLocation.line < line)
+                        {
+                            it->range.beginLocation.line = line;
+                        }
+                    }
+                    if (it->range.endLocation.line >= line)
+                    {
+                        it->range.endLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        if (it->range.endLocation.line < line)
+                        {
+                            it->range.endLocation.line = line;
+                        }
+                    }
+                }
+                updateLine = true;
+            }
+            else if (line > m_CurrentState.m_CurrentEditorLine)
+            {
+                for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
+                {
+                    if (it->range.beginLocation.line >= m_CurrentState.m_CurrentEditorLine)
+                    {
+                        it->range.beginLocation.line += line - m_CurrentState.m_CurrentEditorLine;
+                    }
+                    if (it->range.endLocation.line >= m_CurrentState.m_CurrentEditorLine)
+                    {
+                        it->range.endLocation.line += line + m_CurrentState.m_CurrentEditorLine;
+                    }
+                }
+                updateLine = true;
+            }
+        }
+    }
+    else if (event.GetEventType() == wxEVT_SCI_UPDATEUI)
     {
         if (event.GetUpdated() & wxSCI_UPDATE_SELECTION)
         {
             cbStyledTextCtrl* stc = ed->GetControl();
-            const int line = stc->GetCurrentLine();
+            const unsigned int line = stc->GetCurrentLine();
             if (line != m_CurrentState.m_CurrentEditorLine )
             {
-                m_CurrentState.m_CurrentEditorLine = line;
-                if ( (ed->GetLastModificationTime() != m_CurrentState.m_CurrentEditorModificationTime)||(m_Function&&(m_Function->GetCount()==0)))
-                {
-                    wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
-                    AddPendingEvent(evt);
-                }
-                wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
-                AddPendingEvent(evt2);
+                updateLine = true;
             }
         }
+    }
+    if (updateLine)
+    {
+        cbStyledTextCtrl* stc = ed->GetControl();
+        const unsigned int line = stc->GetCurrentLine();
+        m_CurrentState.m_CurrentEditorLine = line;
+        if ( (ed->GetLastModificationTime() != m_CurrentState.m_CurrentEditorModificationTime)||(m_Function&&(m_Function->GetCount()==0)))
+        {
+            wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
+            AddPendingEvent(evt);
+        }
+        wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
+        AddPendingEvent(evt2);
     }
 }
 

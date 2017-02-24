@@ -44,7 +44,7 @@ private:
     struct CurrentState{
         ClTranslUnitId m_TranslUnitId;
         std::vector<ClTokenScope> m_TokenScopes;
-        int m_CurrentEditorLine;
+        unsigned int m_CurrentEditorLine;
         wxDateTime m_CurrentEditorModificationTime;
         CurrentState() : m_TranslUnitId(-1), m_TokenScopes(), m_CurrentEditorLine(-1), m_CurrentEditorModificationTime() {}
     } m_CurrentState;
