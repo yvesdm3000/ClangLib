@@ -1791,6 +1791,7 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
             }
             ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( file.GetFilename() );
             m_TranslUnits[translUnitId].GetTokenScopes(fId, tokenMask, out_Scopes);
+
         }
         if (!out_Scopes.empty())
         {
@@ -1803,7 +1804,6 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
         ClFileId fileId = pTokenIndexDB->GetFilenameId( file.GetFilename() );
         std::vector<ClIndexToken> tokens;
         pTokenIndexDB->GetFileTokens( fileId, tokenMask, tokens );
-        CCLogger::Get()->DebugLog( F(wxT("Found %d tokens matching one of 0x%x in indexdb for file %d ")+file.GetFilename()+wxT(" proj=")+file.GetProject(), (int)tokens.size(), (int)tokenMask, (int)fileId) );
 
         wxString scopeName;
         wxString lastScopeIdent;
@@ -1821,7 +1821,9 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
                         if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
                         {
                             if (!pTokenIndexDB->LookupTokenType( it->scope.first, fileId, it->scope.second, itLoc->range.beginLocation, scopeTokenType))
+                            {
                                 scopeTokenType = ClTokenType_Unknown;
+                            }
                             if( !pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName ) )
                                 scopeName = wxT("");
                             lastScopeIdent = it->scope.first;

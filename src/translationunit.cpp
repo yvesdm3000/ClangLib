@@ -811,10 +811,10 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             displayName = identifier;
         }
 
-        wxString scopeName;
+        wxString scopeIdentifier;
         wxString scopeUSR;
         CXCursor cursorWalk = clang_getCursorSemanticParent(cursor);
-        while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeName.IsEmpty()) )
+        while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeIdentifier.IsEmpty()) )
         {
             switch (cursorWalk.kind)
             {
@@ -828,9 +828,10 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             case CXCursor_FunctionTemplate:
             case CXCursor_EnumDecl:
             case CXCursor_EnumConstantDecl:
-                str = clang_getCursorDisplayName(cursorWalk);
-                scopeName = wxString::FromUTF8(clang_getCString(str));
-                clang_disposeString(str);
+                {
+                    CXCompletionString token = clang_getCursorCompletionString(cursorWalk);
+                    HashToken( token, scopeIdentifier );
+                }
                 str = clang_getCursorUSR( cursorWalk );
                 scopeUSR = wxString::FromUTF8( clang_getCString( str ) );
                 clang_disposeString( str );
@@ -871,7 +872,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             }
             clang_disposeOverriddenCursors(cursorList);
         }
-        tok.scope = std::make_pair(scopeName,scopeUSR);
+        tok.scope = std::make_pair(scopeIdentifier,scopeUSR);
 
         ctx->database->InsertToken(tok);
         ctx->tokenCount++;
@@ -924,6 +925,11 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         switch (parent.kind)
         {
         case CXCursor_FunctionDecl:
+        case CXCursor_CXXMethod:
+        case CXCursor_Constructor:
+        case CXCursor_Destructor:
+        case CXCursor_ConversionFunction:
+        case CXCursor_FunctionTemplate:
             typ = ClTokenType_FuncDef;
             cursor = parent;
             break;
@@ -931,7 +937,6 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         case CXCursor_ClassDecl:
         case CXCursor_ClassTemplate:
         case CXCursor_ClassTemplatePartialSpecialization:
-        case CXCursor_CXXMethod:
             typ = ClTokenType_ScopeDef;
             cursor = parent;
             break;

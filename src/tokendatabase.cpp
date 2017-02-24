@@ -654,7 +654,8 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, co
 bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
 {
     std::set<int> idList;
-
+    if (identifier.IsEmpty())
+        return false;
     wxMutexLocker locker(m_Mutex);
 
     m_pIndexTokenMap->GetIdSet( identifier, idList );

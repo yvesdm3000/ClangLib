@@ -125,7 +125,6 @@ void ClangToolbar::OnEditorClose(CodeBlocksEvent& event)
     event.Skip();
 }
 
-
 void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
 {
     event.Skip();
@@ -140,20 +139,20 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
-                    if (it->range.beginLocation.line >= line)
+                    if (it->range.beginLocation.line >= line + 1)
                     {
                         it->range.beginLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
-                        if (it->range.beginLocation.line < line)
+                        if (it->range.beginLocation.line < line + 1)
                         {
-                            it->range.beginLocation.line = line;
+                            it->range.beginLocation.line = line + 1;
                         }
                     }
-                    if (it->range.endLocation.line >= line)
+                    if (it->range.endLocation.line >= line + 1)
                     {
                         it->range.endLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
-                        if (it->range.endLocation.line < line)
+                        if (it->range.endLocation.line < line + 1)
                         {
-                            it->range.endLocation.line = line;
+                            it->range.endLocation.line = line + 1;
                         }
                     }
                 }
@@ -163,13 +162,13 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
-                    if (it->range.beginLocation.line >= m_CurrentState.m_CurrentEditorLine)
+                    if (it->range.beginLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
                     {
                         it->range.beginLocation.line += line - m_CurrentState.m_CurrentEditorLine;
                     }
-                    if (it->range.endLocation.line >= m_CurrentState.m_CurrentEditorLine)
+                    if (it->range.endLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
                     {
-                        it->range.endLocation.line += line + m_CurrentState.m_CurrentEditorLine;
+                        it->range.endLocation.line += line - m_CurrentState.m_CurrentEditorLine;
                     }
                 }
                 updateLine = true;
