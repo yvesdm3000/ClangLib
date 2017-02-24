@@ -148,6 +148,12 @@ void ClangDiagnostics::OnGotoPrevDiagnostic(wxCommandEvent& WXUNUSED(event))
 }
 
 // Code::Blocks events
+/** @brief Event handler for when an editor has been activated
+ *
+ * @param event CodeBlocksEvent&
+ * @return void
+ *
+ */
 void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
 {
     event.Skip();
@@ -184,6 +190,12 @@ void ClangDiagnostics::OnEditorActivate(CodeBlocksEvent& event)
     m_Diagnostics.clear();
 }
 
+/** @brief Event handler for when an editor has been closed
+ *
+ * @param event CodeBlocksEvent&
+ * @return void
+ *
+ */
 void ClangDiagnostics::OnEditorClose(CodeBlocksEvent& event)
 {
     event.Skip();
@@ -193,6 +205,13 @@ void ClangDiagnostics::OnEditorClose(CodeBlocksEvent& event)
     m_TranslUnitId = -1;
 }
 
+/** @brief Event handler for when the user has clicked in the editor margin
+ *
+ * @param ed cbEditor*
+ * @param event wxScintillaEvent&
+ * @return void
+ *
+ */
 void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
 {
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
@@ -226,6 +245,14 @@ void ClangDiagnostics::OnMarginClicked(cbEditor* ed, wxScintillaEvent& event )
     }
 }
 
+/** @brief Perform fix-its on the specified line
+ *
+ * @param stc cbStyledTextCtrl*
+ * @param line unsigned int
+ * @param fixitList const std::vector<ClDiagnosticFixit>&
+ * @return bool
+ *
+ */
 bool ClangDiagnostics::HandleFixits(cbStyledTextCtrl* stc, unsigned int line, const std::vector<ClDiagnosticFixit>& fixitList ) const
 {
     if (fixitList.size() == 0)
@@ -251,6 +278,12 @@ bool ClangDiagnostics::HandleFixits(cbStyledTextCtrl* stc, unsigned int line, co
 }
 
 
+/** @brief Event handler for when some diagnostics are updated
+ *
+ * @param event ClangEvent&
+ * @return void
+ *
+ */
 void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
 {
     event.Skip();
@@ -413,6 +446,11 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
     }
 }
 
+/** @brief Return the current translation unit id
+ *
+ * @return ClTranslUnitId
+ *
+ */
 ClTranslUnitId ClangDiagnostics::GetCurrentTranslationUnitId()
 {
     if (m_TranslUnitId == wxNOT_FOUND)

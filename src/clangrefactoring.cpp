@@ -112,9 +112,9 @@ void ClangRefactoring::OnEditorActivate(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed)
     {
-        wxString fn = ed->GetFilename();
+        ClangFile file(ed->GetProjectFile(), ed->GetFilename());
 
-        ClTranslUnitId id = m_pClangPlugin->GetTranslationUnitId(fn);
+        ClTranslUnitId id = m_pClangPlugin->GetTranslationUnitId(file);
         m_TranslUnitId = id;
         cbStyledTextCtrl* stc = ed->GetControl();
         const int theIndicator = 16;
@@ -190,8 +190,9 @@ ClTranslUnitId ClangRefactoring::GetCurrentTranslationUnitId()
         cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
         if (!ed)
             return wxNOT_FOUND;
-        wxString filename = ed->GetFilename();
-        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( filename );
+        ClangFile file(ed->GetProjectFile(), ed->GetFilename());
+
+        m_TranslUnitId = m_pClangPlugin->GetTranslationUnitId( file );
     }
     return m_TranslUnitId;
 }
@@ -223,8 +224,9 @@ void ClangRefactoring::BeginHighlightOccurrences(cbEditor* ed)
 
     const int line = stc->LineFromPosition(pos);
     ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
+    ClangFile file(ed->GetProjectFile(), ed->GetFilename());
 
-    m_pClangPlugin->RequestOccurrencesOf( translId,  ed->GetFilename(), loc );
+    m_pClangPlugin->RequestOccurrencesOf( translId, file, loc );
 }
 
 void ClangRefactoring::OnRequestOccurrencesFinished(ClangEvent& event)
@@ -361,9 +363,6 @@ void ClangRefactoring::BuildModuleMenu(const ModuleType type, wxMenu* menu,
         if (!word.Strip().IsEmpty())
             item->Enable(true);
     }
-
-
-
 }
 
 void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
