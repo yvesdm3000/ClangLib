@@ -194,7 +194,7 @@ public:
                 OutputIndent( indent );
                 std::cout<<"    TokenType:        "<<it->tokenType<<std::endl;
                 OutputIndent( indent );
-                std::cout<<"    Range:            "<<it->range.beginLocation.line<<", "<<it->range.beginLocation.column<<" - "<<it->range.endLocation.line<<", "<<it->range.endLocation.column<<std::endl;
+                std::cout<<"    Range:            "<<std::dec<<it->range.beginLocation.line<<", "<<it->range.beginLocation.column<<" - "<<it->range.endLocation.line<<", "<<it->range.endLocation.column<<std::endl;
                 OutputIndent( indent );
                 std::cout<<"    File:             "<<g_FilenameDatabase.GetFilename( it->fileId ).utf8_str()<<std::endl;
             }
