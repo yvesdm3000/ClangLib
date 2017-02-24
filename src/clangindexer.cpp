@@ -30,7 +30,10 @@ ClangIndexer::~ClangIndexer()
 }
 
 const wxString ClangIndexer::SettingName = _T("/indexer");
+
 static const wxString IndexingDefault = _T("project");
+
+
 void ClangIndexer::OnAttach(IClangPlugin* pClangPlugin)
 {
     ClangPluginComponent::OnAttach(pClangPlugin);
@@ -44,6 +47,12 @@ void ClangIndexer::OnAttach(IClangPlugin* pClangPlugin)
     pClangPlugin->RegisterEventSink(clEVT_REINDEXFILE_FINISHED, new ClIndexerEvent(this, &ClangIndexer::OnReindexFileFinished));
 }
 
+/** @brief Overloaded method that is called when this component (or plugin) is released
+ *
+ * @param pClangPlugin IClangPlugin*
+ * @return void
+ *
+ */
 void ClangIndexer::OnRelease(IClangPlugin* pClangPlugin)
 {
     pClangPlugin->RemoveAllEventSinksFor(this);
@@ -51,6 +60,12 @@ void ClangIndexer::OnRelease(IClangPlugin* pClangPlugin)
     ClangPluginComponent::OnRelease(pClangPlugin);
 }
 
+/** @brief Event handler for the event that a project has been opened
+ *
+ * @param evt CodeBlocksEvent&
+ * @return void
+ *
+ */
 void ClangIndexer::OnProjectOpen(CodeBlocksEvent& evt)
 {
     evt.Skip();
@@ -74,6 +89,12 @@ void ClangIndexer::OnProjectOpen(CodeBlocksEvent& evt)
     }
 }
 
+/** @brief Event handler for the event that a file is opened in the editor
+ *
+ * @param event CodeBlocksEvent&
+ * @return void
+ *
+ */
 void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
 {
     if (!Manager::Get()->IsAppStartedUp())
@@ -115,6 +136,12 @@ void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
     }
 }
 
+/** @brief Event handler for when the file in the editor has been saved
+ *
+ * @param evt CodeBlocksEvent&
+ * @return void
+ *
+ */
 void ClangIndexer::OnEditorSave(CodeBlocksEvent& evt)
 {
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
@@ -125,6 +152,12 @@ void ClangIndexer::OnEditorSave(CodeBlocksEvent& evt)
         m_pClangPlugin->BeginReindexFile( ed->GetFilename() );
 }
 
+/** @brief Event handler for when the reindexing of a file was finished
+ *
+ * @param evt ClangEvent&
+ * @return void
+ *
+ */
 void ClangIndexer::OnReindexFileFinished(ClangEvent& evt)
 {
     if (m_StagingFiles.find( evt.GetFile() ) == m_StagingFiles.end())

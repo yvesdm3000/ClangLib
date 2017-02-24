@@ -76,7 +76,6 @@ void ClangCodeCompletion::OnEditorActivate(CodeBlocksEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed)
     {
-        wxString fn = ed->GetFilename();
         ClangFile file(ed->GetFilename());
         if (ed->GetProjectFile())
         {
@@ -318,7 +317,9 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
         {
             timeout = 100;
         }
-        if (wxCOND_TIMEOUT == m_pClangPlugin->GetCodeCompletionAt(translUnitId, ed->GetFilename(), loc, timeout, options, tknResults))
+        ClangFile file(ed->GetProjectFile(), ed->GetFilename());
+
+        if (wxCOND_TIMEOUT == m_pClangPlugin->GetCodeCompletionAt(translUnitId, file, loc, timeout, options, tknResults))
         {
             m_CCOutstandingLoc = loc;
             return tokens;
@@ -531,7 +532,9 @@ wxString ClangCodeCompletion::GetDocumentation(const cbCodeCompletionPlugin::CCT
     cbEditor* ed = edMgr->GetBuiltinActiveEditor();
     if (ed)
     {
-        return m_pClangPlugin->GetCodeCompletionTokenDocumentation(m_TranslUnitId, ed->GetFilename(), ClTokenPosition(0,0), token.id);
+        ClangFile file(ed->GetProjectFile(), ed->GetFilename());
+
+        return m_pClangPlugin->GetCodeCompletionTokenDocumentation(m_TranslUnitId, file, ClTokenPosition(0,0), token.id);
     }
     return wxEmptyString;
 }
