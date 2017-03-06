@@ -1097,9 +1097,11 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
     {
         Manager::Get()->GetProjectManager()->FindProjectForFile( filename, &pf, false, false );
     }
+    cbProject* proj = (pf ? pf->GetParentProject() : nullptr);
     if (pf)
     {
-        target = pf->GetParentProject()->GetBuildTarget( pf->GetParentProject()->GetActiveBuildTarget() );
+        if (proj)
+            target = proj->GetBuildTarget( proj->GetActiveBuildTarget() );
         if (target && (m_ProjectSettingsMap.find( target ) != m_ProjectSettingsMap.end())&&(m_ProjectSettingsMap[target].compileCommandSource == ProjectSetting::CompileCommandSource_jsonFile) )
         {
             m_UpdateCompileCommand--;
@@ -1108,9 +1110,9 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             CXCompilationDatabase db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
             if (!db)
             {
-                if (pf->GetParentProject())
+                if (proj)
                 {
-                    path = pf->GetParentProject()->GetCommonTopLevelPath();
+                    path = proj->GetCommonTopLevelPath();
                     db = clang_CompilationDatabase_fromDirectory(path.utf8_str(), &err);
                 }
             }
@@ -1152,38 +1154,46 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             }
             return compileCommand;
         }
-        if (pf->GetParentProject() && !pf->GetBuildTargets().IsEmpty())
+        if (proj && !pf->GetBuildTargets().IsEmpty())
         {
-            target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
-            comp = CompilerFactory::GetCompiler(target->GetCompilerID());
+            target = proj->GetBuildTarget(pf->GetBuildTargets()[0]);
+            if (target)
+                comp = CompilerFactory::GetCompiler(target->GetCompilerID());
         }
-
     }
-    cbProject* proj = (pf ? pf->GetParentProject() : nullptr);
-    if (!comp && proj)
+    if ( (!comp) && proj)
         comp = CompilerFactory::GetCompiler(proj->GetCompilerID());
     if (!comp)
     {
         cbProject* tmpPrj = Manager::Get()->GetProjectManager()->GetActiveProject();
         if (tmpPrj)
             comp = CompilerFactory::GetCompiler(tmpPrj->GetCompilerID());
+        if (!proj)
+            proj = tmpPrj;
     }
     if (!comp)
+    {
         comp = CompilerFactory::GetDefaultCompiler();
+        if (!proj)
+        {
+            proj = Manager::Get()->GetProjectManager()->GetActiveProject();
+        }
+    }
 
     wxString compileCommandStr;
-    if (pf && (!pf->GetBuildTargets().IsEmpty()) )
+    if (pf && proj && (!pf->GetBuildTargets().IsEmpty()) )
     {
-        target = pf->GetParentProject()->GetBuildTarget(pf->GetBuildTargets()[0]);
+        target = proj->GetBuildTarget(pf->GetBuildTargets()[0]);
 
         if (pf->GetUseCustomBuildCommand(target->GetCompilerID() ))
             compileCommandStr = pf->GetCustomBuildCommand(target->GetCompilerID()).AfterFirst(wxT(' '));
-
     }
 
     if (compileCommandStr.IsEmpty())
         compileCommandStr = wxT("$options $includes");
-    CompilerCommandGenerator* gen = comp->GetCommandGenerator(proj);
+    CompilerCommandGenerator* gen = NULL;
+    if (proj)
+        gen = comp->GetCommandGenerator(proj);
     if (gen)
         gen->GenerateCommandLine(compileCommandStr, target, pf, filename,
                                  g_InvalidStr, g_InvalidStr, g_InvalidStr );
