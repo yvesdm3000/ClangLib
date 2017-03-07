@@ -194,7 +194,7 @@ public:
         CreateTranslationUnitJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<wxString>& commands, const std::map<wxString, wxString>& unsavedFiles ) :
             EventJob(CreateTranslationUnitType, evtType, evtId),
             m_File(file),
-            m_CompileCommand(DeepCopy(commands)),
+            m_CompileCommand(commands),
             m_TranslationUnitId(-1),
             m_UnsavedFiles(unsavedFiles)
         {
@@ -221,7 +221,7 @@ public:
         {
             return m_File;
         }
-    protected:
+    private:
         /** @brief Copy constructor
          *
          * @param other To copy from
@@ -231,7 +231,7 @@ public:
         CreateTranslationUnitJob(const CreateTranslationUnitJob& other):
             EventJob(other),
             m_File(other.m_File),
-            m_CompileCommand(other.m_CompileCommand),
+            m_CompileCommand(DeepCopy(other.m_CompileCommand)),
             m_TranslationUnitId(other.m_TranslationUnitId),
             m_UnsavedFiles()
         {
@@ -272,7 +272,7 @@ public:
         {
             clangproxy.RemoveTranslationUnit(m_TranslUnitId);
         }
-    protected:
+    private:
         /** @brief Copy constructor
          *
          * @param other To copy from
@@ -301,7 +301,7 @@ public:
             : EventJob(ReparseType, evtType, evtId),
               m_TranslId(translId),
               m_UnsavedFiles(unsavedFiles),
-              m_CompileCommand(DeepCopy(compileCommand)),
+              m_CompileCommand(compileCommand),
               m_File(file),
               m_Parents(parents)
         {
@@ -330,7 +330,7 @@ public:
             : EventJob(other),
               m_TranslId(other.m_TranslId),
               m_UnsavedFiles(),
-              m_CompileCommand(other.m_CompileCommand),
+              m_CompileCommand(DeepCopy(other.m_CompileCommand)),
               m_File(other.m_File),
               m_Parents(other.m_Parents)
         {
@@ -572,8 +572,8 @@ public:
             m_File(other.m_File),
             m_Position(other.m_Position),
             m_Locations(other.m_Locations),
-            m_TokenIdentifier(other.m_TokenIdentifier),
-            m_TokenUSR(other.m_TokenUSR)
+            m_TokenIdentifier(other.m_TokenIdentifier.c_str()),
+            m_TokenUSR(other.m_TokenUSR.c_str())
         {
         }
     protected:
@@ -647,7 +647,7 @@ public:
                 CCLogger::Get()->DebugLog( F(wxT("Found %d definitions"), (int)m_Locations.size()) );
             }
         }
-    protected:
+    private:
         /** @brief Copy constructor
          *
          * @param other To copy from
@@ -656,8 +656,12 @@ public:
          */
         LookupDefinitionInFilesJob( const LookupDefinitionInFilesJob& other ) :
             LookupDefinitionJob(other),
-            m_fileAndCompileCommands(other.m_fileAndCompileCommands)
+            m_fileAndCompileCommands()
         {
+            for( std::vector<std::pair<wxString, std::vector<wxString> > >::const_iterator it = other.m_fileAndCompileCommands.begin(); it != other.m_fileAndCompileCommands.end(); ++it )
+            {
+                m_fileAndCompileCommands.push_back( std::make_pair( it->first.c_str(), DeepCopy( it->second ) ) );
+            }
         }
     private:
         std::vector< std::pair<wxString,std::vector<wxString> > > m_fileAndCompileCommands;
@@ -825,7 +829,7 @@ public:
         {
             return m_Diagnostics;
         }
-    protected:
+    private:
         /** @brief Copy constructor
          *
          * @param other To copy from
@@ -1105,7 +1109,7 @@ public:
         ReindexFileJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<wxString>& commands ):
             EventJob(ReindexFileType, evtType, evtId),
             m_File(file),
-            m_CompileCommand(DeepCopy(commands)) {}
+            m_CompileCommand(commands) {}
         ClangJob* Clone() const
         {
             ReindexFileJob* pJob = new ReindexFileJob(*this);
@@ -1121,7 +1125,7 @@ public:
         ReindexFileJob( const ReindexFileJob& other) :
             EventJob(other),
             m_File(other.m_File),
-            m_CompileCommand(other.m_CompileCommand){}
+            m_CompileCommand(DeepCopy(other.m_CompileCommand)){}
         ClangFile m_File;
         std::vector<wxString> m_CompileCommand;
     };

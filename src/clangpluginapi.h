@@ -149,7 +149,8 @@ struct ClDiagnosticFixit
 {
     ClDiagnosticFixit(const wxString& txt, const unsigned rgStart, const unsigned rgEnd, const wxString& srcLn) :
         text(txt), range(rgStart,rgEnd), srcLine(srcLn){}
-
+    /** @brief Deep copy constructor */
+    ClDiagnosticFixit(const ClDiagnosticFixit& other) : text(other.text.c_str()), range(other.range), srcLine(other.srcLine.c_str()) {}
     wxString text;                      ///< Text to insert to Fix It
     std::pair<unsigned,unsigned> range; ///< Range where the fixit applies
     wxString srcLine;                   ///< Copy of the source line of the fixit.
@@ -160,6 +161,8 @@ struct ClDiagnostic
     ClDiagnostic(const int ln, const unsigned rgStart, const unsigned rgEnd, const ClDiagnosticSeverity level, const wxString& fl, const wxString& msg, const std::vector<ClDiagnosticFixit> fixitL) :
         line(ln), range(rgStart, rgEnd), severity(level), file(fl), message(msg), fixitList(fixitL) {}
 
+    /** @brief Deep copy constructor */
+    ClDiagnostic(const ClDiagnostic& other) : line(other.line), range(other.range), severity(other.severity), file(other.file.c_str()), message(other.message.c_str()), fixitList(other.fixitList){}
     int line;
     std::pair<unsigned, unsigned> range;
     ClDiagnosticSeverity severity;
@@ -240,9 +243,10 @@ public:
     }
 
     ClangFile(const ClangFile& project, const wxString& filename) :
-        m_Project(project.m_Project.c_str()),
-        m_Filename(filename.c_str()){}
+        m_Project(project.m_Project),
+        m_Filename(filename){}
 
+    /** @brief Deep copy constructor */
     ClangFile(const ClangFile& Other) :
         m_Project(Other.m_Project.c_str()),
         m_Filename(Other.m_Filename.c_str()){}
