@@ -219,7 +219,8 @@ void ClangRefactoring::BeginHighlightOccurrences(cbEditor* ed)
     // clear all style indications set in a previous run (is also done once after text gets unselected)
     stc->IndicatorClearRange(0, stc->GetLength());
 
-    if (stc->GetTextRange(pos - 1, pos + 1).Strip().IsEmpty())
+    int max_length =  std::min(pos + 1 ,stc->GetLength());
+    if (stc->GetTextRange(pos - 1, max_length).Strip().IsEmpty())
         return;
 
     const int line = stc->LineFromPosition(pos);
