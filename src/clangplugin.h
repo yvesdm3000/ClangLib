@@ -86,7 +86,7 @@ private:
      * @param compId The id of the compiler
      * @return Include search flags pointing to said locations
      */
-    void AddCompilerInclDirs(const wxString& compId, std::vector<wxString>& inout_CompileCommands);
+    void AddCompilerInclDirs(const wxString& compId, std::vector<std::string>& inout_CompileCommands);
 
 #if 0
     /**
@@ -168,7 +168,7 @@ private:
 
 private: // Internal utility functions
     // Builds compile command
-    std::vector<wxString> GetCompileCommand(ProjectFile* pf, const wxString& filename);
+    std::vector<std::string> GetCompileCommand(ProjectFile* pf, const wxString& filename);
     int UpdateCompileCommand(cbEditor* ed);
 
     void RequestReparse(int delayMilliseconds = 0);
@@ -234,7 +234,7 @@ private: // Members
     int m_LastCallTipPos;
     std::vector<wxStringVec> m_LastCallTips;
 
-    std::vector<wxString> m_CompileCommand;
+    std::vector<std::string> m_CompileCommand;
     int m_UpdateCompileCommand;
     int m_ReparseNeeded;
     ClTranslUnitId m_ReparsingTranslUnitId;

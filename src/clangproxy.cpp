@@ -636,7 +636,7 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
     { // Scope for TU
         ClTranslationUnit tu(database, 127, clangIndex);
         ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(m_File.GetFilename());
-        std::vector<wxCharBuffer> argsBuffer;
+        std::vector<std::string> argsBuffer;
         std::vector<const char*> args;
         clangproxy.BuildCompileArgs( m_File.GetFilename(), m_CompileCommand, argsBuffer, args );
         const std::map<wxString, wxString> unsavedFiles; // No unsaved files for reindex...
@@ -706,14 +706,14 @@ ClangProxy::~ClangProxy()
  *
  * This call will choose either a free slot of translation units or free one if all slots are occupied. It then parses the translation unit and when that is successfull, assign it a slot.
  */
-void ClangProxy::CreateTranslationUnit(const ClangFile& file, const std::vector<wxString>& compileCommand, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
+void ClangProxy::CreateTranslationUnit(const ClangFile& file, const std::vector<std::string>& compileCommand, const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId)
 {
     if (file.GetFilename().Length() == 0)
     {
         CCLogger::Get()->DebugLog( wxT("Cannot create TU from file '")+file.GetFilename()+wxT("'") );
         return;
     }
-    std::vector<wxCharBuffer> argsBuffer;
+    std::vector<std::string> argsBuffer;
     std::vector<const char*> args;
     ClTokenIndexDatabase* db = GetTokenIndexDatabase( file.GetProject() );
     if (!db)
@@ -1858,7 +1858,7 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const ClangFi
  * @return void
  *
  */
-void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const std::vector<wxString>& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
+void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const std::vector<std::string>& /*compileCommand*/, const std::map<wxString, wxString>& unsavedFiles )
 {
     if (translUnitId < 0 )
         return;
@@ -1961,28 +1961,29 @@ void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
     return;
 }
 
-void ClangProxy::BuildCompileArgs(const wxString& filename, const std::vector<wxString>& compileCommand, std::vector<wxCharBuffer>& out_argsBuffer, std::vector<const char*>& out_args) const
+void ClangProxy::BuildCompileArgs(const wxString& filename, const std::vector<std::string>& compileCommand, std::vector<std::string>& out_argsBuffer, std::vector<const char*>& out_args) const
 {
-    std::vector<wxString> cCommand = compileCommand;
-    cCommand.push_back( wxT("-ferror-limit=0") );
+    std::vector<std::string> cCommand = compileCommand;
+    cCommand.push_back( "-ferror-limit=0" );
     //wxString cmd = commands + wxT(" -ferror-limit=0");
     if (!filename.EndsWith(wxT(".c"))) // force language reduces chance of error on STL headers
     {
-        cCommand.push_back(wxT("-x"));
-        cCommand.push_back(wxT("c++"));
+        cCommand.push_back("-x");
+        cCommand.push_back("c++");
     }
-    std::vector<wxString> unknownOptions;
-    unknownOptions.push_back(wxT("-Wno-unused-local-typedefs"));
-    unknownOptions.push_back(wxT("-Wzero-as-null-pointer-constant"));
+    std::vector<std::string> unknownOptions;
+    unknownOptions.push_back("-Wno-unused-local-typedefs");
+    unknownOptions.push_back("-Wzero-as-null-pointer-constant");
     std::sort(unknownOptions.begin(), unknownOptions.end());
-    for (std::vector<wxString>::iterator it = cCommand.begin(); it != cCommand.end(); ++it)
+    for (std::vector<std::string>::iterator it = cCommand.begin(); it != cCommand.end(); ++it)
     {
-        wxString compilerSwitch = *it;
-        compilerSwitch.Replace(wxT("\""), wxT(""), true);
+        std::string compilerSwitch = *it;
+        //compilerSwitch.erase( std::remove(compilerSwitch.begin(),compilerSwitch.end(), '\"'), compileCommand.end() );
+        //compilerSwitch.Replace(wxT("\""), wxT(""), true);
         if (std::binary_search(unknownOptions.begin(), unknownOptions.end(), compilerSwitch))
             continue;
-        out_argsBuffer.push_back(compilerSwitch.ToUTF8());
-        out_args.push_back(out_argsBuffer.back().data());
+        out_argsBuffer.push_back(compilerSwitch);
+        out_args.push_back( out_argsBuffer.back().data() );
     }
 }
 

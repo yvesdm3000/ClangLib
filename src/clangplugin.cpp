@@ -893,14 +893,15 @@ void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
     }
 }
 
-void ClangPlugin::AddCompilerInclDirs(const wxString& compId, std::vector<wxString>& inout_CompileCommands)
+void ClangPlugin::AddCompilerInclDirs(const wxString& compId, std::vector<std::string>& inout_CompileCommands)
 {
     std::map<wxString, std::vector<wxString> >::const_iterator idItr = m_compInclDirs.find(compId);
     if (idItr != m_compInclDirs.end())
     {
         for (std::vector<wxString>::const_iterator it = idItr->second.begin(); it != idItr->second.end(); ++it)
         {
-            inout_CompileCommands.push_back( wxT("-I\"")+*it+wxT("\"") );
+            wxString cmd = wxT("-I")+*it;
+            inout_CompileCommands.push_back( cmd.ToUTF8().data() );
         }
         return;
     }
@@ -934,12 +935,13 @@ void ClangPlugin::AddCompilerInclDirs(const wxString& compId, std::vector<wxStri
     {
         if (errItr->IsSameAs(wxT("End of search list.")))
             break;
-        includeDirs.push_back(errItr->Strip(wxString::both));
-        //includeDirs += wxT(" -I\"") + errItr->Strip(wxString::both)+wxT("\"");
-        inout_CompileCommands.push_back(wxT("-I\"") + errItr->Strip(wxString::both)+wxT("\""));
+        wxString dir = errItr->Strip(wxString::both);
+        dir.Replace(wxT("\""), wxT(""), true);
+        includeDirs.push_back(dir);
+        wxString cmd = wxT("-I")+dir+wxT("\"");
+        inout_CompileCommands.push_back(cmd.ToUTF8().data());
     }
     m_compInclDirs.insert(std::pair<wxString, std::vector<wxString> >(compId, includeDirs));
-    //return m_compInclDirs.insert(std::pair<wxString, wxString>(compId, includeDirs)).first->second;
 }
 #if 0
 wxString ClangPlugin::GetSourceOf(cbEditor* ed)
@@ -1079,16 +1081,16 @@ bool ClangPlugin::IsSourceOf(const wxFileName& candidateFile,
 }
 #endif
 
-std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filename)
+std::vector<std::string> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxString& filename)
 {
-    std::vector<wxString> compileCommand;
+    std::vector<std::string> compileCommand;
     m_UpdateCompileCommand++;
     if (m_UpdateCompileCommand > 1)
     {
         CCLogger::Get()->DebugLog( wxT("GetCompileCommand: skipping re-entry") );
         // Re-entry is not allowed
         m_UpdateCompileCommand--;
-        return std::vector<wxString>();
+        return std::vector<std::string>();
     }
     ProjectBuildTarget* target = nullptr;
     Compiler* comp = nullptr;
@@ -1119,13 +1121,13 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             if (!db)
             {
                 Manager::Get()->GetLogManager()->LogError( wxT("Compilation database \"compile_commands.json\" not found in path \"")+path+wxT("\"") );
-                return compileCommand;
+                return std::vector<std::string>();
             }
             CXCompileCommands lst = clang_CompilationDatabase_getCompileCommands(db, filename.utf8_str());
             if (clang_CompileCommands_getSize(lst) < 1)
             {
                 Manager::Get()->GetLogManager()->LogError( wxT("Lookup of the compile command for ")+filename+wxT(" failed") );
-                return compileCommand;
+                return std::vector<std::string>();
             }
             CXCompileCommand cmd = clang_CompileCommands_getCommand(lst,0);
             for (unsigned i = 1; i<clang_CompileCommand_getNumArgs(cmd); ++i)
@@ -1149,7 +1151,7 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
                     continue;
                 }
                 cmd.Replace(wxT("\""), wxT(""), true);
-                compileCommand.push_back( cmd);
+                compileCommand.push_back( cmd.ToUTF8().data() );
 
             }
             return compileCommand;
@@ -1218,27 +1220,26 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             }
             wxFileName path(pathStr);
             if (path.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE))
-                flag = wxT("-I\"") + path.GetFullPath()+wxT("\"");
+                flag = wxT("-I") + path.GetFullPath();
         }
-        //compileCommand += flag + wxT(" ");
-        compileCommand.push_back(flag);
+        compileCommand.push_back(flag.ToUTF8().data());
     }
     AddCompilerInclDirs(comp->GetID(), compileCommand);
 
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
 
     if (cfg->ReadBool( _T("/cmdoption_wnoattributes") ))
-        compileCommand.push_back( wxT("-Wno-attributes ") );
+        compileCommand.push_back( "-Wno-attributes " );
     else
-        compileCommand.push_back( wxT("-Wattributes ") );
+        compileCommand.push_back( "-Wattributes " );
 
     if (cfg->ReadBool( _T("/cmdoption_wextratokens") ))
-        compileCommand.push_back( wxT("-Wextra-tokens ") );
+        compileCommand.push_back( "-Wextra-tokens " );
     else
-        compileCommand.push_back( wxT("-Wno-extra-tokens ") );
+        compileCommand.push_back( "-Wno-extra-tokens " );
 
     if (cfg->ReadBool( _T("/cmdoption_fparseallcomments") ))
-        compileCommand.push_back( wxT("-fparse-all-comments ") );
+        compileCommand.push_back( "-fparse-all-comments " );
 
     wxString extraOptions = cfg->Read(_T("/cmdoption_extra"));
     if (extraOptions.length() > 0)
@@ -1250,7 +1251,7 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
             wxString opt = extraTokenizer.NextToken();
             opt.Trim(wxString::both);
             if (opt.Length() > 0)
-                compileCommand.push_back( opt );
+                compileCommand.push_back( opt.ToUTF8().data() );
         }
     }
     m_UpdateCompileCommand--;
@@ -1269,7 +1270,7 @@ std::vector<wxString> ClangPlugin::GetCompileCommand(ProjectFile* pf, const wxSt
  */
 int ClangPlugin::UpdateCompileCommand(cbEditor* ed)
 {
-    std::vector<wxString> compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
+    std::vector<std::string> compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
 
     if (compileCommand.empty())
         return 0;
@@ -1561,7 +1562,7 @@ wxDateTime ClangPlugin::GetFileIndexingTimestamp(const ClangFile& file)
 
 void ClangPlugin::BeginReindexFile(const ClangFile& file)
 {
-    std::vector<wxString> compileCommand = GetCompileCommand( NULL, file.GetFilename() );
+    std::vector<std::string> compileCommand = GetCompileCommand( NULL, file.GetFilename() );
     ClangProxy::ReindexFileJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReindex, file, compileCommand);
     m_Proxy.AppendPendingJob( job );
 }
@@ -1673,12 +1674,12 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
                 return;
             // Perform the request again, but now with loading of TU's so we need a compile command for that
             std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
-            std::vector< std::pair<wxString, std::vector<wxString> > > fileAndCompileCommands;
+            std::vector< std::pair<wxString, std::vector<std::string> > > fileAndCompileCommands;
             EditorManager* edMgr = Manager::Get()->GetEditorManager();
             for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
             {
                 wxString filename = db->GetFilename(*it);
-                std::vector<wxString> compileCommand;
+                std::vector<std::string> compileCommand;
                 for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
                 {
                     cbEditor* ed = edMgr->GetBuiltinEditor(i);
