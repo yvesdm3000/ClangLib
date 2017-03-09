@@ -23,19 +23,6 @@ class ClangProxy;
 typedef void* CXIndex;
 typedef int ClFileId;
 
-namespace {
-static std::vector<wxString> DeepCopy(const std::vector<wxString>& src)
-{
-    std::vector<wxString> ret;
-    for (std::vector<wxString>::const_iterator it = src.begin(); it != src.end(); ++it)
-    {
-        ret.push_back( it->c_str() );
-    }
-    return ret;
-}
-
-};
-
 class ClangProxy
 {
 public:
@@ -191,9 +178,10 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        CreateTranslationUnitJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<std::string>& commands, const std::map<wxString, wxString>& unsavedFiles ) :
+        CreateTranslationUnitJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<std::string>& commands, const std::map<std::string, wxString>& unsavedFiles ) :
             EventJob(CreateTranslationUnitType, evtType, evtId),
-            m_File(file),
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_CompileCommand(commands),
             m_TranslationUnitId(-1),
             m_UnsavedFiles(unsavedFiles)
@@ -209,7 +197,7 @@ public:
             //m_TranslationUnitId = clangproxy.GetTranslationUnitId(m_TranslationUnitId, m_File);
             //if (m_TranslationUnitId == wxNOT_FOUND )
             {
-                clangproxy.CreateTranslationUnit( m_File, m_CompileCommand, m_UnsavedFiles, m_TranslationUnitId);
+                clangproxy.CreateTranslationUnit( m_Project, m_Filename, m_CompileCommand, m_UnsavedFiles, m_TranslationUnitId);
             }
             m_UnsavedFiles.clear();
         }
@@ -217,10 +205,19 @@ public:
         {
             return m_TranslationUnitId;
         }
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8(m_Project.c_str()), wxString::FromUTF8(m_Filename.c_str()));
         }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
+        }
+
     private:
         /** @brief Copy constructor
          *
@@ -230,22 +227,24 @@ public:
          */
         CreateTranslationUnitJob(const CreateTranslationUnitJob& other):
             EventJob(other),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_CompileCommand(other.m_CompileCommand),
             m_TranslationUnitId(other.m_TranslationUnitId),
             m_UnsavedFiles()
         {
             /* deep copy */
-            for ( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            for ( std::map<std::string, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
-                m_UnsavedFiles.insert( std::make_pair( it->first.c_str(), it->second.c_str() ) );
+                m_UnsavedFiles.insert( std::make_pair( it->first, it->second.c_str() ) );
             }
         }
     public:
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         std::vector<std::string> m_CompileCommand;
         ClTranslUnitId m_TranslationUnitId; // Returned value
-        std::map<wxString, wxString> m_UnsavedFiles;
+        std::map<std::string, wxString> m_UnsavedFiles;
     };
 
     /** @brief Remove a translation unit from memory
@@ -297,12 +296,13 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        ReparseJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const std::vector<std::string>& compileCommand, const ClangFile& file, const std::map<wxString, wxString>& unsavedFiles, bool parents = false )
+        ReparseJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const std::vector<std::string>& compileCommand, const ClangFile& file, const std::map<std::string, wxString>& unsavedFiles, bool parents = false )
             : EventJob(ReparseType, evtType, evtId),
               m_TranslId(translId),
               m_UnsavedFiles(unsavedFiles),
               m_CompileCommand(compileCommand),
-              m_File(file),
+              m_Project(file.GetProject().ToUTF8().data()),
+              m_Filename(file.GetFilename().ToUTF8().data()),
               m_Parents(parents)
         {
         }
@@ -315,9 +315,17 @@ public:
         {
             return m_TranslId;
         }
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8( m_Project.c_str() ), wxString::FromUTF8( m_Filename.c_str() ) );
+        }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
         }
     private:
         /** @brief Copy constructor
@@ -331,20 +339,22 @@ public:
               m_TranslId(other.m_TranslId),
               m_UnsavedFiles(),
               m_CompileCommand(other.m_CompileCommand),
-              m_File(other.m_File),
+              m_Project(other.m_Project),
+              m_Filename(other.m_Filename),
               m_Parents(other.m_Parents)
         {
             /* deep copy */
-            for (std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            for (std::map<std::string, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
-                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
+                m_UnsavedFiles.insert( std::make_pair( it->first, wxString(it->second.c_str()) ) );
             }
         }
     public:
         ClTranslUnitId m_TranslId;
-        std::map<wxString, wxString> m_UnsavedFiles;
+        std::map<std::string, wxString> m_UnsavedFiles;
         std::vector<std::string> m_CompileCommand;
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         bool m_Parents; // If the parents also need to be reparsed
     };
 
@@ -397,7 +407,8 @@ public:
         GetDiagnosticsJob( const wxEventType evtType, const int evtId, int translId, const ClangFile& file ):
             EventJob(GetDiagnosticsType, evtType, evtId),
             m_TranslId(translId),
-            m_File(file)
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data())
         {}
 
         /** @brief Make a deep copy of this class on the heap
@@ -413,15 +424,23 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetDiagnostics(m_TranslId, m_File.GetFilename(), m_Results);
+            clangproxy.GetDiagnostics(m_TranslId, m_Filename, m_Results);
         }
         ClTranslUnitId GetTranslationUnitId() const
         {
             return m_TranslId;
         }
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8(m_Project.c_str()), wxString::FromUTF8(m_Filename.c_str()));
+        }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
         }
         const std::vector<ClDiagnostic>& GetResults() const
         {
@@ -438,13 +457,16 @@ public:
         GetDiagnosticsJob( const GetDiagnosticsJob& other ) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_Results(other.m_Results) {}
     public:
         ClTranslUnitId m_TranslId;
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         std::vector<ClDiagnostic> m_Results; // Returned value
     };
+
     class LookupDefinitionJob : public EventJob
     {
     public:
@@ -457,7 +479,8 @@ public:
         LookupDefinitionJob( const wxEventType evtType, const int evtId, int translId, const ClangFile& file, const ClTokenPosition& position) :
             EventJob(LookupDefinitionType, evtType, evtId),
             m_TranslId(translId),
-            m_File(file),
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position) {}
         ClangJob* Clone() const
         {
@@ -467,15 +490,14 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             ClTokenPosition pos(0,0);
-            wxString filename = GetFile().GetFilename();
-            if (clangproxy.ResolveTokenDefinitionAt( m_TranslId, filename, m_Position, pos))
+            if (clangproxy.ResolveTokenDefinitionAt( m_TranslId, m_Filename, m_Position, pos))
             {
-                m_Locations.push_back( std::make_pair(filename, pos) );
+                m_Locations.push_back( std::make_pair(m_Filename, pos) );
                 return;
             }
-            if (clangproxy.GetTokenAt( m_TranslId, filename, m_Position, m_TokenIdentifier, m_TokenUSR ))
+            if (clangproxy.GetTokenAt( m_TranslId, m_Filename, m_Position, m_TokenIdentifier, m_TokenUSR ))
             {
-                ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
+                ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( m_Project );
                 if (!db)
                     return;
                 std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, m_TokenUSR, ClTokenType_DefGroup );
@@ -485,7 +507,7 @@ public:
                     ClTokenPosition pos(0,0);
                     if (clangproxy.LookupTokenDefinition(*it, m_TokenIdentifier, m_TokenUSR, pos) )
                     {
-                        wxString fn = db->GetFilename( *it );
+                        std::string fn = db->GetFilename( *it );
                         m_Locations.push_back( std::make_pair( fn, pos ) );
                     }
                     else
@@ -499,7 +521,7 @@ public:
                 }
                 // Find token in subclasses
                 std::vector<wxString> USRList;
-                clangproxy.GetTokenOverridesAt( m_TranslId, filename, m_Position, USRList);
+                clangproxy.GetTokenOverridesAt( m_TranslId, m_Filename, m_Position, USRList);
                 for (std::vector<wxString>::const_iterator it = USRList.begin(); it != USRList.end(); ++it)
                 {
                     const wxString& USR = *it;
@@ -511,12 +533,12 @@ public:
 
                         if (clangproxy.LookupTokenDefinition(*it, m_TokenIdentifier, USR, pos) )
                         {
-                            wxString fn = db->GetFilename( *it );
+                            std::string fn = db->GetFilename( *it );
                             m_Locations.push_back( std::make_pair( fn, pos ) );
                         }
                         else if (db->LookupTokenPosition( m_TokenIdentifier, *it, USR, ClTokenType_DefGroup, pos ))
                         {
-                            wxString fn = db->GetFilename( *it );
+                            std::string fn = db->GetFilename( *it );
                             m_Locations.push_back( std::make_pair( fn, pos ) );
                         }
                         else
@@ -535,19 +557,23 @@ public:
         {
             return m_TranslId;
         }
-        const wxString& GetProject() const
+        ClangFile GetFile() const
         {
-            return m_File.GetProject();
+            return ClangFile(wxString::FromUTF8(m_Project.c_str()), wxString::FromUTF8(m_Filename.c_str()));
         }
-        const ClangFile& GetFile() const
+        const std::string& GetProject() const
         {
-            return m_File;
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
         }
         const ClTokenPosition& GetPosition() const
         {
             return m_Position;
         }
-        const std::vector< std::pair<wxString, ClTokenPosition> >& GetResults() const
+        const std::vector< std::pair<std::string, ClTokenPosition> >& GetResults() const
         {
             return m_Locations;
         }
@@ -569,7 +595,8 @@ public:
         LookupDefinitionJob( const LookupDefinitionJob& other ) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_Position(other.m_Position),
             m_Locations(other.m_Locations),
             m_TokenIdentifier(other.m_TokenIdentifier.c_str()),
@@ -578,9 +605,10 @@ public:
         }
     protected:
         ClTranslUnitId m_TranslId;
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         ClTokenPosition m_Position;
-        std::vector< std::pair<wxString, ClTokenPosition> > m_Locations;
+        std::vector< std::pair<std::string, ClTokenPosition> > m_Locations;
         wxString m_TokenIdentifier;
         wxString m_TokenUSR;
     };
@@ -595,7 +623,7 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        LookupDefinitionInFilesJob( const wxEventType evtType, const int evtId, int translId, const ClangFile& file, const ClTokenPosition& position, const std::vector< std::pair<wxString,std::vector<std::string> > >& fileAndCompileCommands ) :
+        LookupDefinitionInFilesJob( const wxEventType evtType, const int evtId, int translId, const ClangFile& file, const ClTokenPosition& position, const std::vector< std::pair<std::string,std::vector<std::string> > >& fileAndCompileCommands ) :
             LookupDefinitionJob(evtType, evtId, translId, file, position),
             m_fileAndCompileCommands(fileAndCompileCommands){}
         ClangJob* Clone() const
@@ -607,26 +635,26 @@ public:
         {
             wxString tokenIdentifier;
             wxString usr;
-            if (clangproxy.GetTokenAt( m_TranslId, m_File.GetFilename(), m_Position, tokenIdentifier, usr ))
+            if (clangproxy.GetTokenAt( m_TranslId, m_Filename, m_Position, tokenIdentifier, usr ))
             {
                 CXIndex clangIndex = clang_createIndex(0,0);
 
-                for (std::vector< std::pair<wxString,std::vector<std::string> > >::const_iterator it = m_fileAndCompileCommands.begin(); it != m_fileAndCompileCommands.end(); ++it)
+                for (std::vector< std::pair<std::string,std::vector<std::string> > >::const_iterator it = m_fileAndCompileCommands.begin(); it != m_fileAndCompileCommands.end(); ++it)
                 {
                     std::vector<std::string> argsBuffer;
                     std::vector<const char*> args;
                     clangproxy.BuildCompileArgs( it->first, it->second, argsBuffer, args );
-                    ClTokenIndexDatabase* indexdb = clangproxy.LoadTokenIndexDatabase( m_File.GetProject() );
+                    ClTokenIndexDatabase* indexdb = clangproxy.LoadTokenIndexDatabase( m_Project );
                     if (!indexdb)
                         continue;
                     ClFileId destFileId = indexdb->GetFilenameId(it->first);
                     {
                         ClTranslationUnit tu(indexdb, 127, clangIndex);
-                        const std::map<wxString, wxString> unsavedFiles; // No unsaved files for reindex...
-                        CCLogger::Get()->DebugLog( wxT("Parsing file ")+it->first);
+                        const std::map<std::string, wxString> unsavedFiles; // No unsaved files for reindex...
+                        CCLogger::Get()->DebugLog( wxT("Parsing file ")+wxString::FromUTF8(it->first.c_str()));
                         ClFileId fileId = tu.GetTokenDatabase().GetFilenameId( it->first );
                         if (!tu.Parse( it->first, fileId, args, unsavedFiles, false ))
-                            CCLogger::Get()->DebugLog(wxT("Could not parse file ")+it->first);
+                            CCLogger::Get()->DebugLog(wxT("Could not parse file ")+wxString::FromUTF8(it->first.c_str()));
                         else
                         {
                             CCLogger::Get()->DebugLog(wxT("Building tokendatabase from TU"));
@@ -656,15 +684,11 @@ public:
          */
         LookupDefinitionInFilesJob( const LookupDefinitionInFilesJob& other ) :
             LookupDefinitionJob(other),
-            m_fileAndCompileCommands()
+            m_fileAndCompileCommands(other.m_fileAndCompileCommands)
         {
-            for( std::vector<std::pair<wxString, std::vector<std::string> > >::const_iterator it = other.m_fileAndCompileCommands.begin(); it != other.m_fileAndCompileCommands.end(); ++it )
-            {
-                m_fileAndCompileCommands.push_back( std::make_pair( it->first.c_str(), it->second ) );
-            }
         }
     private:
-        std::vector< std::pair<wxString,std::vector<std::string> > > m_fileAndCompileCommands;
+        std::vector< std::pair<std::string,std::vector<std::string> > > m_fileAndCompileCommands;
     };
 
     /*abstract */
@@ -742,11 +766,12 @@ public:
          */
         CodeCompleteAtJob( const wxEventType evtType, const int evtId,
                            const ClangFile& file, const ClTokenPosition& position,
-                           const ClTranslUnitId translId, const std::map<wxString, wxString>& unsavedFiles,
+                           const ClTranslUnitId translId, const std::map<std::string, wxString>& unsavedFiles,
                            const ClCodeCompleteOption complete_options):
             SyncJob(CodeCompleteAtType, evtType, evtId),
             m_SerialNo( ++s_SerialNo ),
-            m_File(file),
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position),
             m_TranslId(translId),
             m_UnsavedFiles(unsavedFiles),
@@ -777,8 +802,8 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             std::vector<ClToken> results;
-            CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt ")+m_File.GetFilename()+wxT(" pos=%d,%d"), m_Position.line, m_Position.column) );
-            clangproxy.CodeCompleteAt(m_TranslId, m_File.GetFilename(), m_Position, m_Options, m_UnsavedFiles, results, m_Diagnostics);
+            CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt ")+wxString::FromUTF8(m_Filename.c_str())+wxT(" pos=%d,%d"), m_Position.line, m_Position.column) );
+            clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Position, m_Options, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {
                 switch (tknIt->category)
@@ -813,9 +838,17 @@ public:
         {
             return m_TranslId;
         }
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8( m_Project.c_str() ), wxString::FromUTF8( m_Filename.c_str() ));
+        }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
         }
         const ClTokenPosition& GetPosition() const
         {
@@ -839,7 +872,8 @@ public:
         CodeCompleteAtJob( const CodeCompleteAtJob& other ) :
             SyncJob(other),
             m_SerialNo(other.m_SerialNo),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_Position(other.m_Position),
             m_TranslId(other.m_TranslId),
             m_IncludeCtors(other.m_IncludeCtors),
@@ -847,16 +881,17 @@ public:
             m_Diagnostics(other.m_Diagnostics),
             m_Options(other.m_Options)
         {
-            for ( std::map<wxString, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
+            for ( std::map<std::string, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
-                m_UnsavedFiles.insert( std::make_pair( wxString(it->first.c_str()), wxString(it->second.c_str()) ) );
+                m_UnsavedFiles.insert( std::make_pair( it->first, wxString(it->second.c_str()) ) );
             }
         }
         unsigned int m_SerialNo;
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         ClTokenPosition m_Position;
         ClTranslUnitId m_TranslId;
-        std::map<wxString, wxString> m_UnsavedFiles;
+        std::map<std::string, wxString> m_UnsavedFiles;
         bool m_IncludeCtors;
         std::vector<ClToken>* m_pResults; // Returned value
         std::vector<ClDiagnostic> m_Diagnostics;
@@ -873,10 +908,9 @@ public:
          * @param evtId Event ID to use when the job is completed
          *
          */
-        DocumentCCTokenJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const ClangFile& file, const ClTokenPosition& position, ClTokenId tknId ):
+        DocumentCCTokenJob( const wxEventType evtType, const int evtId, ClTranslUnitId translId, const ClangFile&, const ClTokenPosition& position, ClTokenId tknId ):
             SyncJob(DocumentCCTokenType, evtType, evtId),
             m_TranslId(translId),
-            m_File(file),
             m_Position(position),
             m_TokenId(tknId),
             m_pResult(new wxString())
@@ -902,10 +936,6 @@ public:
         {
             return m_TranslId;
         }
-        const ClangFile& GetFile() const
-        {
-            return m_File;
-        }
         const ClTokenPosition& GetPosition() const
         {
             return m_Position;
@@ -924,12 +954,10 @@ public:
         DocumentCCTokenJob( const DocumentCCTokenJob& other ) :
             SyncJob(other),
             m_TranslId(other.m_TranslId),
-            m_File(other.m_File),
             m_Position(other.m_Position),
             m_TokenId(other.m_TokenId),
             m_pResult(other.m_pResult) {}
         ClTranslUnitId m_TranslId;
-        ClangFile m_File;
         ClTokenPosition m_Position;
         ClTokenId m_TokenId;
         wxString* m_pResult;
@@ -946,7 +974,7 @@ public:
          */
         GetTokensAtJob( const wxEventType evtType, const int evtId, const ClangFile& file, const ClTokenPosition& position, int translId ):
             SyncJob(GetTokensAtType, evtType, evtId),
-            m_File(file),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position),
             m_TranslId(translId),
             m_pResults(new wxStringVec())
@@ -961,7 +989,7 @@ public:
 
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetTokensAt(m_TranslId, m_File.GetFilename(), m_Position, *m_pResults);
+            clangproxy.GetTokensAt(m_TranslId, m_Filename, m_Position, *m_pResults);
         }
 
         virtual void Finalize()
@@ -979,11 +1007,11 @@ public:
                         wxMutex* pMutex, wxCondition* pCond,
                         wxStringVec* pResults ):
             SyncJob(GetTokensAtType, evtType, evtId, pMutex, pCond),
-            m_File(file),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position),
             m_TranslId(translId),
             m_pResults(pResults) {}
-        ClangFile m_File;
+        std::string m_Filename;
         ClTokenPosition m_Position;
         ClTranslUnitId m_TranslId;
         wxStringVec* m_pResults;
@@ -1002,7 +1030,7 @@ public:
         GetCallTipsAtJob( const wxEventType evtType, const int evtId, const ClangFile& file,
                           const ClTokenPosition& position, int translId, const wxString& tokenStr ):
             SyncJob( GetCallTipsAtType, evtType, evtId),
-            m_File(file),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position),
             m_TranslId(translId),
             m_TokenStr(tokenStr),
@@ -1016,7 +1044,7 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetCallTipsAt( m_TranslId, m_File.GetFilename(), m_Position, m_TokenStr, *m_pResults);
+            clangproxy.GetCallTipsAt( m_TranslId, m_Filename, m_Position, m_TokenStr, *m_pResults);
         }
 
         virtual void Finalize()
@@ -1034,12 +1062,12 @@ public:
                           wxMutex* pMutex, wxCondition* pCond,
                           std::vector<wxStringVec>* pResults ):
             SyncJob(GetCallTipsAtType, evtType, evtId, pMutex, pCond),
-            m_File(file),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position),
             m_TranslId(translId),
             m_TokenStr(tokenStr.c_str()),
             m_pResults(pResults) {}
-        ClangFile m_File;
+        std::string m_Filename;
         ClTokenPosition m_Position;
         ClTranslUnitId m_TranslId;
         wxString m_TokenStr;
@@ -1060,7 +1088,8 @@ public:
                              const ClTokenPosition& position, ClTranslUnitId translId ):
             EventJob( GetOccurrencesOfType, evtType, evtId),
             m_TranslId(translId),
-            m_File(file),
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_Position(position)
         {
         }
@@ -1071,16 +1100,24 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            clangproxy.GetOccurrencesOf(m_TranslId, m_File.GetFilename(), m_Position, m_Results);
+            clangproxy.GetOccurrencesOf(m_TranslId, m_Filename, m_Position, m_Results);
         }
 
         ClTranslUnitId GetTranslationUnitId() const
         {
             return m_TranslId;
         }
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8(m_Project.c_str()), wxString::FromUTF8(m_Filename.c_str()));
+        }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
         }
         const ClTokenPosition& GetPosition() const
         {
@@ -1094,11 +1131,13 @@ public:
         GetOccurrencesOfJob( const GetOccurrencesOfJob& other) :
             EventJob(other),
             m_TranslId(other.m_TranslId),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_Position(other.m_Position),
             m_Results(other.m_Results){}
         ClTranslUnitId m_TranslId;
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         ClTokenPosition m_Position;
         std::vector< std::pair<int, int> > m_Results;
     };
@@ -1108,7 +1147,8 @@ public:
     public:
         ReindexFileJob( const wxEventType evtType, const int evtId, const ClangFile& file, const std::vector<std::string>& commands ):
             EventJob(ReindexFileType, evtType, evtId),
-            m_File(file),
+            m_Project(file.GetProject().ToUTF8().data()),
+            m_Filename(file.GetFilename().ToUTF8().data()),
             m_CompileCommand(commands) {}
         ClangJob* Clone() const
         {
@@ -1117,23 +1157,34 @@ public:
         }
         void Execute(ClangProxy& clangproxy);
 
-        const ClangFile& GetFile() const
+        ClangFile GetFile() const
         {
-            return m_File;
+            return ClangFile(wxString::FromUTF8(m_Project.c_str()), wxString::FromUTF8(m_Filename.c_str()));
         }
+        const std::string& GetProject() const
+        {
+            return m_Project;
+        }
+        const std::string& GetFilename() const
+        {
+            return m_Filename;
+        }
+
     protected:
         ReindexFileJob( const ReindexFileJob& other) :
             EventJob(other),
-            m_File(other.m_File),
+            m_Project(other.m_Project),
+            m_Filename(other.m_Filename),
             m_CompileCommand(other.m_CompileCommand){}
-        ClangFile m_File;
+        std::string m_Project;
+        std::string m_Filename;
         std::vector<std::string> m_CompileCommand;
     };
 
     class StoreTokenIndexDBJob : public EventJob
     {
     public:
-        StoreTokenIndexDBJob( const wxEventType evtType, const int evtId, const wxString& project):
+        StoreTokenIndexDBJob( const wxEventType evtType, const int evtId, const std::string& project):
             EventJob(StoreTokenIndexDBType, evtType, evtId),
             m_Project(project)
         {
@@ -1151,8 +1202,8 @@ public:
     protected:
         StoreTokenIndexDBJob( const StoreTokenIndexDBJob& other) :
             EventJob(other),
-            m_Project(other.m_Project.c_str()){}
-        wxString m_Project;
+            m_Project(other.m_Project){}
+        std::string m_Project;
     };
 
     /**
@@ -1196,7 +1247,7 @@ public:
         }
     };
 
-    static wxString GetTokenIndexDatabaseFilename( const wxString& project );
+    static wxString GetTokenIndexDatabaseFilename( const std::string& project );
 
 public:
     ClangProxy(wxEvtHandler* pEvtHandler, const std::vector<wxString>& cppKeywords);
@@ -1205,56 +1256,56 @@ public:
     /** Append a job to the end of the queue */
     void AppendPendingJob( ClangProxy::ClangJob& job );
 
-    ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const ClangFile& file) const;
+    ClTranslUnitId GetTranslationUnitId( const ClTranslUnitId CtxTranslUnitId, const ClangFile& filename) const;
     void GetAllTranslationUnitIds( std::set<ClTranslUnitId>& out_list ) const;
     void SetMaxTranslationUnits( unsigned int Max );
 
 public: // TokenIndexDatabase functions
-    void GetLoadedTokenIndexDatabases( std::set<wxString>& out_projectFileNamesSet ) const;
-    ClTokenIndexDatabase* GetTokenIndexDatabase( const wxString& projectFileName );
-    const ClTokenIndexDatabase* GetTokenIndexDatabase( const wxString& projectFileName ) const;
-    ClTokenIndexDatabase* LoadTokenIndexDatabase( const wxString& projectFileName );
+    void GetLoadedTokenIndexDatabases( std::set<std::string>& out_projectFileNamesSet ) const;
+    ClTokenIndexDatabase* GetTokenIndexDatabase( const std::string& projectFileName );
+    const ClTokenIndexDatabase* GetTokenIndexDatabase( const std::string& projectFileName ) const;
+    ClTokenIndexDatabase* LoadTokenIndexDatabase( const std::string& projectFileName );
 
 protected: // jobs that are run only on the thread
-    void CreateTranslationUnit( const ClangFile& file, const std::vector<std::string>& compileCommand,  const std::map<wxString, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);
+    void CreateTranslationUnit( const std::string& project, const std::string& filename, const std::vector<std::string>& compileCommand,  const std::map<std::string, wxString>& unsavedFiles, ClTranslUnitId& out_TranslId);
     void RemoveTranslationUnit( const ClTranslUnitId TranslUnitId );
     /** Reparse translation id
      *
      * @param unsavedFiles reference to the unsaved files data. This function takes the data and this list will be empty after this call
      */
-    void Reparse( const ClTranslUnitId translId, const std::vector<std::string>& compileCommand, const std::map<wxString, wxString>& unsavedFiles);
+    void Reparse( const ClTranslUnitId translId, const std::vector<std::string>& compileCommand, const std::map<std::string, wxString>& unsavedFiles);
 
     /** Update token database with all tokens from the passed translation unit id
      * @param translId The ID of the intended translation unit
      */
     void UpdateTokenDatabase( const ClTranslUnitId translId );
-    void GetDiagnostics(  const ClTranslUnitId translId, const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
-    void CodeCompleteAt(  const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& location, unsigned cc_options,
-                          const std::map<wxString, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
+    void GetDiagnostics(  const ClTranslUnitId translId, const std::string& filename, std::vector<ClDiagnostic>& diagnostics);
+    void CodeCompleteAt(  const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& location, unsigned cc_options,
+                          const std::map<std::string, wxString>& unsavedFiles, std::vector<ClToken>& results, std::vector<ClDiagnostic>& diagnostics);
     wxString DocumentCCToken( ClTranslUnitId translId, int tknId );
-    void GetTokensAt(     const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, std::vector<wxString>& results);
-    void GetCallTipsAt(   const ClTranslUnitId translId,const wxString& filename, const ClTokenPosition& position,
+    void GetTokensAt(     const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, std::vector<wxString>& results);
+    void GetCallTipsAt(   const ClTranslUnitId translId,const std::string& filename, const ClTokenPosition& position,
                           const wxString& tokenStr, std::vector<wxStringVec>& results);
-    void GetOccurrencesOf(const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position,
+    void GetOccurrencesOf(const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position,
                           std::vector< std::pair<int, int> >& results);
     void RefineTokenType( const ClTranslUnitId translId, int tknId, ClTokenCategory& out_tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
-    bool GetTokenAt( const ClTranslUnitId translId, const wxString& filename, const ClTokenPosition& position, wxString& out_Identifier, wxString& out_USR );
-    void GetTokenOverridesAt( const ClTranslUnitId translUnitId, const wxString& filename, const ClTokenPosition& position, std::vector<wxString>& out_USRList);
+    bool GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, wxString& out_Identifier, wxString& out_USR );
+    void GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<wxString>& out_USRList);
 
     bool LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_position);
-    void StoreTokenIndexDatabase( const wxString& projectFileName ) const;
+    void StoreTokenIndexDatabase( const std::string& projectFileName ) const;
 
 public: // Tokens
     wxString GetCCInsertSuffix( const  ClTranslUnitId translId, int tknId, bool isDecl, const wxString& newLine, std::vector< std::pair<int, int> >& offsets );
-    bool ResolveTokenDeclarationAt( const ClTranslUnitId translId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
-    bool ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, wxString& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
+    bool ResolveTokenDeclarationAt( const ClTranslUnitId translId, std::string& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
+    bool ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, std::string& inout_filename, const ClTokenPosition& position, ClTokenPosition& out_Position);
 
 public: // Function scopes
-    void GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes);
+    void GetTokenScopes(const ClTranslUnitId id, const std::string& project, const std::string& filename, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes);
 
 
 private: // Utility functions
-    void BuildCompileArgs(const wxString& filename, const std::vector<std::string>& compileCommands, std::vector<std::string>& out_argsBuffer, std::vector<const char*>& out_args) const;
+    void BuildCompileArgs(const std::string& filename, const std::vector<std::string>& compileCommands, std::vector<std::string>& out_argsBuffer, std::vector<const char*>& out_args) const;
 
 private:
     mutable wxMutex m_Mutex;

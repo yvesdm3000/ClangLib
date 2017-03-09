@@ -681,14 +681,14 @@ void ClangPlugin::OnEditorSave(CodeBlocksEvent& event)
     ClangFile file(ed->GetFilename());
     if (ed->GetProjectFile())
         file = ClangFile(*ed->GetProjectFile());
-    std::map<wxString, wxString> unsavedFiles;
+    std::map<std::string, wxString> unsavedFiles;
     // Our saved file is not yet known to all translation units since it's no longer in the unsaved files. We update them here
-    unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
+    unsavedFiles.insert(std::make_pair(ed->GetFilename().ToUTF8().data(), ed->GetControl()->GetText()));
     for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
     {
         cbEditor* editor = edMgr->GetBuiltinEditor(i);
         if (editor && editor->GetModified())
-            unsavedFiles.insert(std::make_pair(editor->GetFilename(), editor->GetControl()->GetText()));
+            unsavedFiles.insert(std::make_pair(editor->GetFilename().ToUTF8().data(), editor->GetControl()->GetText()));
     }
     ClangProxy::ReparseJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReparse, m_TranslUnitId, m_CompileCommand, file, unsavedFiles, true);
     m_Proxy.AppendPendingJob(job);
@@ -710,7 +710,10 @@ void ClangPlugin::OnEditorClose(CodeBlocksEvent& event)
     {
         if (ed != m_pLastEditor)
         {
-            translId = m_Proxy.GetTranslationUnitId(m_TranslUnitId, event.GetEditor()->GetFilename());
+            ClangFile file(ed->GetFilename());
+            if (ed->GetProjectFile())
+                file = ClangFile(*ed->GetProjectFile());
+            translId = m_Proxy.GetTranslationUnitId(m_TranslUnitId, file);
         }
     }
     ClangProxy::RemoveTranslationUnitJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangRemoveTU, translId);
@@ -835,9 +838,9 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
             m_StoreIndexDBTimer.Start( 1000, wxTIMER_ONE_SHOT);
             return;
         }
-        std::set<wxString> projectFiles;
+        std::set<std::string> projectFiles;
         m_Proxy.GetLoadedTokenIndexDatabases( projectFiles );
-        for (std::set<wxString>::const_iterator it = projectFiles.begin(); it != projectFiles.end(); ++it)
+        for (std::set<std::string>::const_iterator it = projectFiles.begin(); it != projectFiles.end(); ++it)
         {
             ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( *it );
             if (db&&db->IsModified())
@@ -881,12 +884,12 @@ void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
             else if (pProject)
                 file = ClangFile(pProject, ed->GetFilename());
         }
-        std::map<wxString, wxString> unsavedFiles;
+        std::map<std::string, wxString> unsavedFiles;
         for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
         {
             ed = edMgr->GetBuiltinEditor(i);
             if (ed && ed->GetModified())
-                unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
+                unsavedFiles.insert(std::make_pair(ed->GetFilename().ToUTF8().data(), ed->GetControl()->GetText()));
         }
         ClangProxy::CreateTranslationUnitJob job( cbEVT_CLANG_ASYNCTASK_FINISHED, idClangCreateTU, file, m_CompileCommand, unsavedFiles );
         m_Proxy.AppendPendingJob(job);
@@ -1314,7 +1317,7 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
     ClangEvent evt2(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile());
     evt2.SetStartedTime( pJob->GetTimestamp() );
     ProcessEvent(evt2);
-    if (pJob->GetFile().GetFilename() != ed->GetFilename())
+    if ( pJob->GetFile().GetFilename() != ed->GetFilename())
         return;
 
     m_TranslUnitId = pJob->GetTranslationUnitId();
@@ -1344,7 +1347,7 @@ void ClangPlugin::OnClangUpdateTokenDatabaseFinished(wxEvent& event)
     event.Skip();
     ClangProxy::UpdateTokenDatabaseJob* pJob = static_cast<ClangProxy::UpdateTokenDatabaseJob*>(event.GetEventObject());
 
-    ClangEvent evt(clEVT_TOKENDATABASE_UPDATED, pJob->GetTranslationUnitId(), ClangFile(wxT("")));
+    ClangEvent evt( clEVT_TOKENDATABASE_UPDATED, pJob->GetTranslationUnitId(),ClangFile(wxT("")) );
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
@@ -1488,7 +1491,7 @@ void ClangPlugin::OnClangReindexFinished(wxEvent& event)
     if (HasEventSink( clEVT_REINDEXFILE_FINISHED ))
     {
         ClangEvent clEvt(clEVT_REINDEXFILE_FINISHED, wxID_ANY, pJob->GetFile());
-        clEvt.SetString(pJob->GetFile().GetFilename());
+        clEvt.SetString( wxString::FromUTF8(pJob->GetFilename().c_str()) );
         ProcessEvent( clEvt );
     }
 }
@@ -1548,16 +1551,16 @@ void ClangPlugin::FlushTranslationUnits()
 
 wxDateTime ClangPlugin::GetFileIndexingTimestamp(const ClangFile& file)
 {
-    ClTokenIndexDatabase* pDb = m_Proxy.GetTokenIndexDatabase(file.GetProject());
+    ClTokenIndexDatabase* pDb = m_Proxy.GetTokenIndexDatabase(file.GetProject().ToUTF8().data());
     if (!pDb)
     {
-        pDb = m_Proxy.LoadTokenIndexDatabase( file.GetProject() );
+        pDb = m_Proxy.LoadTokenIndexDatabase( file.GetProject().ToUTF8().data() );
     }
     if (!pDb)
     {
         return wxDateTime((time_t)0);
     }
-    return pDb->GetFilenameTimestamp( pDb->GetFilenameId(file.GetFilename()) );
+    return pDb->GetFilenameTimestamp( pDb->GetFilenameId(file.GetFilename().ToUTF8().data()) );
 }
 
 void ClangPlugin::BeginReindexFile(const ClangFile& file)
@@ -1580,9 +1583,8 @@ ClTranslUnitId ClangPlugin::GetTranslationUnitId(const ClangFile& file)
 
 void ClangPlugin::GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes)
 {
-    m_Proxy.GetTokenScopes(id, file, tokenMask, out_Scopes);
+    m_Proxy.GetTokenScopes(id, file.GetProject().ToUTF8().data(), file.GetFilename().ToUTF8().data(), tokenMask, out_Scopes);
 }
-
 
 void ClangPlugin::RequestOccurrencesOf(const ClTranslUnitId translUnitId, const ClangFile& file, const ClTokenPosition& loc)
 {
@@ -1613,13 +1615,13 @@ wxCondError ClangPlugin::GetCodeCompletionAt(const ClTranslUnitId translUnitId, 
         m_pOutstandingCodeCompletion = nullptr;
     }
 
-    std::map<wxString, wxString> unsavedFiles;
+    std::map<std::string, wxString> unsavedFiles;
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
     for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
     {
         cbEditor* ed = edMgr->GetBuiltinEditor(i);
         if (ed && ed->GetModified())
-            unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
+            unsavedFiles.insert(std::make_pair(ed->GetFilename().ToUTF8().data(), ed->GetControl()->GetText()));
     }
     m_pOutstandingCodeCompletion = new ClangProxy::CodeCompleteAtJob(cbEVT_CLANG_SYNCTASK_FINISHED, idClangCodeComplete, file, loc, translUnitId, unsavedFiles, complete_options);
     m_Proxy.AppendPendingJob(*m_pOutstandingCodeCompletion);
@@ -1664,7 +1666,7 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
     event.Skip();
 
     ClangProxy::LookupDefinitionJob* pJob = static_cast<ClangProxy::LookupDefinitionJob*>(event.GetEventObject());
-    std::vector< std::pair<wxString, ClTokenPosition> > Locations = pJob->GetResults();
+    std::vector< std::pair<std::string, ClTokenPosition> > Locations = pJob->GetResults();
     if (Locations.size() == 0)
     {
         if (dynamic_cast<ClangProxy::LookupDefinitionInFilesJob*>(pJob)== nullptr)
@@ -1674,16 +1676,16 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
                 return;
             // Perform the request again, but now with loading of TU's so we need a compile command for that
             std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
-            std::vector< std::pair<wxString, std::vector<std::string> > > fileAndCompileCommands;
+            std::vector< std::pair<std::string, std::vector<std::string> > > fileAndCompileCommands;
             EditorManager* edMgr = Manager::Get()->GetEditorManager();
             for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
             {
-                wxString filename = db->GetFilename(*it);
+                std::string filename = db->GetFilename(*it);
                 std::vector<std::string> compileCommand;
                 for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
                 {
                     cbEditor* ed = edMgr->GetBuiltinEditor(i);
-                    if (ed->GetFilename() == filename)
+                    if ( ed->GetFilename() == wxString::FromUTF8( filename.c_str() ) )
                     {
                         compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
                         break;
@@ -1711,10 +1713,10 @@ void ClangPlugin::OnClangStoreTokenIndexDB(wxEvent& /*event*/)
 
 bool ClangPlugin::ResolveTokenDeclarationAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition& loc, ClangFile& out_file, ClTokenPosition& out_loc)
 {
-    wxString filename = file.GetFilename();
+    std::string filename = file.GetFilename().ToUTF8().data();
     if (m_Proxy.ResolveTokenDeclarationAt( id, filename, loc, out_loc ))
     {
-        out_file = ClangFile(file, filename);
+        out_file = ClangFile(file, wxString::FromUTF8(filename.c_str()));
         return true;
     }
     return false;
@@ -1740,12 +1742,12 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const ClangF
         m_ReparseTimer.Stop();
     }
 
-    std::map<wxString, wxString> unsavedFiles;
+    std::map<std::string, wxString> unsavedFiles;
     for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
     {
         ed = edMgr->GetBuiltinEditor(i);
         if (ed && ed->GetModified())
-            unsavedFiles.insert(std::make_pair(ed->GetFilename(), ed->GetControl()->GetText()));
+            unsavedFiles.insert(std::make_pair(ed->GetFilename().ToUTF8().data(), ed->GetControl()->GetText()));
     }
     ClangProxy::ReparseJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReparse, translUnitId, m_CompileCommand, file, unsavedFiles);
     m_Proxy.AppendPendingJob(job);

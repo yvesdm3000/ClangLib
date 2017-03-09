@@ -102,26 +102,26 @@ public:
         return m_pDatabase->GetTokenIndexDatabase();
     }
 
-    bool Parse( const wxString& filename, ClFileId FileId, const std::vector<const char*>& args,
-                const std::map<wxString, wxString>& unsavedFiles, const bool bReparse = true );
-    void Reparse(const std::map<wxString, wxString>& unsavedFiles);
+    bool Parse( const std::string& filename, ClFileId FileId, const std::vector<const char*>& args,
+                const std::map<std::string, wxString>& unsavedFiles, const bool bReparse = true );
+    void Reparse(const std::map<std::string, wxString>& unsavedFiles);
     bool ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenDatabase* out_pTokenDatabase) const;
     void SwapTokenDatabase(ClTokenDatabase& other);
     // note that complete_line and complete_column are 1 index, not 0 index!
-    CXCodeCompleteResults* CodeCompleteAt( const wxString& complete_filename, const ClTokenPosition& location,
+    CXCodeCompleteResults* CodeCompleteAt( const std::string& complete_filename, const ClTokenPosition& location,
                                            struct CXUnsavedFile* unsaved_files,
                                            unsigned num_unsaved_files, unsigned completeOptions );
     const CXCodeCompleteResults* GetCCResults() const;
     const CXCompletionResult* GetCCResult(unsigned index) const;
     bool HasCCContext( CXCompletionContext ctx ) const;
 
-    CXCursor GetTokenAt(const wxString& filename, const ClTokenPosition& position);
-    wxString GetTokenIdentifierAt(const wxString& filename, const ClTokenPosition& position);
+    CXCursor GetTokenAt(const std::string& filename, const ClTokenPosition& position);
+    wxString GetTokenIdentifierAt(const std::string& filename, const ClTokenPosition& position);
 
-    void GetDiagnostics(const wxString& filename, std::vector<ClDiagnostic>& diagnostics);
-    CXFile GetFileHandle(const wxString& filename) const;
-    void ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
-    void ExpandDiagnostic(CXDiagnostic diag, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
+    void GetDiagnostics(const std::string& filename, std::vector<ClDiagnostic>& diagnostics);
+    CXFile GetFileHandle(const std::string& filename) const;
+    void ExpandDiagnosticSet(CXDiagnosticSet diagSet, const std::string& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
+    void ExpandDiagnostic(CXDiagnostic diag, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
 
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; std::sort(m_Files.begin(), m_Files.end()); }
     void GetTokenScopes( const ClFileId fileId, unsigned int tokenMask, ClTokenScopeList& out_functionScopes )

@@ -106,10 +106,10 @@ struct ClIndexToken
 class ClFilenameEntry
 {
 public:
-    ClFilenameEntry(wxString _filename, wxDateTime _timestamp) :
+    ClFilenameEntry(const std::string& _filename, wxDateTime _timestamp) :
         filename(_filename),
         timestamp(_timestamp) {}
-    wxString filename;
+    std::string filename;
     wxDateTime timestamp;
 };
 
@@ -143,9 +143,9 @@ public:
     ClFilenameDatabase(const ClFilenameDatabase& Other);
     ~ClFilenameDatabase();
 
-    bool HasFilename( const wxString& filename )const;
-    ClFileId GetFilenameId(const wxString& filename) const;
-    wxString GetFilename(const ClFileId fId) const;
+    bool HasFilename( const std::string& filename )const;
+    ClFileId GetFilenameId(const std::string& filename) const;
+    std::string GetFilename(const ClFileId fId) const;
     const wxDateTime GetFilenameTimestamp(const ClFileId fId) const;
     void UpdateFilenameTimestamp(const ClFileId fId, const wxDateTime& timestamp);
 
@@ -180,19 +180,19 @@ public:
         delete m_pIndexTokenMap;
     }
 
-    bool HasFilename( const wxString& filename ) const
+    bool HasFilename( const std::string& filename ) const
     {
         wxMutexLocker locker(m_Mutex);
 
         return m_FileDB.HasFilename(filename);
     }
-    ClFileId GetFilenameId( const wxString& filename ) const
+    ClFileId GetFilenameId( const std::string& filename ) const
     {
         wxMutexLocker locker(m_Mutex);
 
         return m_FileDB.GetFilenameId( filename );
     }
-    wxString GetFilename(ClFileId fId) const
+    std::string GetFilename(ClFileId fId) const
     {
         wxMutexLocker locker(m_Mutex);
 
@@ -274,7 +274,7 @@ private:
     mutable wxMutex m_Mutex;
 };
 
-typedef std::map<wxString, ClTokenIndexDatabase*> ClTokenIndexDatabaseMap_t;
+typedef std::map<std::string, ClTokenIndexDatabase*> ClTokenIndexDatabaseMap_t;
 
 class ClTokenDatabase
 {
@@ -285,9 +285,9 @@ public:
 
     friend void swap(ClTokenDatabase& first, ClTokenDatabase& second);
 
-    bool HasFilename(const wxString& filename) const { return m_pTokenIndexDB->HasFilename(filename); }
-    ClFileId GetFilenameId(const wxString& filename) const;
-    wxString GetFilename(const ClFileId fId) const;
+    bool HasFilename(const std::string& filename) const { return m_pTokenIndexDB->HasFilename(filename); }
+    ClFileId GetFilenameId(const std::string& filename) const;
+    std::string GetFilename(const ClFileId fId) const;
     wxDateTime GetFilenameTimestamp(const ClFileId fId) const;
     ClTokenId GetTokenId(const wxString& identifier, const ClFileId fId, const ClTokenType tokenType, const int tokenHash) const; ///< returns wxNOT_FOUND on failure
     ClAbstractToken GetToken(const ClTokenId tId) const;

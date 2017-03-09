@@ -406,10 +406,14 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
     }
     else if (results.size() > 0)
     {
-        wxArrayString list;
+        wxArrayString strList;
         for (std::vector< std::pair<wxString,ClTokenPosition> >::const_iterator it = results.begin(); it != results.end(); ++it)
-            list.Add(F(it->first+wxT(":%d"), it->second.line));
-        int choice = wxGetSingleChoiceIndex(wxT("Please make your choice: "), wxT("Goto definition:"), list);
+        {
+            wxString str = F( it->first + wxT(":%d"), it->second.line);
+            strList.Remove(str);
+            strList.Add(str);
+        }
+        int choice = wxGetSingleChoiceIndex(wxT("Please make your choice: "), wxT("Goto definition:"), strList);
         if ((choice >= 0)&&(choice < (int)results.size()))
         {
             tokenFilename = results[choice].first;
@@ -421,11 +425,11 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
     else // Nothing found...
         return;
 
-    cbEditor* newEd = Manager::Get()->GetEditorManager()->Open(results.front().first);
+    cbEditor* newEd = Manager::Get()->GetEditorManager()->Open(tokenFilename);
     if (newEd)
     {
-        CCLogger::Get()->DebugLog( wxT("Going to file ")+results.front().first );
-        newEd->GotoTokenPosition(results.front().second.line - 1, stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true)));
+        CCLogger::Get()->DebugLog( wxT("Going to file ")+tokenFilename );
+        newEd->GotoTokenPosition(tokenPosition.line - 1, stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true)));
     }
 }
 

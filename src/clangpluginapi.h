@@ -158,15 +158,14 @@ struct ClDiagnosticFixit
 
 struct ClDiagnostic
 {
-    ClDiagnostic(const int ln, const unsigned rgStart, const unsigned rgEnd, const ClDiagnosticSeverity level, const wxString& fl, const wxString& msg, const std::vector<ClDiagnosticFixit> fixitL) :
-        line(ln), range(rgStart, rgEnd), severity(level), file(fl), message(msg), fixitList(fixitL) {}
+    ClDiagnostic(const int ln, const unsigned rgStart, const unsigned rgEnd, const ClDiagnosticSeverity level, const wxString& msg, const std::vector<ClDiagnosticFixit> fixitL) :
+        line(ln), range(rgStart, rgEnd), severity(level), message(msg), fixitList(fixitL) {}
 
     /** @brief Deep copy constructor */
-    ClDiagnostic(const ClDiagnostic& other) : line(other.line), range(other.range), severity(other.severity), file(other.file.c_str()), message(other.message.c_str()), fixitList(other.fixitList){}
+    ClDiagnostic(const ClDiagnostic& other) : line(other.line), range(other.range), severity(other.severity), /*file(other.file),*/ message(other.message.c_str()), fixitList(other.fixitList){}
     int line;
     std::pair<unsigned, unsigned> range;
     ClDiagnosticSeverity severity;
-    wxString file;
     wxString message;
     std::vector<ClDiagnosticFixit> fixitList;
 };
@@ -222,6 +221,9 @@ public:
     ClangFile(const wxString& filename) :
         m_Project(wxT("")),
         m_Filename(filename){}
+    ClangFile(const wxString& project, const wxString& filename) :
+        m_Project(project),
+        m_Filename(filename){}
     ClangFile(const cbProject* pProject, const wxString& filename) :
         m_Project( pProject ? pProject->GetFilename() : wxT("") ),
         m_Filename(filename){}
@@ -246,10 +248,9 @@ public:
         m_Project(project.m_Project),
         m_Filename(filename){}
 
-    /** @brief Deep copy constructor */
     ClangFile(const ClangFile& Other) :
-        m_Project(Other.m_Project.c_str()),
-        m_Filename(Other.m_Filename.c_str()){}
+        m_Project(Other.m_Project),
+        m_Filename(Other.m_Filename){}
 
     friend bool operator<(const ClangFile& first, const ClangFile& second )
     {
@@ -291,7 +292,7 @@ public:
         m_File(file),
         m_Position(pos),
         m_GetCodeCompletionResults(completions) {}
-    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file ,
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
                 const ClTokenPosition& loc, const std::vector<ClDiagnostic>& diag ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
@@ -306,12 +307,19 @@ public:
         m_Position(loc),
         m_DocumentationResults(documentation) {}
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
-               const ClTokenPosition& loc, const std::vector< std::pair<wxString, ClTokenPosition > >& locations ) :
+               const ClTokenPosition& loc, const std::vector< std::pair<std::string, ClTokenPosition > >& locations ) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_File(file),
         m_Position(loc),
-        m_LocationResults(locations) {}
+        m_LocationResults()
+        {
+            for (std::vector< std::pair<std::string, ClTokenPosition> >::const_iterator it = locations.begin(); it != locations.end(); ++it)
+            {
+                wxString filename = wxString::FromUTF8(it->first.c_str());
+                m_LocationResults.push_back(std::make_pair(filename, it->second));
+            }
+        }
 
     /** @brief Copy constructor
      *
@@ -382,7 +390,7 @@ private:
     const std::vector<ClToken> m_GetCodeCompletionResults;
     const std::vector<ClDiagnostic> m_DiagnosticResults;
     const wxString m_DocumentationResults;
-    const std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults;
+    std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults; // Pair of filename + tokenPositions
 };
 
 

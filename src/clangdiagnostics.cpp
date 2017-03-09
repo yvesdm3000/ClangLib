@@ -355,12 +355,6 @@ void ClangDiagnostics::OnDiagnosticsUpdated(ClangEvent& event)
     for (std::vector<ClDiagnostic>::const_iterator dgItr = diagnostics.begin();
          dgItr != diagnostics.end(); ++dgItr)
     {
-        Manager::Get()->GetLogManager()->Log(dgItr->file + wxT(" ") + dgItr->message + F(wxT(" %d, %d"), dgItr->range.first, dgItr->range.second));
-        if (dgItr->file != filename)
-        {
-            CCLogger::Get()->Log(wxT("WARNING: Filename mismatch in diagnostics !!"));
-            continue;
-        }
         if (update)
         {
             m_Diagnostics.push_back( *dgItr );

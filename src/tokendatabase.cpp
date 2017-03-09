@@ -259,9 +259,9 @@ ClFilenameDatabase::~ClFilenameDatabase()
     delete m_pFileEntries;
 }
 
-void ClFilenameDatabase::AddFilename(const ClFilenameEntry& filename)
+void ClFilenameDatabase::AddFilename(const ClFilenameEntry& file)
 {
-    m_pFileEntries->Insert( filename.filename, filename );
+    m_pFileEntries->Insert( wxString::FromUTF8( file.filename.c_str()), file );
 }
 
 std::vector<ClFilenameEntry> ClFilenameDatabase::GetFilenames() const
@@ -276,10 +276,10 @@ std::vector<ClFilenameEntry> ClFilenameDatabase::GetFilenames() const
 }
 
 
-bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
+bool ClFilenameDatabase::HasFilename( const std::string &filename ) const
 {
     assert(m_pFileEntries);
-    wxFileName fln(filename.c_str());
+    wxFileName fln(wxString::FromUTF8( filename.c_str() ));
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
 #ifdef __WXMSW__
     wxPathFormat pathFormat = wxPATH_WIN;
@@ -300,14 +300,14 @@ bool ClFilenameDatabase::HasFilename( const wxString &filename ) const
 
 /** @brief Get a filename id from a filename. Creates a new ID if the filename was not known yet.
  *
- * @param filename const wxString&
+ * @param filename const std::string&
  * @return ClFileId
  *
  */
-ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
+ClFileId ClFilenameDatabase::GetFilenameId(const std::string& filename) const
 {
     assert(m_pFileEntries);
-    wxFileName fln(filename.c_str());
+    wxFileName fln(wxString::FromUTF8( filename.c_str() ));
     fln.Normalize(wxPATH_NORM_ALL & ~wxPATH_NORM_CASE);
 #ifdef __WXMSW__
     wxPathFormat pathFormat = wxPATH_WIN;
@@ -322,7 +322,7 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
     {
         wxString f = wxString(normFile.c_str());
         wxDateTime ts; // Timestamp updated when file was parsed into the token database.
-        ClFilenameEntry entry(f,ts);
+        ClFilenameEntry entry(f.ToUTF8().data(),ts);
         return m_pFileEntries->Insert(f, entry);
     }
     return *idList.begin();
@@ -334,23 +334,17 @@ ClFileId ClFilenameDatabase::GetFilenameId(const wxString& filename) const
  * @return wxString
  *
  */
-wxString ClFilenameDatabase::GetFilename( const ClFileId fId) const
+std::string ClFilenameDatabase::GetFilename( const ClFileId fId) const
 {
     assert(m_pFileEntries);
 
     if (!m_pFileEntries->HasValue(fId))
     {
-        return wxEmptyString;
+        return "";
     }
 
     ClFilenameEntry entry = m_pFileEntries->GetValue(fId);
-    const wxChar* val = entry.filename.c_str();
-    if (val == nullptr)
-    {
-        return wxEmptyString;
-    }
-
-    return wxString(val);
+    return entry.filename;
 }
 
 /** @brief Get the timestamp from a filename
@@ -827,7 +821,7 @@ bool CTokenIndexDatabasePersistence::ReadIn( IPersistentTokenIndexDatabase& toke
                     long long ts = 0;
                     if (!ReadLongLong(in, ts))
                         return false;
-                    tokenDatabase.GetFilenameDatabase()->AddFilename( ClFilenameEntry(filename, wxDateTime(wxLongLong(ts))) );
+                    tokenDatabase.GetFilenameDatabase()->AddFilename( ClFilenameEntry(filename.ToUTF8().data(), wxDateTime(wxLongLong(ts))) );
                 }
             }
             break;
@@ -877,7 +871,7 @@ bool CTokenIndexDatabasePersistence::WriteOut( const IPersistentTokenIndexDataba
         WriteInt(out, (int)filenames.size());
         for (std::vector<ClFilenameEntry>::const_iterator it = filenames.begin(); it != filenames.end(); ++it)
         {
-            if (!WriteString(out, (const char*)it->filename.utf8_str()))
+            if (!WriteString(out, it->filename.c_str()))
                 return false;
             long long ts = 0;
             if (it->timestamp.IsValid())
@@ -923,7 +917,7 @@ void ClTokenDatabase::Clear()
  * @return ClFileId
  *
  */
-ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename) const
+ClFileId ClTokenDatabase::GetFilenameId(const std::string& filename) const
 {
     return m_pTokenIndexDB->GetFilenameId(filename);
 }
@@ -934,7 +928,7 @@ ClFileId ClTokenDatabase::GetFilenameId(const wxString& filename) const
  * @return Full path to the file
  *
  */
-wxString ClTokenDatabase::GetFilename(ClFileId fId) const
+std::string ClTokenDatabase::GetFilename(ClFileId fId) const
 {
     return m_pTokenIndexDB->GetFilename( fId );
 }

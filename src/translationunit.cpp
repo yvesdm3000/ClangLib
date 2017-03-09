@@ -126,7 +126,7 @@ std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
  * \param CompleteOptions   Options passed to clang. See clang_codeCompleteAt for allowed values
  * \return Pointer to a CXCodeCompleteResults that represents all results from code completion
  */
-CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complete_filename, const ClTokenPosition& complete_location,
+CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const std::string& complete_filename, const ClTokenPosition& complete_location,
                                                          struct CXUnsavedFile* unsaved_files, unsigned num_unsaved_files, unsigned CompleteOptions )
 {
     if (m_ClTranslUnit == nullptr)
@@ -140,7 +140,7 @@ CXCodeCompleteResults* ClTranslationUnit::CodeCompleteAt(const wxString& complet
     //}
     if (m_LastCC)
         clang_disposeCodeCompleteResults(m_LastCC);
-    m_LastCC = clang_codeCompleteAt(m_ClTranslUnit, (const char*)complete_filename.ToUTF8(), complete_location.line, complete_location.column,
+    m_LastCC = clang_codeCompleteAt(m_ClTranslUnit, complete_filename.c_str(), complete_location.line, complete_location.column,
                                     unsaved_files, num_unsaved_files, clang_defaultCodeCompleteOptions() | CompleteOptions );
     m_LastPos.Set(complete_location.line, complete_location.column);
     if (m_LastCC)
@@ -221,7 +221,7 @@ const CXCompletionResult* ClTranslationUnit::GetCCResult(unsigned index) const
     return nullptr;
 }
 
-CXCursor ClTranslationUnit::GetTokenAt(const wxString& filename, const ClTokenPosition& location)
+CXCursor ClTranslationUnit::GetTokenAt(const std::string& filename, const ClTokenPosition& location)
 {
     if (m_ClTranslUnit == nullptr)
     {
@@ -231,10 +231,9 @@ CXCursor ClTranslationUnit::GetTokenAt(const wxString& filename, const ClTokenPo
     return cursor;
 }
 
-wxString ClTranslationUnit::GetTokenIdentifierAt( const wxString &filename, const ClTokenPosition &position )
+wxString ClTranslationUnit::GetTokenIdentifierAt( const std::string& filename, const ClTokenPosition &position )
 {
     wxString tokenName;
-    CCLogger::Get()->DebugLog(F(wxT("GetTokenIdentifierAt %d,%d")+filename, position.line, position.column));
     CXCursor cursor = GetTokenAt( filename, position );
     CXCompletionString token = clang_getCursorCompletionString(cursor);
     HashToken( token, tokenName);
@@ -253,7 +252,7 @@ wxString ClTranslationUnit::GetTokenIdentifierAt( const wxString &filename, cons
  * @arg filename The filename that is the main file of the translation unit
  * @arg fileId The fileid that is the view for this translation unit
  */
-bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<wxString, wxString>& unsavedFiles, const bool bReparse )
+bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<std::string, wxString>& unsavedFiles, const bool bReparse )
 {
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse id=%d"), (int)m_Id));
 
@@ -268,24 +267,24 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
         m_ClTranslUnit = nullptr;
     }
     m_Diagnostics.clear();
-    wxString viewFilename = m_pDatabase->GetFilename( fileId );
+    std::string viewFilename = m_pDatabase->GetFilename( fileId );
 
     // TODO: check and handle error conditions
     std::vector<CXUnsavedFile> clUnsavedFiles;
-    std::vector<wxCharBuffer> clFileBuffer;
-    for (std::map<wxString, wxString>::const_iterator fileIt = unsavedFiles.begin();
+    std::vector<std::string> clFileBuffer;
+    for (std::map<std::string, wxString>::const_iterator fileIt = unsavedFiles.begin();
             fileIt != unsavedFiles.end(); ++fileIt)
     {
         CXUnsavedFile unit;
-        clFileBuffer.push_back(fileIt->first.ToUTF8());
-        unit.Filename = clFileBuffer.back().data();
-        clFileBuffer.push_back(fileIt->second.ToUTF8());
-        unit.Contents = clFileBuffer.back().data();
-#if wxCHECK_VERSION(2, 9, 4)
+        clFileBuffer.push_back(fileIt->first);
+        unit.Filename = clFileBuffer.back().c_str();
+        clFileBuffer.push_back(fileIt->second.ToUTF8().data());
+        unit.Contents = clFileBuffer.back().c_str();
+//#if wxCHECK_VERSION(2, 9, 4)
         unit.Length   = clFileBuffer.back().length();
-#else
-        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
-#endif
+//#else
+//        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
+//#endif
         clUnsavedFiles.push_back(unit);
     }
     m_LastParsed = wxDateTime::Now();
@@ -294,7 +293,7 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
 
     if (filename.length() != 0)
     {
-        m_ClTranslUnit = clang_parseTranslationUnit(m_ClIndex, filename.ToUTF8().data(), args.empty() ? nullptr : &args[0], args.size(),
+        m_ClTranslUnit = clang_parseTranslationUnit(m_ClIndex, filename.c_str(), args.empty() ? nullptr : &args[0], args.size(),
                          //clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0], clUnsavedFiles.size(),
                          nullptr, 0,
                          clang_defaultEditingTranslationUnitOptions()
@@ -308,8 +307,7 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                                                    );
         if (m_ClTranslUnit == nullptr)
         {
-            CCLogger::Get()->DebugLog( wxT("clang_parseTranslationUnit failed for ")+filename );
-            CCLogger::Get()->LogError( wxT("ClangLib: Parse Translation Unit failed for ")+filename );
+            //CCLogger::Get()->LogError( wxT("ClangLib: Parse Translation Unit failed for ")+filename );
             return false;
         }
         if (bReparse)
@@ -319,8 +317,8 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
                                                    clang_defaultReparseOptions(m_ClTranslUnit) );
             if (ret != 0)
             {
-                CCLogger::Get()->DebugLog(wxT("ReparseTranslationUnit failed for ")+filename);
-                CCLogger::Get()->LogError(wxT("ClangLib: Reparse Translation Unit failed for ")+filename);
+                //CCLogger::Get()->DebugLog(wxT("ReparseTranslationUnit failed for ")+filename);
+                //CCLogger::Get()->LogError(wxT("ClangLib: Reparse Translation Unit failed for ")+filename);
                 // clang spec specifies that the only valid operation on the translation unit after a failure is to dispose the TU
                 clang_disposeTranslationUnit(m_ClTranslUnit);
                 m_ClTranslUnit = nullptr;
@@ -349,7 +347,7 @@ bool ClTranslationUnit::Parse(const wxString& filename, ClFileId fileId, const s
     return false;
 }
 
-void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFiles)
+void ClTranslationUnit::Reparse( const std::map<std::string, wxString>& unsavedFiles)
 {
     CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Reparse id=%d"), (int)m_Id));
 
@@ -357,23 +355,22 @@ void ClTranslationUnit::Reparse( const std::map<wxString, wxString>& unsavedFile
     {
         return;
     }
-    wxString filename = m_pDatabase->GetFilename( m_FileId );
-    CCLogger::Get()->DebugLog( F(wxT("Filename for %d: '")+filename+wxT("'"), m_FileId) );
+    std::string filename = m_pDatabase->GetFilename( m_FileId );
     std::vector<CXUnsavedFile> clUnsavedFiles;
-    std::vector<wxCharBuffer> clFileBuffer;
-    for (std::map<wxString, wxString>::const_iterator fileIt = unsavedFiles.begin();
+    std::vector<std::string> clFileBuffer;
+    for (std::map<std::string, wxString>::const_iterator fileIt = unsavedFiles.begin();
          fileIt != unsavedFiles.end(); ++fileIt)
     {
         CXUnsavedFile unit;
-        clFileBuffer.push_back(fileIt->first.ToUTF8());
+        clFileBuffer.push_back(fileIt->first);
         unit.Filename = clFileBuffer.back().data();
-        clFileBuffer.push_back(fileIt->second.ToUTF8());
+        clFileBuffer.push_back(fileIt->second.ToUTF8().data());
         unit.Contents = clFileBuffer.back().data();
-#if wxCHECK_VERSION(2, 9, 4)
+//#if wxCHECK_VERSION(2, 9, 4)
         unit.Length   = clFileBuffer.back().length();
-#else
-        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
-#endif
+//#else
+//        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
+//#endif
         clUnsavedFiles.push_back(unit);
     }
 
@@ -455,7 +452,7 @@ void ClTranslationUnit::SwapTokenDatabase(ClTokenDatabase& other)
     swap(*m_pDatabase, other);
 }
 
-void ClTranslationUnit::GetDiagnostics(const wxString& /*filename*/, std::vector<ClDiagnostic>& out_diagnostics)
+void ClTranslationUnit::GetDiagnostics(const std::string& /*filename*/, std::vector<ClDiagnostic>& out_diagnostics)
 {
     if (m_ClTranslUnit == nullptr)
     {
@@ -465,9 +462,9 @@ void ClTranslationUnit::GetDiagnostics(const wxString& /*filename*/, std::vector
     CCLogger::Get()->DebugLog( F(wxT("Returning %d diagnostics for tu %d"), (int)m_Diagnostics.size(), (int)m_Id) );
 }
 
-CXFile ClTranslationUnit::GetFileHandle(const wxString& filename) const
+CXFile ClTranslationUnit::GetFileHandle(const std::string& filename) const
 {
-    return clang_getFile(m_ClTranslUnit, filename.ToUTF8().data());
+    return clang_getFile(m_ClTranslUnit, filename.c_str());
 }
 
 static void RangeToColumns(CXSourceRange range, unsigned& rgStart, unsigned& rgEnd)
@@ -486,7 +483,7 @@ static void RangeToColumns(CXSourceRange range, unsigned& rgStart, unsigned& rgE
  * @return void
  *
  */
-void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& inout_diagnostics )
+void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& srcText, std::vector<ClDiagnostic>& inout_diagnostics )
 {
     if (diag == nullptr)
         return;
@@ -586,18 +583,18 @@ void ClTranslationUnit::ExpandDiagnostic( CXDiagnostic diag, const wxString& fil
             fixitLine = srcText.SubString( offset1, offset2 ).Trim();
         fixitList.push_back( ClDiagnosticFixit(text, fixitStart, fixitEnd, fixitLine) );
     }
-    inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, filename, diagText, fixitList ));
+    inout_diagnostics.push_back(ClDiagnostic( line, rgStart, rgEnd, sev, diagText, fixitList ));
 }
 
 /** @brief Structure used to add diagnostics on include statements
  */
 struct UpdateIncludeDiagnosticsData
 {
-    wxString filename; // Translation unit filename
+    std::string filename; // Translation unit filename
     std::vector<ClDiagnostic>& diagnostics;
-    std::set<wxString> warningIncludes;
-    std::set<wxString> errorIncludes;
-    UpdateIncludeDiagnosticsData( const wxString& fName, std::vector<ClDiagnostic>& diags) : filename(fName), diagnostics(diags), warningIncludes(), errorIncludes() {}
+    std::set<std::string> warningIncludes;
+    std::set<std::string> errorIncludes;
+    UpdateIncludeDiagnosticsData( const std::string& fName, std::vector<ClDiagnostic>& diags) : filename(fName), diagnostics(diags), warningIncludes(), errorIncludes() {}
 };
 
 
@@ -619,7 +616,7 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
     CXFile file;
     clang_getSpellingLocation( inclusion_stack[0], &file, &line, &column, NULL );
     str = clang_getFileName( file );
-    wxString srcFilename = wxString::FromUTF8( clang_getCString( str ) );
+    std::string srcFilename = clang_getCString( str );
     clang_disposeString( str );
     struct UpdateIncludeDiagnosticsData* data = static_cast<struct UpdateIncludeDiagnosticsData*>( clientData );
 
@@ -627,15 +624,15 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
         return;
 
     str = clang_getFileName(included_file);
-    wxString includedFileName = wxString::FromUTF8(clang_getCString(str));
+    std::string includedFileName = clang_getCString(str);
     clang_disposeString(str);
     if (data->errorIncludes.find( includedFileName ) != data->errorIncludes.end())
     {
-        data->diagnostics.push_back( ClDiagnostic( line, column, column, sError, srcFilename, wxT("Errors present"), std::vector<ClDiagnosticFixit>() ));
+        data->diagnostics.push_back( ClDiagnostic( line, column, column, sError, wxT("Errors present"), std::vector<ClDiagnosticFixit>() ));
     }
     else if (data->warningIncludes.find( includedFileName ) != data->warningIncludes.end())
     {
-        data->diagnostics.push_back( ClDiagnostic( line, column, column, sWarning, srcFilename, wxT("Warnings present"), std::vector<ClDiagnosticFixit>() ));
+        data->diagnostics.push_back( ClDiagnostic( line, column, column, sWarning, wxT("Warnings present"), std::vector<ClDiagnosticFixit>() ));
     }
 }
 
@@ -647,7 +644,7 @@ void UpdateIncludeDiagnosticsVisitor( CXFile included_file, CXSourceLocation* in
  * @return void
  *
  */
-void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxString& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics)
+void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const std::string& filename, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics)
 {
     size_t numDiags = clang_getNumDiagnosticsInSet(diagSet);
     struct UpdateIncludeDiagnosticsData includesData(filename, diagnostics);
@@ -662,12 +659,12 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const wxStr
         CXFile file;
         clang_getSpellingLocation(diagLoc, &file, &line, &column, nullptr);
         CXString str = clang_getFileName(file);
-        wxString flName = wxString::FromUTF8(clang_getCString(str));
+        std::string flName = clang_getCString(str);
         clang_disposeString(str);
 
         if (flName == filename)
         {
-            ExpandDiagnostic(diag, filename, srcText, diagnostics);
+            ExpandDiagnostic(diag, srcText, diagnostics);
         }
         else
         {
@@ -732,7 +729,7 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
     if (inclFile.MakeAbsolute())
     {
         std::pair<std::vector<ClFileId>*, ClTokenDatabase*>* data = static_cast<std::pair<std::vector<ClFileId>*, ClTokenDatabase*>*>(client_data);
-        ClFileId fileId = data->second->GetFilenameId( inclFile.GetFullPath() );
+        ClFileId fileId = data->second->GetFilenameId( inclFile.GetFullPath().ToUTF8().data() );
         data->first->push_back( fileId );
         //clTranslUnit->first->AddInclude(clTranslUnit->second->GetFilenameId(inclFile.GetFullPath()));
     }
@@ -782,9 +779,9 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
     str = clang_getFileName(clFile);
-    wxString filename = wxString::FromUTF8(clang_getCString(str));
+    std::string filename = clang_getCString(str);
     clang_disposeString(str);
-    if (filename.IsEmpty())
+    if (filename.empty())
     {
         if (typ == ClTokenType_FuncDecl)
             CCLogger::Get()->DebugLog( wxT("no filename") );
