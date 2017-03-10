@@ -3,9 +3,10 @@
 
 #include <vector>
 #include <set>
+#include <string>
 
 struct TreeNode;
-class wxString;
+
 template<typename _TpVal> class ClTreeMap;
 
 template<>
@@ -15,14 +16,14 @@ public:
     ClTreeMap();
     ClTreeMap(const ClTreeMap<int>& other);
     ~ClTreeMap();
-    int Insert(const wxString& key, int value); // returns value
-    void Remove(const wxString& key, int value);
-    void Remove(const wxString& key);
+    int Insert(const std::string& key, int value); // returns value
+    void Remove(const std::string& key, int value);
+    void Remove(const std::string& key);
     void Shrink();
-    void GetIdSet(const wxString& key, std::set<int>& out_ids) const;
+    void GetIdSet(const std::string& key, std::set<int>& out_ids) const;
     int GetValue(int id) const; // returns id
     int GetCount() const;
-    std::set<wxString> GetKeySet() const;
+    std::set<std::string> GetKeySet() const;
 private:
     TreeNode* m_Root;
 };
@@ -32,7 +33,7 @@ class ClTreeMap
 {
 public:
     // returns the id of the value inserted
-    int Insert(const wxString& key, const _TpVal& value)
+    int Insert(const std::string& key, const _TpVal& value)
     {
         m_Data.push_back(value);
         return m_Tree.Insert(key, m_Data.size() - 1);
@@ -48,15 +49,15 @@ public:
 #endif
     }
 
-    void GetIdSet(const wxString& key, std::set<int>& out_ids) const
+    void GetIdSet(const std::string& key, std::set<int>& out_ids) const
     {
         m_Tree.GetIdSet(key, out_ids);
     }
-    void RemoveIdKey( const wxString& key, int id )
+    void RemoveIdKey( const std::string& key, int id )
     {
         m_Tree.Remove(key, id);
     }
-    void Remove( const wxString& key )
+    void Remove( const std::string& key )
     {
         m_Tree.Remove(key);
     }
@@ -78,7 +79,7 @@ public:
     {
         return m_Data.size();
     }
-    std::set<wxString> GetKeySet() const
+    std::set<std::string> GetKeySet() const
     {
         return m_Tree.GetKeySet();
     }

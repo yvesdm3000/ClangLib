@@ -459,7 +459,7 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int WXUNUS
         if (!tknText.IsEmpty())
         {
             ClTokenPosition loc(line + 1, column + 1);
-            ClangProxy::GetCallTipsAtJob job(cbEVT_CLANG_SYNCTASK_FINISHED, idClangSyncTask, ClangFile( ed->GetProjectFile(), ed->GetFilename()), loc, m_TranslUnitId, tknText);
+            ClangProxy::GetCallTipsAtJob job(cbEVT_CLANG_SYNCTASK_FINISHED, idClangSyncTask, ClangFile( ed->GetProjectFile(), ed->GetFilename()), loc, m_TranslUnitId, tknText.ToUTF8().data());
             m_Proxy.AppendPendingJob(job);
             if (job.WaitCompletion(40) == wxCOND_TIMEOUT)
                 return tips;
@@ -480,12 +480,13 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int WXUNUS
         int hlEnd = wxSCI_INVALID_POSITION;
         for (int i = 0; i < strVecSz; ++i)
         {
+            wxString str = (*strVecItr)[i];
             if (i == commas + 1 && strVecSz > 2)
             {
                 hlStart = tip.Length();
-                hlEnd = hlStart + (*strVecItr)[i].Length();
+                hlEnd = hlStart + str.Length();
             }
-            tip += (*strVecItr)[i];
+            tip += str;
             if (i > 0 && i < (strVecSz - 2))
                 tip += wxT(", ");
         }
@@ -513,9 +514,9 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed,
     m_Proxy.AppendPendingJob(job);
 
     job.WaitCompletion(40);
-    wxStringVec names = job.GetResults();
-    for (wxStringVec::const_iterator nmIt = names.begin(); nmIt != names.end(); ++nmIt)
-        tokens.push_back(CCToken(-1, *nmIt));
+    std::vector<ClIdentifierString> names = job.GetResults();
+    for (std::vector<ClIdentifierString>::const_iterator nmIt = names.begin(); nmIt != names.end(); ++nmIt)
+        tokens.push_back(CCToken(-1, wxString::FromUTF8( nmIt->c_str() )) );
 
     return tokens;
 }

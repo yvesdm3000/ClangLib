@@ -10,7 +10,7 @@
 #include <algorithm>
 
 
-unsigned HashToken(CXCompletionString token, wxString& out_identifier);
+unsigned HashToken(CXCompletionString token, ClIdentifierString& out_identifier);
 
 typedef std::vector<ClTokenScope> ClTokenScopeList;
 typedef std::map<ClFileId, ClTokenScopeList> ClTokenScopeMap;
@@ -116,7 +116,7 @@ public:
     bool HasCCContext( CXCompletionContext ctx ) const;
 
     CXCursor GetTokenAt(const std::string& filename, const ClTokenPosition& position);
-    wxString GetTokenIdentifierAt(const std::string& filename, const ClTokenPosition& position);
+    ClIdentifierString GetTokenIdentifierAt(const std::string& filename, const ClTokenPosition& position);
 
     void GetDiagnostics(const std::string& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const std::string& filename) const;

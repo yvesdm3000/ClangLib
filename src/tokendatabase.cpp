@@ -12,6 +12,7 @@
 #include <iostream>
 #include <wx/mstream.h>
 #include <clang-c/Index.h>
+#include <string>
 
 enum
 {
@@ -197,12 +198,12 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
         WriteInt(out, it->range.endLocation.column);
     }
     WriteInt(out, (int)token.parentTokenList.size());
-    for (std::vector< std::pair<wxString, ClUSRString> >::const_iterator it = token.parentTokenList.begin(); it != token.parentTokenList.end(); ++it)
+    for (std::vector< std::pair<ClIdentifierString, ClUSRString> >::const_iterator it = token.parentTokenList.begin(); it != token.parentTokenList.end(); ++it)
     {
-        WriteString( out, it->first.utf8_str() );
+        WriteString( out, it->first.c_str() );
         WriteString( out, it->second.c_str() );
     }
-    WriteString( out, token.scope.first.utf8_str() );
+    WriteString( out, token.scope.first.c_str() );
     WriteString( out, token.scope.second.c_str() );
     return true;
 }
@@ -257,7 +258,7 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
 
     for (unsigned int i = 0; i< (unsigned int)val; ++i)
     {
-        wxString identifier;
+        ClIdentifierString identifier;
         if (!ReadString( in, identifier ))
             return false;
         ClUSRString USR;
@@ -294,7 +295,7 @@ ClFilenameDatabase::~ClFilenameDatabase()
 
 void ClFilenameDatabase::AddFilename(const ClFilenameEntry& file)
 {
-    m_pFileEntries->Insert( wxString::FromUTF8( file.filename.c_str()), file );
+    m_pFileEntries->Insert( file.filename, file );
 }
 
 std::vector<ClFilenameEntry> ClFilenameDatabase::GetFilenames() const
@@ -325,7 +326,7 @@ bool ClFilenameDatabase::HasFilename( const std::string &filename ) const
         return false;
     std::set<int> idList;
 
-    m_pFileEntries->GetIdSet(normFile, idList);
+    m_pFileEntries->GetIdSet(normFile.ToUTF8().data(), idList);
     if (idList.empty())
         return false;
     return true;
@@ -350,13 +351,13 @@ ClFileId ClFilenameDatabase::GetFilenameId(const std::string& filename) const
     const wxString& normFile = fln.GetFullPath(pathFormat);
     std::set<int> idList;
 
-    m_pFileEntries->GetIdSet(normFile, idList);
+    m_pFileEntries->GetIdSet(normFile.ToUTF8().data(), idList);
     if (idList.empty())
     {
         wxString f = wxString(normFile.c_str());
         wxDateTime ts; // Timestamp updated when file was parsed into the token database.
         ClFilenameEntry entry(f.ToUTF8().data(),ts);
-        return m_pFileEntries->Insert(f, entry);
+        return m_pFileEntries->Insert(entry.filename, entry);
     }
     return *idList.begin();
 }
@@ -478,7 +479,7 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
     swap(first.m_pFileTokens, second.m_pFileTokens);
 }
 
-std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& identifier, const ClUSRString& USR, const ClTokenType typeMask ) const
+std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const ClIdentifierString& identifier, const ClUSRString& USR, const ClTokenType typeMask ) const
 {
     std::set<ClFileId> retList;
     std::set<int> idList;
@@ -498,7 +499,7 @@ std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& id
     return retList;
 }
 
-std::set< std::pair<ClFileId, ClUSRString> > ClTokenIndexDatabase::LookupTokenOverrides( const wxString& identifier, const std::string& USR, const ClTokenType typeMask ) const
+std::set< std::pair<ClFileId, ClUSRString> > ClTokenIndexDatabase::LookupTokenOverrides( const ClIdentifierString& identifier, const std::string& USR, const ClTokenType typeMask ) const
 {
     std::set<std::pair<ClFileId, ClUSRString> > retList;
     std::set<int> idList;
@@ -534,7 +535,7 @@ std::set< std::pair<ClFileId, ClUSRString> > ClTokenIndexDatabase::LookupTokenOv
  * @return void
  *
  */
-void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxString& displayName, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<wxString,ClUSRString> >& overrideTokenList, const std::pair<wxString,ClUSRString>& scope)
+void ClTokenIndexDatabase::UpdateToken( const ClIdentifierString& identifier, const wxString& displayName, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<ClIdentifierString,ClUSRString> >& overrideTokenList, const std::pair<ClIdentifierString,ClUSRString>& scope)
 {
     std::set<int> idList;
 
@@ -560,7 +561,7 @@ void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxStri
                 if (std::find(token.locationList.begin(), token.locationList.end(), location) == token.locationList.end())
                     token.locationList.push_back( location );
             }
-            for (std::vector<std::pair<wxString,ClUSRString> >::const_iterator usrIt = overrideTokenList.begin(); usrIt != overrideTokenList.end(); ++usrIt)
+            for (std::vector<std::pair<ClIdentifierString,ClUSRString> >::const_iterator usrIt = overrideTokenList.begin(); usrIt != overrideTokenList.end(); ++usrIt)
             {
                 if (std::find( token.parentTokenList.begin(), token.parentTokenList.end(), *usrIt ) == token.parentTokenList.end())
                 {
@@ -569,14 +570,14 @@ void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxStri
             }
             wxString fid = wxString::Format( wxT("%d"), fileId );
             //m_pFileTokens->Remove( fid, *it );
-            m_pFileTokens->Insert( fid, *it );
+            m_pFileTokens->Insert( fid.ToUTF8().data(), *it );
             m_bModified = true;
             return;
         }
     }
     ClTokenId id = m_pIndexTokenMap->Insert( identifier, ClIndexToken(identifier, displayName, fileId, USR, tokType, tokenRange, overrideTokenList, scope) );
     wxString fid = wxString::Format( wxT("%d"), fileId );
-    m_pFileTokens->Insert( fid, id );
+    m_pFileTokens->Insert( fid.ToUTF8().data(), id );
     m_bModified = true;
 }
 
@@ -588,7 +589,7 @@ void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxStri
  */
 void ClTokenIndexDatabase::RemoveFileTokens(const ClFileId fileId)
 {
-    wxString key = wxString::Format(wxT("%d"), fileId);
+    std::string key = wxString::Format(wxT("%d"), fileId).ToUTF8().data();
     std::set<ClTokenId> tokenList;
 
     wxMutexLocker locker(m_Mutex);
@@ -612,7 +613,7 @@ void ClTokenIndexDatabase::RemoveFileTokens(const ClFileId fileId)
 }
 
 
-bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
+bool ClTokenIndexDatabase::LookupTokenPosition(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
 {
     std::set<int> idList;
     wxMutexLocker locker(m_Mutex);
@@ -639,7 +640,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const
+bool ClTokenIndexDatabase::LookupTokenPosition(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const
 {
     std::set<int> idList;
 
@@ -667,7 +668,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, const ClUSRString& USR, wxString& out_DisplayName) const
+bool ClTokenIndexDatabase::LookupTokenDisplayName(const ClIdentifierString& identifier, const ClUSRString& USR, wxString& out_DisplayName) const
 {
     std::set<int> idList;
 
@@ -691,10 +692,10 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, co
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
+bool ClTokenIndexDatabase::LookupTokenType(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
 {
     std::set<int> idList;
-    if (identifier.IsEmpty())
+    if (identifier.empty())
         return false;
     wxMutexLocker locker(m_Mutex);
 
@@ -728,7 +729,7 @@ bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClF
  */
 void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenTypeMask, std::vector<ClIndexToken>& out_tokens) const
 {
-    wxString key = wxString::Format(wxT("%d"), fId);
+    std::string key = wxString::Format(wxT("%d"), fId).ToUTF8().data();
     std::set<int> tokenList;
 
     wxMutexLocker locker(m_Mutex);
@@ -745,7 +746,7 @@ void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenType
 
 void ClTokenIndexDatabase::AddToken( const ClIndexToken& token)
 {
-    if (token.identifier.IsEmpty())
+    if (token.identifier.empty())
     {
         return;
     }
@@ -762,7 +763,7 @@ void ClTokenIndexDatabase::AddToken( const ClIndexToken& token)
         ClIndexToken& tokenRef = m_pIndexTokenMap->GetValue( *it );
         if (tokenRef.USR == token.USR)
         {
-            CCLogger::Get()->DebugLog( wxT("ERROR: internal db consistency error updating ")+token.identifier );
+            CCLogger::Get()->DebugLog( wxT("ERROR: internal db consistency error updating ")+wxString::FromUTF8(token.identifier.c_str()) );
             for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
             {
                 tokenRef.locationList.push_back( *it );
@@ -777,7 +778,7 @@ void ClTokenIndexDatabase::AddToken( const ClIndexToken& token)
     {
         wxString fid = wxString::Format( wxT("%d"), it->fileId );
         //m_pFileTokens->Remove( fid, id );
-        m_pFileTokens->Insert( fid, id );
+        m_pFileTokens->Insert( fid.ToUTF8().data(), id );
     }
     m_bModified = true;
 }
@@ -786,8 +787,8 @@ std::vector<ClIndexToken> ClTokenIndexDatabase::GetTokens() const
 {
     std::vector<ClIndexToken> tokenList;
     wxMutexLocker locker(m_Mutex);
-    std::set<wxString> tokens = m_pIndexTokenMap->GetKeySet();
-    for (std::set<wxString>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
+    std::set<ClIdentifierString> tokens = m_pIndexTokenMap->GetKeySet();
+    for (std::set<ClIdentifierString>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
     {
         std::set<int> tokenIds;
         m_pIndexTokenMap->GetIdSet( *it, tokenIds );
@@ -876,7 +877,7 @@ bool CTokenIndexDatabasePersistence::ReadIn( IPersistentTokenIndexDatabase& toke
                     return false;
                 for (i = 0; i < packetCount; ++i)
                 {
-                    wxString identifier;
+                    ClIdentifierString identifier;
                     if (!ReadString( in, identifier ))
                     {
                         return false;
@@ -931,7 +932,7 @@ bool CTokenIndexDatabasePersistence::WriteOut( const IPersistentTokenIndexDataba
 
     for (std::vector<ClIndexToken>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
     {
-        if (!WriteString( out, (const char*)it->identifier.utf8_str() ) )
+        if (!WriteString( out, (const char*)it->identifier.c_str() ) )
         {
             return false;
         }
@@ -996,9 +997,9 @@ wxDateTime ClTokenDatabase::GetFilenameTimestamp( const ClFileId fId ) const
  */
 ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
 {
-    ClTokenId tId = m_pTokens->Insert(wxString(token.identifier), token);
+    ClTokenId tId = m_pTokens->Insert(token.identifier, token);
     wxString filen = wxString::Format(wxT("%d"), token.fileId);
-    m_pFileTokens->Insert(filen, tId);
+    m_pFileTokens->Insert(filen.ToUTF8().data(), tId);
     return tId;
 }
 
@@ -1011,7 +1012,7 @@ ClTokenId ClTokenDatabase::InsertToken( const ClAbstractToken& token )
  * @return ClTokenId
  *
  */
-ClTokenId ClTokenDatabase::GetTokenId( const wxString& identifier, const ClFileId fileId, const ClTokenType tokenType, const int tokenHash ) const
+ClTokenId ClTokenDatabase::GetTokenId( const ClIdentifierString& identifier, const ClFileId fileId, const ClTokenType tokenType, const int tokenHash ) const
 {
     std::set<int> ids;
     m_pTokens->GetIdSet(identifier, ids);
@@ -1048,11 +1049,11 @@ ClAbstractToken ClTokenDatabase::GetToken(const ClTokenId tId) const
 
 /** @brief Find the token IDs of all matches of an identifier
  *
- * @param identifier const wxString&
+ * @param identifier const ClIdentifierString&
  * @return std::vector<ClTokenId>
  *
  */
-void ClTokenDatabase::GetTokenMatches(const wxString& identifier, std::set<ClTokenId>& out_List) const
+void ClTokenDatabase::GetTokenMatches(const ClIdentifierString& identifier, std::set<ClTokenId>& out_List) const
 {
     m_pTokens->GetIdSet(identifier, out_List);
 }
@@ -1065,7 +1066,7 @@ void ClTokenDatabase::GetTokenMatches(const wxString& identifier, std::set<ClTok
  */
 void ClTokenDatabase::GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out_tokens) const
 {
-    wxString key = wxString::Format(wxT("%d"), fId);
+    std::string key = wxString::Format(wxT("%d"), fId).ToUTF8().data();
     m_pFileTokens->GetIdSet(key, out_tokens);
 }
 
@@ -1074,10 +1075,10 @@ void ClTokenDatabase::GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out
  */
 void ClTokenDatabase::GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const
 {
-    std::set<wxString> keys = m_pFileTokens->GetKeySet();
-    for (std::set<wxString>::const_iterator it = keys.begin(); it != keys.end(); ++it)
+    std::set<ClIdentifierString> keys = m_pFileTokens->GetKeySet();
+    for (std::set<ClIdentifierString>::const_iterator it = keys.begin(); it != keys.end(); ++it)
     {
-        out_fileIds.insert( wxAtoi( *it ) );
+        out_fileIds.insert( std::atoi( it->c_str() ) );
     }
 }
 
@@ -1085,7 +1086,7 @@ void ClTokenDatabase::GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const
 void ClTokenDatabase::GetTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const
 {
     std::set<ClTokenId> tokenIds;
-    wxString key = wxString::Format(wxT("%d"), fileId);
+    std::string key = wxString::Format(wxT("%d"), fileId).ToUTF8().data();
     m_pFileTokens->GetIdSet(key, tokenIds);
     CCLogger::Get()->DebugLog( F(wxT("TokenDatabase: found %d tokens"), (int)tokenIds.size()) );
     for (std::set<ClTokenId>::const_iterator it = tokenIds.begin(); it != tokenIds.end(); ++it)
@@ -1095,7 +1096,7 @@ void ClTokenDatabase::GetTokenScopes(const ClFileId fileId, const unsigned Token
         {
             if (token.tokenType&TokenTypeMask)
             {
-                wxString scopeName = token.scope.first;
+                wxString scopeName = wxString::FromUTF8( token.scope.first.c_str() );
                 GetTokenIndexDatabase()->LookupTokenDisplayName( token.scope.first, token.scope.second, scopeName );
                 out_Scopes.push_back( ClTokenScope(token.displayName, scopeName, token.range) );
             }
@@ -1132,7 +1133,7 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
     tokenRef.tokenHash = token.tokenHash;
     tokenRef.tokenType = token.tokenType;
     wxString filen = wxString::Format(wxT("%d"), token.fileId);
-    m_pFileTokens->Insert(filen, freeTokenId);
+    m_pFileTokens->Insert(filen.ToUTF8().data(), freeTokenId);
 }
 
 /** @brief Remove a token from the token database
@@ -1145,7 +1146,7 @@ void ClTokenDatabase::UpdateToken( const ClTokenId freeTokenId, const ClAbstract
 void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 {
     ClAbstractToken oldToken = GetToken(tokenId);
-    wxString key = wxString::Format(wxT("%d"), oldToken.fileId);
+    std::string key = wxString::Format(wxT("%d"), oldToken.fileId).ToUTF8().data();
     m_pFileTokens->Remove(key, tokenId);
     ClAbstractToken t;
     // We just invalidate it here. Real removal is rather complex
@@ -1154,7 +1155,7 @@ void ClTokenDatabase::RemoveToken( const ClTokenId tokenId )
 
 void ClTokenDatabase::RemoveFileTokens( const ClFileId fileId )
 {
-    wxString key = wxString::Format( wxT("%d"), (int)fileId );
+    std::string key = wxString::Format(wxT("%d"), fileId).ToUTF8().data();
     std::set<ClTokenId> ids;
     m_pFileTokens->GetIdSet( key, ids );
     for (std::set<ClTokenId>::const_iterator it = ids.begin(); it != ids.end(); ++it)
@@ -1172,10 +1173,10 @@ unsigned long ClTokenDatabase::GetTokenCount()
 void ClTokenDatabase::StoreIndexes() const
 {
     ClTokenId id;
-    std::set<wxString> keySet = m_pFileTokens->GetKeySet();
-    for (std::set<wxString>::const_iterator it = keySet.begin(); it != keySet.end(); ++it)
+    std::set<std::string> keySet = m_pFileTokens->GetKeySet();
+    for (std::set<std::string>::const_iterator it = keySet.begin(); it != keySet.end(); ++it)
     {
-        ClFileId fId = wxAtoi( *it );
+        ClFileId fId = atoi( it->c_str() );
         //if (!m_pTokenIndexDB->GetFilename( fId ).StartsWith( wxT("/usr") ))
         //    CCLogger::Get()->DebugLog( wxT("Removing all tokens for file ")+m_pTokenIndexDB->GetFilename( fId ) );
         m_pTokenIndexDB->RemoveFileTokens( fId );
@@ -1201,7 +1202,7 @@ void ClTokenDatabase::StoreIndexes() const
     CCLogger::Get()->DebugLog( F(wxT("Inserted total files: %d in indexdb"), (int)createdFiles.size()) );
 }
 
-bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const std::string& usr, ClTokenPosition& out_Position) const
+bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const std::string& usr, ClTokenPosition& out_Position) const
 {
     std::set<ClTokenId> tokenIdList;
     GetTokenMatches(identifier, tokenIdList);
@@ -1224,7 +1225,7 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
     return false;
 }
 
-bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const ClUSRString& usr, ClTokenRange& out_Range) const
+bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenRange& out_Range) const
 {
     std::set<ClTokenId> tokenIdList;
     GetTokenMatches(identifier, tokenIdList);
@@ -1245,5 +1246,5 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
         }
     }
     return false;
-}
+};
 

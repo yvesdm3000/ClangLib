@@ -231,19 +231,20 @@ CXCursor ClTranslationUnit::GetTokenAt(const std::string& filename, const ClToke
     return cursor;
 }
 
-wxString ClTranslationUnit::GetTokenIdentifierAt( const std::string& filename, const ClTokenPosition &position )
+ClIdentifierString ClTranslationUnit::GetTokenIdentifierAt( const std::string& filename, const ClTokenPosition &position )
 {
-    wxString tokenName;
+    ClIdentifierString identifier;
     CXCursor cursor = GetTokenAt( filename, position );
     CXCompletionString token = clang_getCursorCompletionString(cursor);
-    HashToken( token, tokenName);
-    if (tokenName.length() == 0)
+    HashToken( token, identifier);
+    if (identifier.empty())
     {
         CXString str = clang_getCursorDisplayName(cursor);
-        tokenName = wxString::FromUTF8(clang_getCString(str));
+        if (clang_getCString( str ))
+            identifier = clang_getCString(str);
         clang_disposeString(str);
     }
-    return tokenName;
+    return identifier;
 }
 
 /**
@@ -276,8 +277,7 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
             fileIt != unsavedFiles.end(); ++fileIt)
     {
         CXUnsavedFile unit;
-        clFileBuffer.push_back(fileIt->first);
-        unit.Filename = clFileBuffer.back().c_str();
+        unit.Filename = fileIt->first.c_str();
         clFileBuffer.push_back(fileIt->second.ToUTF8().data());
         unit.Contents = clFileBuffer.back().c_str();
         unit.Length = clFileBuffer.back().length();
@@ -358,8 +358,7 @@ void ClTranslationUnit::Reparse( const std::map<std::string, wxString>& unsavedF
          fileIt != unsavedFiles.end(); ++fileIt)
     {
         CXUnsavedFile unit;
-        clFileBuffer.push_back(fileIt->first);
-        unit.Filename = clFileBuffer.back().c_str();
+        unit.Filename = fileIt->first.c_str();
         clFileBuffer.push_back(fileIt->second.ToUTF8().data());
         unit.Contents = clFileBuffer.back().data();
         unit.Length = clFileBuffer.back().length();
@@ -683,11 +682,11 @@ void ClTranslationUnit::ExpandDiagnosticSet(CXDiagnosticSet diagSet, const std::
 /** @brief Calculate a hash from a Clang token
  *
  * @param token CXCompletionString
- * @param identifier wxString&
+ * @param identifier ClIdentifierString&
  * @return unsigned
  *
  */
-unsigned HashToken(CXCompletionString token, wxString& out_identifier)
+unsigned HashToken(CXCompletionString token, ClIdentifierString& out_identifier)
 {
     unsigned hVal = 2166136261u;
     size_t upperBound = clang_getNumCompletionChunks(token);
@@ -696,7 +695,7 @@ unsigned HashToken(CXCompletionString token, wxString& out_identifier)
         CXString str = clang_getCompletionChunkText(token, i);
         const char* pCh = clang_getCString(str);
         if (clang_getCompletionChunkKind(token, i) == CXCompletionChunk_TypedText)
-            out_identifier = wxString::FromUTF8(*pCh =='~' ? pCh + 1 : pCh);
+            out_identifier = *pCh =='~' ? pCh + 1 : pCh;
         for (; *pCh; ++pCh)
         {
             hVal ^= *pCh;
@@ -732,7 +731,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
 {
     CXString str;
     CXCompletionString token = clang_getCursorCompletionString(cursor);
-    wxString identifier;
+    ClIdentifierString identifier;
     int tokenHash = HashToken( token, identifier );
     str = clang_getCursorUSR( cursor );
     ClUSRString usr;
@@ -749,7 +748,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     }
     if (typ == 0)
     {
-        CCLogger::Get()->DebugLog( F(wxT("Unknown token type: %d for token ")+identifier, cursor.kind) );
+        CCLogger::Get()->DebugLog( F(wxT("Unknown token type: %d for token ")+wxString::FromUTF8(identifier.c_str()), cursor.kind) );
     }
     if (typ < ClTokenType_DeclGroup)
     {
@@ -784,7 +783,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         return;
     }
 
-    if (identifier.IsEmpty())
+    if (identifier.empty())
     {
         if (typ == ClTokenType_FuncDecl)
             CCLogger::Get()->DebugLog( wxT("Identifier is empty usr=")+wxString::FromUTF8(usr.c_str()) );
@@ -800,13 +799,13 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         clang_disposeString(str);
         if (displayName.IsEmpty())
         {
-            displayName = identifier;
+            displayName = wxString::FromUTF8(identifier.c_str());
         }
 
-        wxString scopeIdentifier;
+        ClIdentifierString scopeIdentifier;
         ClUSRString scopeUSR;
         CXCursor cursorWalk = clang_getCursorSemanticParent(cursor);
-        while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeIdentifier.IsEmpty()) )
+        while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeIdentifier.empty()) )
         {
             switch (cursorWalk.kind)
             {
@@ -859,7 +858,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
                 ClUSRString usr = clang_getCString( str );
                 clang_disposeString( str );
                 str = clang_getCursorSpelling( cursorList[i] );
-                wxString identifier = wxString::FromUTF8( clang_getCString(str) );
+                ClIdentifierString identifier = clang_getCString(str);
                 clang_disposeString( str );
                 tok.parentTokenList.push_back( std::make_pair( identifier, usr ) );
             }
