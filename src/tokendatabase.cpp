@@ -140,6 +140,40 @@ static bool ReadString( wxInputStream& in, wxString& out_String )
     return true;
 }
 
+/** @brief Read a string from an input stream
+ *
+ * @param in wxInputStream&
+ * @param out_String wxString&
+ * @return bool
+ *
+ */
+static bool ReadString( wxInputStream& in, std::string& out_String )
+{
+    int len;
+    if (!ReadInt(in, len))
+        return false;
+    if (len == 0)
+    {
+        out_String.clear();
+        return true;
+    }
+    if (len > 32*1024)
+    {
+        return false;
+    }
+    if (!in.CanRead())
+        return false;
+    char buffer[len + 1];
+
+    in.Read( buffer, len );
+    if (in.LastRead() != len)
+        return false;
+    buffer[len] = '\0';
+
+    out_String = buffer;
+
+    return true;
+}
 /** @brief Write a token to an output stream
  *
  * @param token const ClAbstractToken&
@@ -151,7 +185,7 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
 {
     // This is a cached database so we don't care about endianness for now. Who will ever copy these from one platform to another?
     WriteString( out, token.displayName.utf8_str());
-    WriteString( out, token.USR.utf8_str() );
+    WriteString( out, token.USR.c_str() );
     WriteInt(out, (int)token.locationList.size());
     for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it )
     {
@@ -163,13 +197,13 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
         WriteInt(out, it->range.endLocation.column);
     }
     WriteInt(out, (int)token.parentTokenList.size());
-    for (std::vector< std::pair<wxString, wxString> >::const_iterator it = token.parentTokenList.begin(); it != token.parentTokenList.end(); ++it)
+    for (std::vector< std::pair<wxString, ClUSRString> >::const_iterator it = token.parentTokenList.begin(); it != token.parentTokenList.end(); ++it)
     {
         WriteString( out, it->first.utf8_str() );
-        WriteString( out, it->second.utf8_str() );
+        WriteString( out, it->second.c_str() );
     }
     WriteString( out, token.scope.first.utf8_str() );
-    WriteString( out, token.scope.second.utf8_str() );
+    WriteString( out, token.scope.second.c_str() );
     return true;
 }
 
@@ -226,7 +260,7 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
         wxString identifier;
         if (!ReadString( in, identifier ))
             return false;
-        wxString USR;
+        ClUSRString USR;
         if (!ReadString( in, USR ))
             return false;
         token.parentTokenList.push_back( std::make_pair( identifier, USR ) );
@@ -444,7 +478,7 @@ void swap( ClTokenDatabase& first, ClTokenDatabase& second )
     swap(first.m_pFileTokens, second.m_pFileTokens);
 }
 
-std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
+std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& identifier, const ClUSRString& USR, const ClTokenType typeMask ) const
 {
     std::set<ClFileId> retList;
     std::set<int> idList;
@@ -455,7 +489,7 @@ std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& id
     for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
     {
         ClIndexToken& token = m_pIndexTokenMap->GetValue(*it);
-        if (((token.tokenTypeMask&typeMask)==typeMask )&&((USR.Length() == 0)||(token.USR.Length() == 0)||(USR == token.USR)))
+        if (((token.tokenTypeMask&typeMask)==typeMask )&&((USR.empty())||(token.USR.empty())||(USR == token.USR)))
         {
             for (std::vector<ClIndexTokenLocation>::const_iterator it2 = token.locationList.begin(); it2 != token.locationList.end(); ++it2)
                 retList.insert( it2->fileId );
@@ -464,9 +498,9 @@ std::set<ClFileId> ClTokenIndexDatabase::LookupTokenFileList( const wxString& id
     return retList;
 }
 
-std::set< std::pair<ClFileId, wxString> > ClTokenIndexDatabase::LookupTokenOverrides( const wxString& identifier, const wxString& USR, const ClTokenType typeMask ) const
+std::set< std::pair<ClFileId, ClUSRString> > ClTokenIndexDatabase::LookupTokenOverrides( const wxString& identifier, const std::string& USR, const ClTokenType typeMask ) const
 {
-    std::set<std::pair<ClFileId, wxString> > retList;
+    std::set<std::pair<ClFileId, ClUSRString> > retList;
     std::set<int> idList;
 
     wxMutexLocker locker(m_Mutex);
@@ -487,7 +521,20 @@ std::set< std::pair<ClFileId, wxString> > ClTokenIndexDatabase::LookupTokenOverr
     return retList;
 }
 
-void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxString& displayName, const ClFileId fileId, const wxString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<wxString,wxString> >& overrideTokenList, const std::pair<wxString,wxString>& scope)
+/** @brief Update a token in the token database
+ *
+ * @param identifier const wxString&
+ * @param displayName const wxString&
+ * @param fileId const ClFileId
+ * @param USR const ClUSRString&
+ * @param tokType const ClTokenType
+ * @param tokenRange const ClTokenRange&
+ * @param overrideTokenList std::pair<wxString const std::vector<ClUSRString> >&
+ * @param scope std::pair<wxString const, scope ClUSRString>&
+ * @return void
+ *
+ */
+void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxString& displayName, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<wxString,ClUSRString> >& overrideTokenList, const std::pair<wxString,ClUSRString>& scope)
 {
     std::set<int> idList;
 
@@ -513,7 +560,7 @@ void ClTokenIndexDatabase::UpdateToken( const wxString& identifier, const wxStri
                 if (std::find(token.locationList.begin(), token.locationList.end(), location) == token.locationList.end())
                     token.locationList.push_back( location );
             }
-            for (std::vector<std::pair<wxString,wxString> >::const_iterator usrIt = overrideTokenList.begin(); usrIt != overrideTokenList.end(); ++usrIt)
+            for (std::vector<std::pair<wxString,ClUSRString> >::const_iterator usrIt = overrideTokenList.begin(); usrIt != overrideTokenList.end(); ++usrIt)
             {
                 if (std::find( token.parentTokenList.begin(), token.parentTokenList.end(), *usrIt ) == token.parentTokenList.end())
                 {
@@ -565,7 +612,7 @@ void ClTokenIndexDatabase::RemoveFileTokens(const ClFileId fileId)
 }
 
 
-bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
+bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const
 {
     std::set<int> idList;
     wxMutexLocker locker(m_Mutex);
@@ -576,7 +623,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
         ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
         if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
         {
-            if ((USR.Length() == 0)||(USR == token.USR))
+            if ((USR.empty())||(USR == token.USR))
             {
                 for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
                 {
@@ -592,7 +639,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const
+bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const
 {
     std::set<int> idList;
 
@@ -604,7 +651,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
         ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
         if ((token.tokenTypeMask&tokenTypeMask)==tokenTypeMask)
         {
-            if ((USR.Length() == 0)||(USR == token.USR))
+            if ((USR.empty())||(USR == token.USR))
             {
                 for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
                 {
@@ -620,7 +667,7 @@ bool ClTokenIndexDatabase::LookupTokenPosition(const wxString& identifier, const
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, const wxString& USR, wxString& out_DisplayName) const
+bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, const ClUSRString& USR, wxString& out_DisplayName) const
 {
     std::set<int> idList;
 
@@ -630,7 +677,7 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, co
     for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
     {
         ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
-        if ((USR.Length() == 0)||(USR == token.USR))
+        if ((USR.empty())||(USR == token.USR))
         {
             out_DisplayName = token.displayName;
             wxString parentScopeDisplayName;
@@ -644,7 +691,7 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const wxString& identifier, co
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClFileId fileId, const wxString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
+bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
 {
     std::set<int> idList;
     if (identifier.IsEmpty())
@@ -655,7 +702,7 @@ bool ClTokenIndexDatabase::LookupTokenType(const wxString& identifier, const ClF
     for (std::set<int>::const_iterator it = idList.begin(); it != idList.end(); ++it)
     {
         ClIndexToken& token = m_pIndexTokenMap->GetValue( *it );
-        if ((USR.Length() == 0)||(USR == token.USR))
+        if ((USR.empty())||(USR == token.USR))
         {
             for (std::vector<ClIndexTokenLocation>::const_iterator it = token.locationList.begin(); it != token.locationList.end(); ++it)
             {
@@ -1154,7 +1201,7 @@ void ClTokenDatabase::StoreIndexes() const
     CCLogger::Get()->DebugLog( F(wxT("Inserted total files: %d in indexdb"), (int)createdFiles.size()) );
 }
 
-bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_Position) const
+bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const std::string& usr, ClTokenPosition& out_Position) const
 {
     std::set<ClTokenId> tokenIdList;
     GetTokenMatches(identifier, tokenIdList);
@@ -1166,7 +1213,7 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
         {
             if ( (tok.tokenType&ClTokenType_DefGroup) == ClTokenType_DefGroup ) // We only want token definitions
             {
-                if( (usr.Length() == 0)||(tok.USR == usr))
+                if( (usr.empty())||(tok.USR == usr))
                 {
                     out_Position = tok.range.beginLocation;
                     return true;
@@ -1177,7 +1224,7 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
     return false;
 }
 
-bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenRange& out_Range) const
+bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const ClUSRString& usr, ClTokenRange& out_Range) const
 {
     std::set<ClTokenId> tokenIdList;
     GetTokenMatches(identifier, tokenIdList);
@@ -1189,7 +1236,7 @@ bool ClTokenDatabase::LookupTokenDefinition( const ClFileId fileId, const wxStri
         {
             if ( (tok.tokenType&ClTokenType_DefGroup) == ClTokenType_DefGroup ) // We only want token definitions
             {
-                if( (usr.Length() == 0)||(tok.USR == usr))
+                if( (usr.empty())||(tok.USR == usr))
                 {
                     out_Range = tok.range;
                     return true;

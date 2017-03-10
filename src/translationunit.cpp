@@ -735,13 +735,16 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     wxString identifier;
     int tokenHash = HashToken( token, identifier );
     str = clang_getCursorUSR( cursor );
-    wxString usr = wxString::FromUTF8( clang_getCString( str ) );
+    ClUSRString usr;
+    if (clang_getCString( str ))
+        usr = clang_getCString(str);
     clang_disposeString( str );
-    if (usr.Length() == 0)
+    if (usr.empty())
     {
         CXCursor declCursor = clang_getCursorDefinition( cursor );
         str = clang_getCursorUSR( declCursor );
-        usr = wxString::FromUTF8( clang_getCString( str ) );
+        if (clang_getCString(str))
+            usr = clang_getCString( str );
         clang_disposeString( str );
     }
     if (typ == 0)
@@ -784,7 +787,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     if (identifier.IsEmpty())
     {
         if (typ == ClTokenType_FuncDecl)
-            CCLogger::Get()->DebugLog( wxT("Identifier is empty usr=")+usr );
+            CCLogger::Get()->DebugLog( wxT("Identifier is empty usr=")+wxString::FromUTF8(usr.c_str()) );
         //str = clang_getCursorDisplayName(cursor);
         //wxString displayName = wxString::FromUTF8( clang_getCString( str ) );
         //CCLogger::Get()->DebugLog( F(wxT("Skipping symbol %d,%d")+displayName, line, col ));
@@ -801,7 +804,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         }
 
         wxString scopeIdentifier;
-        wxString scopeUSR;
+        ClUSRString scopeUSR;
         CXCursor cursorWalk = clang_getCursorSemanticParent(cursor);
         while ( (!clang_Cursor_isNull(cursorWalk))&&(scopeIdentifier.IsEmpty()) )
         {
@@ -822,7 +825,8 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
                     HashToken( token, scopeIdentifier );
                 }
                 str = clang_getCursorUSR( cursorWalk );
-                scopeUSR = wxString::FromUTF8( clang_getCString( str ) );
+                if (clang_getCString(str) != NULL)
+                    scopeUSR = clang_getCString( str );
                 clang_disposeString( str );
                 break;
             case CXCursor_TranslationUnit:
@@ -852,7 +856,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             for (unsigned int i=0; i < cursorNum; ++i)
             {
                 str = clang_getCursorUSR( cursorList[i] );
-                wxString usr = wxString::FromUTF8( clang_getCString( str ) );
+                ClUSRString usr = clang_getCString( str );
                 clang_disposeString( str );
                 str = clang_getCursorSpelling( cursorList[i] );
                 wxString identifier = wxString::FromUTF8( clang_getCString(str) );

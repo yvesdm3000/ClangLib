@@ -1550,7 +1550,7 @@ void ClangProxy::GetTokensAt( const ClTranslUnitId translUnitId, const std::stri
     }
 }
 
-bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, wxString& out_Identifier, wxString& out_USR )
+bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, wxString& out_Identifier, std::string& out_USR )
 {
     if (translId < 0)
     {
@@ -1564,28 +1564,27 @@ bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& f
     out_Identifier = m_TranslUnits[translId].GetTokenIdentifierAt( filename, position );
     CXCursor cursor = m_TranslUnits[translId].GetTokenAt(filename, position);
     CXString str = clang_getCursorUSR(cursor);
-    out_USR = wxString::FromUTF8( clang_getCString( str ) );
+    out_USR = clang_getCString( str );
     clang_disposeString( str );
-    if (out_USR.Length() == 0)
+    if ( out_USR.empty() )
     {
         ProxyHelper::ResolveCursorDecl( cursor );
         CXString str = clang_getCursorUSR(cursor);
-        out_USR = wxString::FromUTF8( clang_getCString( str ) );
+        out_USR = clang_getCString( str );
         clang_disposeString( str );
     }
-    CCLogger::Get()->DebugLog( wxT("GetTokenAt: Identifier=")+out_Identifier+wxT(" USR=")+out_USR );
 
     return true;
 }
 
-void ClangProxy::GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<wxString>& out_USRList)
+void ClangProxy::GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList)
 {
     if (translUnitId < 0)
     {
         return;
     }
     wxString identifier;
-    wxString USR;
+    ClUSRString USR;
     if (GetTokenAt(translUnitId, filename, position, identifier, USR))
     {
         wxMutexLocker lock(m_Mutex);
@@ -1593,8 +1592,8 @@ void ClangProxy::GetTokenOverridesAt( const ClTranslUnitId translUnitId, const s
         {
             return;
         }
-        std::set<std::pair<ClFileId,wxString> > list = m_TranslUnits[translUnitId].GetTokenDatabase().GetTokenIndexDatabase()->LookupTokenOverrides( identifier, USR, ClTokenType_DefGroup );
-        for (std::set<std::pair<ClFileId,wxString> >::const_iterator it = list.begin(); it != list.end(); ++it)
+        std::set<std::pair<ClFileId,ClUSRString> > list = m_TranslUnits[translUnitId].GetTokenDatabase().GetTokenIndexDatabase()->LookupTokenOverrides( identifier, USR, ClTokenType_DefGroup );
+        for (std::set<std::pair<ClFileId,ClUSRString> >::const_iterator it = list.begin(); it != list.end(); ++it)
         {
             out_USRList.push_back( it->second );
         }
@@ -1753,12 +1752,12 @@ bool ClangProxy::ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, st
  *
  * @param fileId const ClFileId
  * @param identifier const wxString&
- * @param usr const wxString&
+ * @param usr const ClUSRString&
  * @param out_Position ClTokenPosition&
  * @return bool
  *
  */
-bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const wxString& usr, ClTokenPosition& out_Position)
+bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const wxString& identifier, const ClUSRString& usr, ClTokenPosition& out_Position)
 {
     wxMutexLocker lock(m_Mutex);
     for (ClTranslUnitId id = 0; id < (ClTranslUnitId)m_TranslUnits.size(); ++id)
@@ -1788,7 +1787,7 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const std::st
 
         wxString scopeName;
         wxString lastScopeIdent;
-        wxString lastScopeUSR;
+        ClUSRString lastScopeUSR;
         ClTokenType scopeTokenType = ClTokenType_Unknown;
 
         for (std::vector<ClIndexToken>::const_iterator it = tokens.begin(); it != tokens.end(); ++it)
