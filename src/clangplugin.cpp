@@ -1575,7 +1575,7 @@ ClTranslUnitId ClangPlugin::GetTranslationUnitId(const ClangFile& file)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (ed && ed->IsOK())
     {
-        if (ed->GetFilename() == file.GetFilename())
+        if ((ed->GetFilename() == file.GetFilename())&&(m_TranslUnitId != wxNOT_FOUND))
             return m_TranslUnitId;
     }
     return m_Proxy.GetTranslationUnitId(m_TranslUnitId, file);

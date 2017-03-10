@@ -1779,23 +1779,7 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const std::st
     {
         return;
     }
-    if (translUnitId >= 0 )
-    {
-        {
-            wxMutexLocker lock(m_Mutex);
-            if (translUnitId >= (int)m_TranslUnits.size())
-            {
-                return;
-            }
-            ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
-            m_TranslUnits[translUnitId].GetTokenScopes(fId, tokenMask, out_Scopes);
 
-        }
-        if (!out_Scopes.empty())
-        {
-            return;
-        }
-    }
     ClTokenIndexDatabase* pTokenIndexDB = GetTokenIndexDatabase( project );
     if (pTokenIndexDB)
     {
@@ -1843,6 +1827,24 @@ void ClangProxy::GetTokenScopes(const ClTranslUnitId translUnitId, const std::st
                 }
             }
         }
+    }
+    if (!out_Scopes.empty())
+    {
+        return;
+    }
+    if (translUnitId >= 0 )
+    {
+        {
+            wxMutexLocker lock(m_Mutex);
+            if (translUnitId >= (int)m_TranslUnits.size())
+            {
+                return;
+            }
+            ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
+            m_TranslUnits[translUnitId].GetTokenScopes(fId, tokenMask, out_Scopes);
+
+        }
+        CCLogger::Get()->DebugLog(F(wxT("Token scopes returned from TU: %d"), out_Scopes.size()));
     }
 }
 

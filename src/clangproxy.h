@@ -236,7 +236,7 @@ public:
             /* deep copy */
             for ( std::map<std::string, wxString>::const_iterator it = other.m_UnsavedFiles.begin(); it != other.m_UnsavedFiles.end(); ++it)
             {
-                m_UnsavedFiles.insert( std::make_pair( it->first, it->second.c_str() ) );
+                m_UnsavedFiles.insert( std::make_pair( it->first, wxString(it->second.c_str()) ) );
             }
         }
     public:

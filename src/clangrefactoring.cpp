@@ -425,11 +425,12 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
     else // Nothing found...
         return;
 
+    wxString textRange = stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true));
     cbEditor* newEd = Manager::Get()->GetEditorManager()->Open(tokenFilename);
     if (newEd)
     {
         CCLogger::Get()->DebugLog( wxT("Going to file ")+tokenFilename );
-        newEd->GotoTokenPosition(tokenPosition.line - 1, stc->GetTextRange(stc->WordStartPosition( stc->GetCurrentPos(), true), stc->WordEndPosition(stc->GetCurrentPos(), true)));
+        newEd->GotoTokenPosition(tokenPosition.line - 1, textRange);
     }
 }
 
@@ -450,10 +451,11 @@ void ClangRefactoring::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
     ClangFile declFile = file;
     if ( !m_pClangPlugin->ResolveTokenDeclarationAt(m_TranslUnitId, file, loc, declFile, declLoc) )
         return;
+    wxString textRange = stc->GetTextRange(stc->WordStartPosition(pos, true),
+                              stc->WordEndPosition(pos, true));
     ed = Manager::Get()->GetEditorManager()->Open(declFile.GetFilename());
     if (ed)
     {
-        ed->GotoTokenPosition(declLoc.line - 1, stc->GetTextRange(stc->WordStartPosition(pos, true),
-                              stc->WordEndPosition(pos, true)));
+        ed->GotoTokenPosition(declLoc.line - 1, textRange);
     }
 }

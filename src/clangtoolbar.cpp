@@ -99,6 +99,7 @@ void ClangToolbar::OnEditorActivate(CodeBlocksEvent& event)
         }
 
         m_CurrentState.m_TranslUnitId = id;
+
         wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
         AddPendingEvent(evt);
         wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
@@ -291,7 +292,7 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
         file = ClangFile(*ed->GetProjectFile());
     }
     m_CurrentState.m_TokenScopes.clear();
-    m_pClangPlugin->GetTokenScopes( m_CurrentState.m_TranslUnitId, file, ClTokenType_DeclGroup|ClTokenType_DefGroup, m_CurrentState.m_TokenScopes );
+    m_pClangPlugin->GetTokenScopes(GetCurrentTranslationUnitId(), file, ClTokenType_DeclGroup|ClTokenType_DefGroup, m_CurrentState.m_TokenScopes );
     if (m_CurrentState.m_TokenScopes.empty())
     {
         EnableToolbarTools(false);
