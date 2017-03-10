@@ -387,7 +387,6 @@ void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
 
 void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
 {
-    CCLogger::Get()->DebugLog( wxT("OnGetDefinitionFinished") );
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if (!ed)
         return;

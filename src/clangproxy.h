@@ -501,18 +501,14 @@ public:
                 if (!db)
                     return;
                 std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, m_TokenUSR, ClTokenType_DefGroup );
-                std::set<ClFileId> unhandledFileIdList;
                 for ( std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
                 {
                     ClTokenPosition pos(0,0);
                     if (clangproxy.LookupTokenDefinition(*it, m_TokenIdentifier, m_TokenUSR, pos) )
                     {
                         std::string fn = db->GetFilename( *it );
-                        m_Locations.push_back( std::make_pair( fn, pos ) );
-                    }
-                    else
-                    {
-                        unhandledFileIdList.insert( *it );
+                        if (std::find( m_Locations.begin(), m_Locations.end(), std::make_pair( fn, pos ) ) == m_Locations.end())
+                            m_Locations.push_back( std::make_pair( fn, pos ) );
                     }
                 }
                 if (m_Locations.size() > 0)
@@ -526,7 +522,6 @@ public:
                 {
                     const ClUSRString& USR = *it;
                     std::set<ClFileId> fileIdList = db->LookupTokenFileList( m_TokenIdentifier, USR, ClTokenType_Unknown );
-                    std::set<ClFileId> unhandledFileIdList;
                     for ( std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
                     {
                         ClTokenPosition pos(0,0);
@@ -540,10 +535,6 @@ public:
                         {
                             std::string fn = db->GetFilename( *it );
                             m_Locations.push_back( std::make_pair( fn, pos ) );
-                        }
-                        else
-                        {
-                            unhandledFileIdList.insert( *it );
                         }
                     }
                 }
