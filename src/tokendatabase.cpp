@@ -5,7 +5,6 @@
  * database should have a reference to the same filename database.
  *
  */
-
 #include "tokendatabase.h"
 
 #include <wx/filename.h>
@@ -687,13 +686,11 @@ void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenType
 
     wxMutexLocker locker(m_Mutex);
     m_pFileTokens->GetIdSet(key, tokenList);
-    CCLogger::Get()->DebugLog( F(wxT(" file %d tok: %d from total %d in %p"), (int)fId, (int)tokenList.size(), (int)m_pFileTokens->GetCount(), m_pFileTokens) );
     for (std::set<int>::const_iterator it = tokenList.begin(); it != tokenList.end(); ++it)
     {
         const ClIndexToken& tok = m_pIndexTokenMap->GetValue( m_pFileTokens->GetValue( *it ) );
         if ( (tokenTypeMask==0)||(tok.tokenTypeMask&tokenTypeMask) )
         {
-            //CCLogger::Get()->DebugLog( F(wxT("Adding token ")+tok.identifier+wxT(" with mask %x USR=")+tok.USR, (int)tok.tokenTypeMask) );
             out_tokens.push_back(tok);
         }
     }

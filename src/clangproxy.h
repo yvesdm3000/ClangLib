@@ -802,7 +802,6 @@ public:
         void Execute(ClangProxy& clangproxy)
         {
             std::vector<ClToken> results;
-            CCLogger::Get()->DebugLog( F(wxT("CodeCompleteAt ")+wxString::FromUTF8(m_Filename.c_str())+wxT(" pos=%d,%d"), m_Position.line, m_Position.column) );
             clangproxy.CodeCompleteAt(m_TranslId, m_Filename, m_Position, m_Options, m_UnsavedFiles, results, m_Diagnostics);
             for (std::vector<ClToken>::iterator tknIt = results.begin(); tknIt != results.end(); ++tknIt)
             {

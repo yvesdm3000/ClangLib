@@ -280,11 +280,7 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
         unit.Filename = clFileBuffer.back().c_str();
         clFileBuffer.push_back(fileIt->second.ToUTF8().data());
         unit.Contents = clFileBuffer.back().c_str();
-//#if wxCHECK_VERSION(2, 9, 4)
-        unit.Length   = clFileBuffer.back().length();
-//#else
-//        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
-//#endif
+        unit.Length = clFileBuffer.back().length();
         clUnsavedFiles.push_back(unit);
     }
     m_LastParsed = wxDateTime::Now();
@@ -363,14 +359,10 @@ void ClTranslationUnit::Reparse( const std::map<std::string, wxString>& unsavedF
     {
         CXUnsavedFile unit;
         clFileBuffer.push_back(fileIt->first);
-        unit.Filename = clFileBuffer.back().data();
+        unit.Filename = clFileBuffer.back().c_str();
         clFileBuffer.push_back(fileIt->second.ToUTF8().data());
         unit.Contents = clFileBuffer.back().data();
-//#if wxCHECK_VERSION(2, 9, 4)
-        unit.Length   = clFileBuffer.back().length();
-//#else
-//        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
-//#endif
+        unit.Length = clFileBuffer.back().length();
         clUnsavedFiles.push_back(unit);
     }
 

@@ -890,17 +890,16 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const std::s
         return;
     }
     std::vector<CXUnsavedFile> clUnsavedFiles;
+    std::vector<std::string> clFileBuffer;
     for (std::map<std::string, wxString>::const_iterator fileIt = unsavedFiles.begin();
             fileIt != unsavedFiles.end(); ++fileIt)
     {
         CXUnsavedFile unit;
-        unit.Filename = fileIt->first.c_str();
-        unit.Contents = fileIt->second.ToUTF8().data();
-#if wxCHECK_VERSION(2, 9, 4)
-        unit.Length = fileIt->second.length();
-#else
-        unit.Length   = strlen(unit.Contents); // extra work needed because wxString::Length() treats multibyte character length as '1'
-#endif
+        clFileBuffer.push_back(fileIt->first);
+        unit.Filename = clFileBuffer.back().c_str();
+        clFileBuffer.push_back(fileIt->second.ToUTF8().data());
+        unit.Contents = clFileBuffer.back().data();
+        unit.Length = clFileBuffer.back().length();
         clUnsavedFiles.push_back(unit);
     }
     wxMutexLocker locker(m_Mutex);
@@ -1906,7 +1905,6 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
             tu.SetFiles(includeFiles);
             tu.SwapTokenDatabase( tokenDatabase );
         }
-        //CCLogger::Get()->DebugLog( F(wxT("Total token count: %d, function scopes for TU %d: %d, files: %d"), (int)m_Database.GetTokenCount(), (int)translUnitId, (int)functionScopes.size(), (int)includeFiles.size() ) );
     } else {
         CCLogger::Get()->DebugLog( F(_T("UpdateTokenDatabase: Translation unit %d is not valid!"), translUnitId) );
     }
