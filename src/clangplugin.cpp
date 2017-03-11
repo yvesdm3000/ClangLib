@@ -1668,39 +1668,54 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
 
     ClangProxy::LookupDefinitionJob* pJob = static_cast<ClangProxy::LookupDefinitionJob*>(event.GetEventObject());
     std::vector< std::pair<std::string, ClTokenPosition> > Locations = pJob->GetResults();
-    if (Locations.size() == 0)
+    if (Locations.empty())
     {
-        if (dynamic_cast<ClangProxy::LookupDefinitionInFilesJob*>(pJob)== nullptr)
-        {
-            ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( pJob->GetProject() );
-            if (!db)
-                return;
-            // Perform the request again, but now with loading of TU's so we need a compile command for that
-            std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
-            std::vector< std::pair<std::string, std::vector<std::string> > > fileAndCompileCommands;
-            EditorManager* edMgr = Manager::Get()->GetEditorManager();
-            for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
-            {
-                std::string filename = db->GetFilename(*it);
-                std::vector<std::string> compileCommand;
-                for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
-                {
-                    cbEditor* ed = edMgr->GetBuiltinEditor(i);
-                    if ( ed->GetFilename() == wxString::FromUTF8( filename.c_str() ) )
-                    {
-                        compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
-                        break;
-                    }
-                }
-                fileAndCompileCommands.push_back( std::make_pair(filename,compileCommand) );
-            }
-            ClangProxy::LookupDefinitionInFilesJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangLookupDefinition, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetPosition(), fileAndCompileCommands);
-            m_Proxy.AppendPendingJob( job );
+        CCLogger::Get()->DebugLog( wxT("lookupDefinition of ")+wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() )+wxT(" failed, looking in indexdb now") );
+        ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( pJob->GetProject() );
+        if (!db)
             return;
+        // Perform the request again, but now with loading of TU's so we need a compile command for that
+        std::set<ClFileId> fileIdList = db->LookupTokenFileList( pJob->GetTokenIdentifier(), pJob->GetTokenUSR(), ClTokenType_DefGroup );
+        for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
+        {
+            ClTokenPosition pos(0,0);
+            if (db->LookupTokenPosition( pJob->GetTokenIdentifier(), *it, pJob->GetTokenUSR(), ClTokenType_DefGroup, pos ) )
+            {
+                std::string fn = db->GetFilename( *it );
+                Locations.push_back( std::make_pair( fn, pos ) );
+            }
+        }
+
+        if (Locations.empty())
+        {
+            if (dynamic_cast<ClangProxy::LookupDefinitionInFilesJob*>(pJob)== nullptr)
+            {
+                CCLogger::Get()->DebugLog( wxT("lookupDefinition of ")+wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() )+wxT(" failed, looking in files now") );
+                std::vector< std::pair<std::string, std::vector<std::string> > > fileAndCompileCommands;
+                EditorManager* edMgr = Manager::Get()->GetEditorManager();
+                for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
+                {
+                    std::string filename = db->GetFilename(*it);
+                    std::vector<std::string> compileCommand;
+                    for (int i = 0; i < edMgr->GetEditorsCount(); ++i)
+                    {
+                        cbEditor* ed = edMgr->GetBuiltinEditor(i);
+                        if ( ed->GetFilename() == wxString::FromUTF8( filename.c_str() ) )
+                        {
+                            compileCommand = GetCompileCommand( ed->GetProjectFile(), ed->GetFilename() );
+                            break;
+                        }
+                    }
+                    fileAndCompileCommands.push_back( std::make_pair(filename,compileCommand) );
+                }
+                ClangProxy::LookupDefinitionInFilesJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangLookupDefinition, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetPosition(), fileAndCompileCommands);
+                m_Proxy.AppendPendingJob( job );
+                return;
+            }
         }
     }
 
-    ClangEvent evt(clEVT_GETDEFINITION_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetPosition(), pJob->GetResults());
+    ClangEvent evt(clEVT_GETDEFINITION_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetPosition(), Locations);
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }
