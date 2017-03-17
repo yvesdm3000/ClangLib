@@ -104,6 +104,15 @@ struct ClTokenRange
     ClTokenRange() : beginLocation(0,0), endLocation(0,0) {}
     ClTokenRange(const ClTokenPosition beginPos, const ClTokenPosition endPos) : beginLocation(beginPos), endLocation(endPos) {}
 
+    bool operator<(const ClTokenRange& other) const
+    {
+        if (beginLocation < other.beginLocation)
+            return true;
+        else if (beginLocation > other.beginLocation)
+            return false;
+        return endLocation < other.endLocation;
+    }
+
     bool InRange(const ClTokenPosition pos) const
     {
         if (pos < beginLocation)
@@ -115,28 +124,6 @@ struct ClTokenRange
 
     ClTokenPosition beginLocation;
     ClTokenPosition endLocation;
-};
-
-struct ClTokenScope
-{
-    wxString tokenName;
-    wxString scopeName;
-    ClTokenRange range;
-    ClTokenScope() : tokenName(), scopeName(), range() {}
-    ClTokenScope(const wxString& tokName, const wxString& symanticScopeName, ClTokenRange scopeRange) : tokenName(tokName), scopeName(symanticScopeName), range(scopeRange){}
-
-    bool operator==(const ClTokenScope& other) const
-    {
-        if (other.tokenName != tokenName)
-            return false;
-        if (other.scopeName != scopeName)
-            return false;
-        if (other.range.beginLocation != range.beginLocation)
-            return false;
-        if (other.range.endLocation != range.endLocation)
-            return false;
-        return true;
-    }
 };
 
 /** @brief Level of diagnostic
@@ -213,6 +200,8 @@ typedef enum _ClCodeCompleteOption
     ClCodeCompleteOption_IncludeMacros        = 1<<3
 } ClCodeCompleteOption;
 
+/** @brief Class to represent a file linked to a project
+ */
 class ClangFile
 {
     wxString m_Project;
@@ -268,6 +257,65 @@ public:
     const wxString& GetFilename() const { return m_Filename; }
 };
 
+class ClTokenScope
+{
+    wxString m_TokenIdentifier;
+    wxString m_TokenDisplayName;
+    wxString m_ScopeName;  // Sepantic scope e.g. class or namespace where the token is declared
+    ClTokenRange m_Range;
+public:
+    ClTokenScope() : m_TokenIdentifier(), m_ScopeName(), m_Range() {}
+    ClTokenScope(const wxString& tokIdent, const wxString& tokDisplayName, const wxString& semanticScopeName, const ClTokenRange scopeRange) :
+        m_TokenIdentifier(tokIdent),
+        m_TokenDisplayName(tokDisplayName),
+        m_ScopeName(semanticScopeName),
+        m_Range(scopeRange){}
+    bool operator==(const ClTokenScope& other) const
+    {
+        if (other.m_TokenIdentifier != m_TokenIdentifier)
+            return false;
+        if (other.m_TokenDisplayName != m_TokenDisplayName)
+            return false;
+        if (other.m_ScopeName != m_ScopeName)
+            return false;
+        if (other.m_Range.beginLocation != m_Range.beginLocation)
+            return false;
+        if (other.m_Range.endLocation != m_Range.endLocation)
+            return false;
+        return true;
+    }
+    const wxString& GetTokenIdentifier() const { return m_TokenIdentifier; }
+    wxString& GetTokenIdentifier() { return m_TokenIdentifier; }
+    const wxString& GetTokenDisplayName() const { return m_TokenDisplayName; }
+    wxString& GetTokenDisplayName() { return m_TokenDisplayName; }
+    const wxString& GetScopeName() const { return m_ScopeName; }
+    wxString& GetScopeName() { return m_ScopeName; }
+    const ClTokenRange& GetTokenRange() const { return m_Range; }
+    ClTokenRange& GetTokenRange() { return m_Range; }
+    wxString GetFullName() const
+    {
+        if (m_TokenDisplayName.IsEmpty())
+            return wxT("");
+        if (m_ScopeName.IsEmpty())
+            return m_TokenDisplayName;
+        return m_ScopeName+wxT("::")+m_TokenDisplayName;
+    }
+};
+
+class ClTokenReference : public ClTokenScope
+{
+    ClangFile m_File;
+    ClTokenScope m_ReferenceScope; // Scope where the reference is
+public:
+    ClTokenReference(const wxString& name, const wxString& displayName, const wxString& declScope, const ClTokenRange& range, const ClangFile& file, const ClTokenScope& referenceScope) :
+        ClTokenScope(name,displayName, declScope, range),
+        m_File(file),
+        m_ReferenceScope(referenceScope){}
+    const ClangFile& GetFile() const { return m_File; }
+    const ClTokenScope& GetReferenceScope() const { return m_ReferenceScope; }
+};
+
+
 /** @brief Event used in wxWidgets command event returned by the plugin.
  */
 class ClangEvent : public wxCommandEvent
@@ -320,6 +368,14 @@ public:
                 m_LocationResults.push_back(std::make_pair(filename, it->second));
             }
         }
+    ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
+                const wxString& tokenName, const ClTokenPosition& loc, const std::vector<ClTokenReference>& references) :
+        wxCommandEvent(wxEVT_NULL, evtId),
+        m_TranslationUnitId(id),
+        m_File(file),
+        m_TokenName( tokenName ),
+        m_Position(loc),
+        m_ReferenceResults(references) {}
 
     /** @brief Copy constructor
      *
@@ -330,11 +386,13 @@ public:
         wxCommandEvent(other),
         m_TranslationUnitId(other.m_TranslationUnitId),
         m_File(other.m_File),
+        m_TokenName(other.m_TokenName),
         m_Position(other.m_Position),
         m_GetOccurrencesResults(other.m_GetOccurrencesResults),
         m_GetCodeCompletionResults(other.m_GetCodeCompletionResults),
         m_DiagnosticResults(other.m_DiagnosticResults),
-        m_DocumentationResults(other.m_DocumentationResults) {}
+        m_DocumentationResults(other.m_DocumentationResults),
+        m_ReferenceResults(other.m_ReferenceResults) {}
     virtual ~ClangEvent() {}
     virtual wxEvent *Clone() const
     {
@@ -344,6 +402,10 @@ public:
     ClTranslUnitId GetTranslationUnitId() const
     {
         return m_TranslationUnitId;
+    }
+    const wxString& GetTokenName() const
+    {
+        return m_TokenName;
     }
     const ClTokenPosition& GetPosition() const
     {
@@ -365,9 +427,13 @@ public:
     {
         return m_DocumentationResults;
     }
-    const std::vector< std::pair<wxString, ClTokenPosition> > GetLocationResults() const
+    const std::vector< std::pair<wxString, ClTokenPosition> >& GetLocationResults() const
     {
         return m_LocationResults;
+    }
+    const std::vector<ClTokenReference>& GetReferenceResults() const
+    {
+        return m_ReferenceResults;
     }
     void SetStartedTime( const wxDateTime& tm )
     {
@@ -385,12 +451,14 @@ private:
     wxDateTime m_StartedTime;
     const ClTranslUnitId m_TranslationUnitId;
     const ClangFile m_File;
+    const wxString m_TokenName;
     const ClTokenPosition m_Position;
     const std::vector< std::pair<int, int> > m_GetOccurrencesResults;
     const std::vector<ClToken> m_GetCodeCompletionResults;
     const std::vector<ClDiagnostic> m_DiagnosticResults;
     const wxString m_DocumentationResults;
     std::vector< std::pair<wxString, ClTokenPosition > > m_LocationResults; // Pair of filename + tokenPositions
+    std::vector<ClTokenReference> m_ReferenceResults;
 };
 
 
@@ -403,6 +471,7 @@ extern const wxEventType clEVT_GETDOCUMENTATION_FINISHED;
 extern const wxEventType clEVT_DIAGNOSTICS_UPDATED;
 extern const wxEventType clEVT_REINDEXFILE_FINISHED;
 extern const wxEventType clEVT_GETDEFINITION_FINISHED;
+extern const wxEventType clEVT_GETREFERENCESCOPES_FINISHED;
 
 /* interface */
 class IClangPlugin
@@ -445,6 +514,9 @@ public:
 
     /** Resolve the declaration of a token */
     virtual bool ResolveTokenDeclarationAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc, ClangFile& out_file, ClTokenPosition& out_loc) = 0;
+
+    /** Performs an asynchronous request for callers that references the token at the specified position */
+    virtual void RequestTokenReferenceScopesAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition loc) = 0;
 };
 
 /** @brief Base class for ClangPlugin components.

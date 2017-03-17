@@ -7,6 +7,8 @@
 
 #include "clangpluginapi.h"
 
+class ClangCallHierarchyView;
+
 class ClangRefactoring: public ClangPluginComponent
 {
 public:
@@ -26,6 +28,8 @@ public:
      */
     void BeginHighlightOccurrences(cbEditor* ed);
 
+    void LookupCallHierarchy(const ClangFile& file, const ClTokenPosition position);
+
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);
@@ -41,11 +45,13 @@ public: // UI Command Events
     void OnGotoDefinition(wxCommandEvent& event);
     /// Resolve the token under the cursor and open the relevant location
     void OnGotoDeclaration(wxCommandEvent& event);
+    void OnShowCallHierarchy(wxCommandEvent& event);
 
 public: // Clang events
     void OnTranslationUnitCreated(ClangEvent& event);
     void OnRequestOccurrencesFinished(ClangEvent& event);
     void OnGetDefinitionFinished(ClangEvent& event);
+    void OnGetCallHierarchyFinished(ClangEvent& event);
 
 private:
     /** Get the current translation unit id */
@@ -60,6 +66,7 @@ private:
 
     bool m_bShowOccurrences;
     wxTimer m_HighlightTimer;
+    ClangCallHierarchyView* m_pCallHierarchyView; // Notebook view of call hierarchy
 };
 
 

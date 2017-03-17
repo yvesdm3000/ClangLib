@@ -692,7 +692,7 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const ClIdentifierString& iden
     return false;
 }
 
-bool ClTokenIndexDatabase::LookupTokenType(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const
+bool ClTokenIndexDatabase::LookupTokenType(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition Position,  ClTokenType& out_TokenType) const
 {
     std::set<int> idList;
     if (identifier.empty())
@@ -740,9 +740,51 @@ void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenType
         if ( (tokenTypeMask==0)||(tok.tokenTypeMask&tokenTypeMask) )
         {
             out_tokens.push_back(tok);
+            for (std::vector<ClIndexTokenLocation>::iterator itLoc = out_tokens.back().locationList.begin(); itLoc != out_tokens.back().locationList.end(); ++itLoc)
+            {
+                if( (itLoc->fileId != fId)||( (tokenTypeMask != 0)&&( (itLoc->tokenType&tokenTypeMask) ==0) )  )
+                {
+                    itLoc = out_tokens.back().locationList.erase( itLoc );
+                    if (itLoc == out_tokens.back().locationList.end())
+                        break;
+                }
+            }
         }
     }
 }
+
+/** @brief Get all tokens linked to a file ID with a specific USR
+ *
+ * @param fId const ClFileId
+ * @return std::vector<ClTokenId>
+ *
+ */
+void ClTokenIndexDatabase::GetFileTokens(const ClFileId fId, const int tokenTypeMask, const ClUSRString& usr, std::vector<ClIndexToken>& out_tokens) const
+{
+    std::string key = wxString::Format(wxT("%d"), fId).ToUTF8().data();
+    std::set<int> tokenList;
+
+    wxMutexLocker locker(m_Mutex);
+    m_pFileTokens->GetIdSet(key, tokenList);
+    for (std::set<int>::const_iterator it = tokenList.begin(); it != tokenList.end(); ++it)
+    {
+        const ClIndexToken& tok = m_pIndexTokenMap->GetValue( m_pFileTokens->GetValue( *it ) );
+        if ( ((tokenTypeMask==0)||(tok.tokenTypeMask&tokenTypeMask))&&(tok.USR == usr) )
+        {
+            out_tokens.push_back(tok);
+            for (std::vector<ClIndexTokenLocation>::iterator itLoc = out_tokens.back().locationList.begin(); itLoc != out_tokens.back().locationList.end(); ++itLoc)
+            {
+                if( (itLoc->fileId != fId)||( (tokenTypeMask != 0)&&( (itLoc->tokenType&tokenTypeMask) ==0) )  )
+                {
+                    itLoc = out_tokens.back().locationList.erase( itLoc );
+                    if (itLoc == out_tokens.back().locationList.end())
+                        break;
+                }
+            }
+        }
+    }
+}
+
 
 void ClTokenIndexDatabase::AddToken( const ClIndexToken& token)
 {
@@ -1083,12 +1125,11 @@ void ClTokenDatabase::GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const
 }
 
 
-void ClTokenDatabase::GetTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const
+void ClTokenDatabase::GetAllFileTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const
 {
     std::set<ClTokenId> tokenIds;
     std::string key = wxString::Format(wxT("%d"), fileId).ToUTF8().data();
     m_pFileTokens->GetIdSet(key, tokenIds);
-    CCLogger::Get()->DebugLog( F(wxT("TokenDatabase: found %d tokens"), (int)tokenIds.size()) );
     for (std::set<ClTokenId>::const_iterator it = tokenIds.begin(); it != tokenIds.end(); ++it)
     {
         ClAbstractToken token = GetToken( *it );
@@ -1098,10 +1139,39 @@ void ClTokenDatabase::GetTokenScopes(const ClFileId fileId, const unsigned Token
             {
                 wxString scopeName = wxString::FromUTF8( token.scope.first.c_str() );
                 GetTokenIndexDatabase()->LookupTokenDisplayName( token.scope.first, token.scope.second, scopeName );
-                out_Scopes.push_back( ClTokenScope(token.displayName, scopeName, token.range) );
+                out_Scopes.push_back( ClTokenScope(wxString::FromUTF8(token.identifier.c_str()), token.displayName, scopeName, token.range) );
             }
         }
     }
+}
+
+void ClTokenDatabase::GetTokenScopeAt(const ClFileId fileId, const ClTokenPosition pos, const unsigned TokenTypeMask, ClTokenScope& out_Scope) const
+{
+    ClTokenScope scope;
+    std::set<ClTokenId> tokenIds;
+    std::string key = wxString::Format(wxT("%d"), fileId).ToUTF8().data();
+    m_pFileTokens->GetIdSet(key, tokenIds);
+    for (std::set<ClTokenId>::const_iterator it = tokenIds.begin(); it != tokenIds.end(); ++it)
+    {
+        ClAbstractToken token = GetToken( *it );
+        if (!token.displayName.IsEmpty())
+        {
+            if ( token.tokenType&TokenTypeMask )
+            {
+                if (token.range.InRange( pos ))
+                {
+                    if (token.range.beginLocation > scope.GetTokenRange().beginLocation)
+                    {
+                        scope.GetTokenIdentifier() = wxString::FromUTF8( token.identifier.c_str() );
+                        scope.GetTokenDisplayName() = token.displayName;
+                        scope.GetTokenRange() = token.range;
+                        GetTokenIndexDatabase()->LookupTokenDisplayName( token.scope.first, token.scope.second, scope.GetScopeName() );
+                    }
+                }
+            }
+        }
+    }
+    out_Scope = scope;
 }
 
 

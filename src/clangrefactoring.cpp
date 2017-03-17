@@ -25,10 +25,12 @@
 #include <wx/choicdlg.h>
 //#endif // CB_PRECOMP
 #include "cclogger.h"
+#include "callhierarchyview.h"
 
 const int idHighlightTimer = wxNewId();
 const int idGotoDefinition = wxNewId();
 const int idGotoDeclaration = wxNewId();
+const int idShowCallHierarchy = wxNewId();
 #define HIGHLIGHT_DELAY 700
 
 const wxString ClangRefactoring::SettingName = _T("/refactoring");
@@ -38,7 +40,8 @@ ClangRefactoring::ClangRefactoring() :
     m_TranslUnitId(-1),
     m_EditorHookId(-1),
     m_bShowOccurrences(false),
-    m_HighlightTimer(this, idHighlightTimer)
+    m_HighlightTimer(this, idHighlightTimer),
+    m_pCallHierarchyView(NULL)
 {
 
 }
@@ -54,13 +57,14 @@ void ClangRefactoring::OnAttach(IClangPlugin* pClangPlugin)
 
     Connect(idGotoDefinition,          wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnGotoDefinition),    nullptr, this);
     Connect(idGotoDeclaration,         wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnGotoDeclaration),   nullptr, this);
-
+    Connect(idShowCallHierarchy,       wxEVT_COMMAND_MENU_SELECTED,    wxCommandEventHandler(ClangRefactoring::OnShowCallHierarchy), nullptr, this);
     typedef cbEventFunctor<ClangRefactoring, CodeBlocksEvent> CBEvent;
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_ACTIVATED, new CBEvent(this, &ClangRefactoring::OnEditorActivate));
 
     typedef cbEventFunctor<ClangRefactoring, ClangEvent> ClEvent;
     pClangPlugin->RegisterEventSink(clEVT_GETOCCURRENCES_FINISHED, new ClEvent(this, &ClangRefactoring::OnRequestOccurrencesFinished));
     pClangPlugin->RegisterEventSink(clEVT_GETDEFINITION_FINISHED,  new ClEvent(this, &ClangRefactoring::OnGetDefinitionFinished));
+    pClangPlugin->RegisterEventSink(clEVT_GETREFERENCESCOPES_FINISHED, new ClEvent(this, &ClangRefactoring::OnGetCallHierarchyFinished));
     ConfigurationChanged();
 }
 
@@ -74,6 +78,7 @@ void ClangRefactoring::OnRelease(IClangPlugin* pClangPlugin)
     }
     Manager::Get()->RemoveAllEventSinksFor(this);
 
+    Disconnect( idShowCallHierarchy );
     Disconnect( idGotoDeclaration );
     Disconnect( idGotoDefinition );
 
@@ -364,6 +369,16 @@ void ClangRefactoring::BuildModuleMenu(const ModuleType type, wxMenu* menu,
         if (!word.Strip().IsEmpty())
             item->Enable(true);
     }
+
+    menu->InsertSeparator( 2 );
+    if (!word.Strip().IsEmpty())
+    {
+        item = menu->Insert(2, idShowCallHierarchy, wxT("Show call hierarchy of '")+word+wxT("' (clang)") );
+        if ( m_TranslUnitId!= wxNOT_FOUND)
+        {
+            item->Enable(true);
+        }
+    }
 }
 
 void ClangRefactoring::OnGotoDefinition(wxCommandEvent& /*event*/)
@@ -392,8 +407,6 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
         return;
     cbStyledTextCtrl* stc = ed->GetControl();
     const std::vector< std::pair<wxString,ClTokenPosition> >& results = event.GetLocationResults();
-
-    CCLogger::Get()->DebugLog( F(wxT("Received %d location results"), (int)results.size()) );
 
     wxString tokenFilename;
     ClTokenPosition tokenPosition(0,0);
@@ -428,7 +441,6 @@ void ClangRefactoring::OnGetDefinitionFinished( ClangEvent &event )
     cbEditor* newEd = Manager::Get()->GetEditorManager()->Open(tokenFilename);
     if (newEd)
     {
-        CCLogger::Get()->DebugLog( wxT("Going to file ")+tokenFilename );
         newEd->GotoTokenPosition(tokenPosition.line - 1, textRange);
     }
 }
@@ -458,3 +470,38 @@ void ClangRefactoring::OnGotoDeclaration(wxCommandEvent& WXUNUSED(event))
         ed->GotoTokenPosition(declLoc.line - 1, textRange);
     }
 }
+
+void ClangRefactoring::LookupCallHierarchy(const ClangFile& file, const ClTokenPosition position)
+{
+    m_pClangPlugin->RequestTokenReferenceScopesAt(m_TranslUnitId, file, position );
+}
+
+
+void ClangRefactoring::OnShowCallHierarchy( wxCommandEvent & )
+{
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (!ed || m_TranslUnitId == wxNOT_FOUND)
+        return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    const int pos = stc->GetCurrentPos();
+    int line = stc->LineFromPosition(pos);
+    int column = pos - stc->PositionFromLine(line);
+    if (stc->GetLine(line).StartsWith(wxT("#include")))
+        column = 3;
+    ClangFile file(ed->GetProjectFile(), ed->GetFilename());
+    ClTokenPosition loc(line+1, column+1);
+    LookupCallHierarchy( file, loc );
+}
+
+void ClangRefactoring::OnGetCallHierarchyFinished(ClangEvent& event)
+{
+    if (!m_pCallHierarchyView)
+    {
+        m_pCallHierarchyView = new ClangCallHierarchyView(*this);
+        m_pCallHierarchyView->AddViewToManager();
+    }
+    event.GetReferenceResults();
+    m_pCallHierarchyView->ActivateView();
+    m_pCallHierarchyView->AddReferences( event.GetReferenceResults() );
+}
+

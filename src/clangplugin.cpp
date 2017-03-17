@@ -55,6 +55,7 @@ DEFINE_EVENT_TYPE(clEVT_GETDOCUMENTATION_FINISHED);
 DEFINE_EVENT_TYPE(clEVT_TOKENDATABASE_UPDATED);
 DEFINE_EVENT_TYPE(clEVT_REINDEXFILE_FINISHED);
 DEFINE_EVENT_TYPE(clEVT_GETDEFINITION_FINISHED);
+DEFINE_EVENT_TYPE(clEVT_GETREFERENCESCOPES_FINISHED);
 
 static const wxString g_InvalidStr(wxT("invalid"));
 const int idReparseTimer    = wxNewId();
@@ -78,6 +79,7 @@ const int idClangGetCCDocumentation = wxNewId();
 const int idClangGetOccurrences = wxNewId();
 const int idClangLookupDefinition = wxNewId();
 const int idClangStoreTokenIndexDB = wxNewId();
+const int idClangLookupTokenReferences = wxNewId();
 
 ClangPlugin::ClangPlugin() :
     m_Proxy(this, m_CppKeywords),
@@ -199,6 +201,7 @@ void ClangPlugin::OnAttach()
     Connect(idClangGetCCDocumentation,     cbEVT_CLANG_SYNCTASK_FINISHED,  wxEventHandler(ClangPlugin::OnClangSyncTaskFinished),        nullptr, this);
     Connect(idClangLookupDefinition,       cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangLookupDefinitionFinished),nullptr, this);
     Connect(idClangStoreTokenIndexDB,      cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangStoreTokenIndexDB),       nullptr, this);
+    Connect(idClangLookupTokenReferences,  cbEVT_CLANG_ASYNCTASK_FINISHED, wxEventHandler(ClangPlugin::OnClangLookupTokenReferencesFinished),nullptr, this);
 
     m_EditorHookId = EditorHooks::RegisterHook(new EditorHooks::HookFunctor<ClangPlugin>(this, &ClangPlugin::OnEditorHook));
 
@@ -356,7 +359,6 @@ cbConfigurationPanel* ClangPlugin::GetConfigurationPanel(wxWindow* parent)
 
 cbConfigurationPanel* ClangPlugin::GetProjectConfigurationPanel(wxWindow* parent, cbProject* project)
 {
-    CCLogger::Get()->DebugLog( wxT("GetProjectConfigurationPanel") );
     return new ClangProjectSettingsDlg(parent, project, this);
 }
 
@@ -510,13 +512,12 @@ std::vector<ClangPlugin::CCToken> ClangPlugin::GetTokenAt(int pos, cbEditor* ed,
     const unsigned int line = stc->LineFromPosition(pos);
     ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
 
-    ClangProxy::GetTokensAtJob job( cbEVT_CLANG_SYNCTASK_FINISHED, idClangSyncTask, ClangFile( ed->GetProjectFile(), ed->GetFilename()), loc, m_TranslUnitId);
+    ClangProxy::GetTokenCompletionAtJob job( cbEVT_CLANG_SYNCTASK_FINISHED, idClangSyncTask, ClangFile( ed->GetProjectFile(), ed->GetFilename()), loc, m_TranslUnitId);
     m_Proxy.AppendPendingJob(job);
 
     job.WaitCompletion(40);
-    std::vector<ClIdentifierString> names = job.GetResults();
-    for (std::vector<ClIdentifierString>::const_iterator nmIt = names.begin(); nmIt != names.end(); ++nmIt)
-        tokens.push_back(CCToken(-1, wxString::FromUTF8( nmIt->c_str() )) );
+    ClIdentifierString name = job.GetResult();
+    tokens.push_back(CCToken(-1, wxString::FromUTF8( name.c_str() )) );
 
     return tokens;
 }
@@ -610,17 +611,6 @@ void ClangPlugin::OnCCErrorLogger(CodeBlocksThreadEvent& event)
 
 void ClangPlugin::OnEditorOpen(CodeBlocksEvent& event)
 {
-#if 0
-    CCLogger::Get()->DebugLog( wxT("OnEditorOpen") );
-    cbProject* pProject = event.GetProject();
-    if (pProject)
-    {
-        CCLogger::Get()->DebugLog( wxT(" project=")+pProject->GetFilename() );
-    }
-    else {
-        CCLogger::Get()->DebugLog( wxT(" No project!") );
-    }
-#endif
 }
 
 void ClangPlugin::OnEditorActivate(CodeBlocksEvent& event)
@@ -629,11 +619,6 @@ void ClangPlugin::OnEditorActivate(CodeBlocksEvent& event)
     if (!Manager::Get()->IsAppStartedUp())
     {
         return;
-    }
-    cbProject* pProject = event.GetProject();
-    if (pProject)
-    {
-        CCLogger::Get()->DebugLog( pProject->GetFilename() );
     }
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinEditor(event.GetEditor());
     if (ed && ed->IsOK())
@@ -856,12 +841,14 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
 
 void ClangPlugin::OnCreateTranslationUnit(wxCommandEvent& event)
 {
+    event.Skip();
+
     if (m_TranslUnitId != wxNOT_FOUND)
     {
         return;
     }
     wxString filename = event.GetString();
-    if (filename.Length() == 0)
+    if (filename.IsEmpty())
         return;
 
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
@@ -1328,7 +1315,6 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 void ClangPlugin::OnClangReparseFinished( wxEvent& event )
 {
     event.Skip();
-    CCLogger::Get()->DebugLog( F(_T("OnClangReparseFinished reparseNeeded=%d"), m_ReparseNeeded));
     ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
     m_ReparsingTranslUnitId = wxNOT_FOUND;
     if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
@@ -1584,7 +1570,7 @@ ClTranslUnitId ClangPlugin::GetTranslationUnitId(const ClangFile& file)
 
 void ClangPlugin::GetTokenScopes(const ClTranslUnitId id, const ClangFile& file, unsigned int tokenMask, std::vector<ClTokenScope>& out_Scopes)
 {
-    m_Proxy.GetTokenScopes(id, file.GetProject().ToUTF8().data(), file.GetFilename().ToUTF8().data(), tokenMask, out_Scopes);
+    m_Proxy.ResolveTokenScopes(id, file.GetProject().ToUTF8().data(), file.GetFilename().ToUTF8().data(), tokenMask, out_Scopes);
 }
 
 void ClangPlugin::RequestOccurrencesOf(const ClTranslUnitId translUnitId, const ClangFile& file, const ClTokenPosition& loc)
@@ -1670,7 +1656,6 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
     std::vector< std::pair<std::string, ClTokenPosition> > Locations = pJob->GetResults();
     if (Locations.empty())
     {
-        CCLogger::Get()->DebugLog( wxT("lookupDefinition of ")+wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() )+wxT(" failed, looking in indexdb now") );
         ClTokenIndexDatabase* db = m_Proxy.GetTokenIndexDatabase( pJob->GetProject() );
         if (!db)
             return;
@@ -1690,7 +1675,6 @@ void ClangPlugin::OnClangLookupDefinitionFinished(wxEvent& event)
         {
             if (dynamic_cast<ClangProxy::LookupDefinitionInFilesJob*>(pJob)== nullptr)
             {
-                CCLogger::Get()->DebugLog( wxT("lookupDefinition of ")+wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() )+wxT(" failed, looking in files now") );
                 std::vector< std::pair<std::string, std::vector<std::string> > > fileAndCompileCommands;
                 EditorManager* edMgr = Manager::Get()->GetEditorManager();
                 for (std::set<ClFileId>::const_iterator it = fileIdList.begin(); it != fileIdList.end(); ++it)
@@ -1748,7 +1732,6 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const ClangF
         return;
     if (translUnitId == wxNOT_FOUND)
     {
-        CCLogger::Get()->Log(wxT("Translation unit not found for file ")+file.GetFilename());
         return;
     }
     if (translUnitId == m_TranslUnitId)
@@ -1768,6 +1751,38 @@ void ClangPlugin::RequestReparse(const ClTranslUnitId translUnitId, const ClangF
     ClangProxy::ReparseJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangReparse, translUnitId, m_CompileCommand, file, unsavedFiles);
     m_Proxy.AppendPendingJob(job);
     m_ReparsingTranslUnitId = translUnitId;
+}
+
+void ClangPlugin::RequestTokenReferenceScopesAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition loc)
+{
+    ClangProxy::LookupTokenReferencesAtJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangLookupTokenReferences, id, file, loc);
+    m_Proxy.AppendPendingJob( job );
+}
+
+void ClangPlugin::OnClangLookupTokenReferencesFinished(wxEvent& event)
+{
+    event.Skip();
+
+    std::vector<ClTokenReference> refs;
+    ClangProxy::LookupTokenReferencesAtJob* pJob = static_cast<ClangProxy::LookupTokenReferencesAtJob*>(event.GetEventObject());
+    wxString tokenIdentifier = wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() );
+    wxString tokenDisplayName = pJob->GetTokenDisplayName();
+    wxString tokenScopePath = pJob->GetTokenScopePath();
+
+    std::set<std::pair<std::string, ClTokenRange> > Refs = pJob->GetResults();
+    for (std::set<std::pair<std::string, ClTokenRange> >::const_iterator it = Refs.begin(); it != Refs.end(); ++it)
+    {
+        ClTokenScope scope;
+        if (m_Proxy.ResolveTokenScopeAt(pJob->GetTranslationUnitId(), pJob->GetProject(), it->first, it->second.beginLocation, scope))
+        {
+            ClTokenReference scopeRef( tokenIdentifier, tokenDisplayName, tokenScopePath, it->second, ClangFile(wxString::FromUTF8( pJob->GetProject().c_str()), wxString::FromUTF8( it->first.c_str() )), scope );
+            if (std::find( refs.begin(), refs.end(), scopeRef ) == refs.end())
+                refs.push_back( scopeRef );
+        }
+    }
+    ClangEvent evt(clEVT_GETREFERENCESCOPES_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetTokenDisplayName(), pJob->GetPosition(), refs);
+    evt.SetStartedTime(pJob->GetTimestamp());
+    ProcessEvent(evt);
 }
 
 void ClangPlugin::GetFileAndProject( ProjectFile& pf, wxString& out_project, wxString& out_filename)

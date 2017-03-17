@@ -166,6 +166,8 @@ private:
 
     void OnClangStoreTokenIndexDB(wxEvent& event);
 
+    void OnClangLookupTokenReferencesFinished(wxEvent& event);
+
 private: // Internal utility functions
     // Builds compile command
     std::vector<std::string> GetCompileCommand(ProjectFile* pf, const wxString& filename);
@@ -202,6 +204,7 @@ public: // IClangPlugin
     void RequestTokenDefinitionsAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc);
     bool ResolveTokenDeclarationAt(const ClTranslUnitId, const ClangFile& file, const ClTokenPosition& loc,
                                  ClangFile& out_file, ClTokenPosition& out_loc);
+    void RequestTokenReferenceScopesAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition loc);
 
     const wxImageList& GetImageList(const ClTranslUnitId WXUNUSED(id))
     {

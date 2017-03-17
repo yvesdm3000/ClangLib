@@ -140,20 +140,20 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
-                    if (it->range.beginLocation.line >= line + 1)
+                    if (it->GetTokenRange().beginLocation.line >= line + 1)
                     {
-                        it->range.beginLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
-                        if (it->range.beginLocation.line < line + 1)
+                        it->GetTokenRange().beginLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        if (it->GetTokenRange().beginLocation.line < line + 1)
                         {
-                            it->range.beginLocation.line = line + 1;
+                            it->GetTokenRange().beginLocation.line = line + 1;
                         }
                     }
-                    if (it->range.endLocation.line >= line + 1)
+                    if (it->GetTokenRange().endLocation.line >= line + 1)
                     {
-                        it->range.endLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
-                        if (it->range.endLocation.line < line + 1)
+                        it->GetTokenRange().endLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        if (it->GetTokenRange().endLocation.line < line + 1)
                         {
-                            it->range.endLocation.line = line + 1;
+                            it->GetTokenRange().endLocation.line = line + 1;
                         }
                     }
                 }
@@ -163,13 +163,13 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
-                    if (it->range.beginLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
+                    if (it->GetTokenRange().beginLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
                     {
-                        it->range.beginLocation.line += line - m_CurrentState.m_CurrentEditorLine;
+                        it->GetTokenRange().beginLocation.line += line - m_CurrentState.m_CurrentEditorLine;
                     }
-                    if (it->range.endLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
+                    if (it->GetTokenRange().endLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
                     {
-                        it->range.endLocation.line += line - m_CurrentState.m_CurrentEditorLine;
+                        it->GetTokenRange().endLocation.line += line - m_CurrentState.m_CurrentEditorLine;
                     }
                 }
                 updateLine = true;
@@ -231,16 +231,16 @@ void ClangToolbar::OnUpdateSelection( wxCommandEvent& event )
         ClTokenPosition loc(line + 1, pos - stc->PositionFromLine(line) + 1);
         for (std::vector<ClTokenScope>::const_iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
         {
-            if (it->range.InRange( loc ))
+            if (it->GetTokenRange().InRange( loc ))
             {
-                if (it->range.beginLocation.line > tokScope.range.beginLocation.line)
+                if (it->GetTokenRange().beginLocation.line > tokScope.GetTokenRange().beginLocation.line)
                 {
                     tokScope = *it;
                 }
             }
         }
 
-        wxString scopeName = tokScope.scopeName;
+        wxString scopeName = tokScope.GetScopeName();
         if (scopeName.IsEmpty())
         {
             scopeName = wxT("<global>");
@@ -256,11 +256,11 @@ void ClangToolbar::OnUpdateSelection( wxCommandEvent& event )
             }
             m_Scope->SetSelection(line);
         }
-        line = m_Function->FindString( tokScope.tokenName );
+        line = m_Function->FindString( tokScope.GetTokenDisplayName() );
         if (line < 0 )
         {
-            m_Function->Append(tokScope.tokenName);
-            line = m_Function->FindString(tokScope.tokenName);
+            m_Function->Append(tokScope.GetTokenDisplayName());
+            line = m_Function->FindString(tokScope.GetTokenDisplayName());
         }
         m_Function->SetSelection(line);
     }
@@ -272,11 +272,11 @@ void ClangToolbar::OnUpdateSelection( wxCommandEvent& event )
 
 static int SortByName( const ClTokenScope& first, const ClTokenScope& second )
 {
-    if (first.scopeName == second.scopeName)
+    if (first.GetScopeName() == second.GetScopeName())
     {
-        return first.tokenName < second.tokenName;
+        return first.GetTokenDisplayName() < second.GetTokenDisplayName();
     }
-    return first.scopeName < second.scopeName;
+    return first.GetScopeName() < second.GetScopeName();
 }
 
 void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
@@ -309,7 +309,7 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
         m_Scope->Clear();
         for ( std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it )
         {
-            class wxString scope = it->scopeName;
+            class wxString scope = it->GetScopeName();
             if ( scope.IsEmpty() )
             {
                 scope = wxT("<global>");
@@ -362,11 +362,11 @@ void ClangToolbar::OnFunction( wxCommandEvent& /*evt*/ )
     wxString func = m_Function->GetString(m_Function->GetSelection());
     for (std::vector< ClTokenScope >::const_iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
     {
-        if ( (!m_Scope)||(it->scopeName == scope) )
+        if ( (!m_Scope)||(it->GetScopeName() == scope) )
         {
-            if (it->tokenName == func)
+            if (it->GetTokenDisplayName() == func)
             {
-                ed->GetControl()->GotoLine(it->range.beginLocation.line-1);
+                ed->GetControl()->GotoLine(it->GetTokenRange().beginLocation.line-1);
                 break;
             }
         }
@@ -438,11 +438,11 @@ void ClangToolbar::UpdateFunctions( const wxString& scopeItem )
     m_Function->Clear();
     for ( std::vector<ClTokenScope>::const_iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
     {
-        if (!it->tokenName.IsEmpty())
+        if (!it->GetTokenDisplayName().IsEmpty())
         {
-            if ( (!m_Scope) || (it->scopeName == scopeName) )
+            if ( (!m_Scope) || (it->GetScopeName() == scopeName) )
             {
-                m_Function->Append(it->tokenName);
+                m_Function->Append(it->GetTokenDisplayName());
             }
         }
     }

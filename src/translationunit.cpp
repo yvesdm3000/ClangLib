@@ -231,12 +231,11 @@ CXCursor ClTranslationUnit::GetTokenAt(const std::string& filename, const ClToke
     return cursor;
 }
 
-ClIdentifierString ClTranslationUnit::GetTokenIdentifierAt( const std::string& filename, const ClTokenPosition &position )
+ClIdentifierString ClTranslationUnit::GetTokenIdentifier( const CXCursor& cursor )
 {
     ClIdentifierString identifier;
-    CXCursor cursor = GetTokenAt( filename, position );
     CXCompletionString token = clang_getCursorCompletionString(cursor);
-    HashToken( token, identifier);
+    HashToken(token, identifier);
     if (identifier.empty())
     {
         CXString str = clang_getCursorDisplayName(cursor);
@@ -335,7 +334,6 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
             }
             ExpandDiagnosticSet(diagSet, viewFilename, srcText, m_Diagnostics);
             clang_disposeDiagnosticSet(diagSet);
-            CCLogger::Get()->DebugLog( F(wxT("Diagnostics expanded: %d"), (int)m_Diagnostics.size()) );
         }
 
         return true;
@@ -729,27 +727,6 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* WXUNUSED(
 
 static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenType typ, CXClientData client_data)
 {
-    CXString str;
-    CXCompletionString token = clang_getCursorCompletionString(cursor);
-    ClIdentifierString identifier;
-    int tokenHash = HashToken( token, identifier );
-    str = clang_getCursorUSR( cursor );
-    ClUSRString usr;
-    if (clang_getCString( str ))
-        usr = clang_getCString(str);
-    clang_disposeString( str );
-    if (usr.empty())
-    {
-        CXCursor declCursor = clang_getCursorDefinition( cursor );
-        str = clang_getCursorUSR( declCursor );
-        if (clang_getCString(str))
-            usr = clang_getCString( str );
-        clang_disposeString( str );
-    }
-    if (typ == 0)
-    {
-        CCLogger::Get()->DebugLog( F(wxT("Unknown token type: %d for token ")+wxString::FromUTF8(identifier.c_str()), cursor.kind) );
-    }
     if (typ < ClTokenType_DeclGroup)
     {
         if (clang_isCursorDefinition( cursor ))
@@ -765,6 +742,34 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             typ = (ClTokenType)(typ | ClTokenType_RefGroup);
         }
     }
+    CXString str;
+    CXCursor referencedCursor = cursor;
+    CXCompletionString token = clang_getCursorCompletionString(cursor);
+    ClIdentifierString identifier;
+    int tokenHash = HashToken( token, identifier );
+    if (identifier.empty())
+    {
+        if (typ&ClTokenType_RefGroup)
+        {
+            referencedCursor = clang_getCursorReferenced( cursor );
+            token = clang_getCursorCompletionString( referencedCursor );
+            tokenHash = HashToken( token, identifier );
+        }
+    }
+
+    str = clang_getCursorUSR( referencedCursor );
+    ClUSRString usr;
+    if (clang_getCString( str ))
+        usr = clang_getCString(str);
+    clang_disposeString( str );
+    if (usr.empty())
+    {
+        CXCursor declCursor = clang_getCursorDefinition( referencedCursor );
+        str = clang_getCursorUSR( declCursor );
+        if (clang_getCString(str))
+            usr = clang_getCString( str );
+        clang_disposeString( str );
+    }
 
 
     CXSourceLocation loc = clang_getCursorLocation(cursor);
@@ -773,28 +778,24 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     unsigned line = 1, col = 1;
     clang_getSpellingLocation(loc, &clFile, &line, &col, nullptr);
     str = clang_getFileName(clFile);
-    std::string filename = clang_getCString(str);
+    std::string filename;
+    if (clang_getCString( str ))
+        filename = clang_getCString(str);
     clang_disposeString(str);
     if (filename.empty())
     {
         if (typ == ClTokenType_FuncDecl)
             CCLogger::Get()->DebugLog( wxT("no filename") );
-
-        return;
     }
 
     if (identifier.empty())
     {
         if (typ == ClTokenType_FuncDecl)
             CCLogger::Get()->DebugLog( wxT("Identifier is empty usr=")+wxString::FromUTF8(usr.c_str()) );
-        //str = clang_getCursorDisplayName(cursor);
-        //wxString displayName = wxString::FromUTF8( clang_getCString( str ) );
-        //CCLogger::Get()->DebugLog( F(wxT("Skipping symbol %d,%d")+displayName, line, col ));
-        //clang_disposeString(str);
     }else{
         //CCLogger::Get()->DebugLog( wxT("Visited symbol ")+identifier );
         wxString displayName;
-        str = clang_getCursorDisplayName(cursor);
+        str = clang_getCursorDisplayName(referencedCursor);
         displayName = wxString::FromUTF8(clang_getCString(str));
         clang_disposeString(str);
         if (displayName.IsEmpty())
@@ -851,7 +852,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
         {
             CXCursor* cursorList = NULL;
             unsigned int cursorNum = 0;
-            clang_getOverriddenCursors( cursor, &cursorList, &cursorNum );
+            clang_getOverriddenCursors( referencedCursor, &cursorList, &cursorNum );
             for (unsigned int i=0; i < cursorNum; ++i)
             {
                 str = clang_getCursorUSR( cursorList[i] );
@@ -949,7 +950,9 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         typ = ClTokenType_VarDecl;
         ret = CXChildVisit_Continue;
         break;
+    case CXCursor_MemberRefExpr:
     case CXCursor_MemberRef:
+    case CXCursor_CallExpr:
         typ = ClTokenType_FuncRef;
         ret = CXChildVisit_Recurse;
         break;

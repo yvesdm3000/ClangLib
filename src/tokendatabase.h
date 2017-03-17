@@ -236,9 +236,10 @@ public:
 
     bool LookupTokenDisplayName(const ClIdentifierString& identifier, const ClUSRString& USR, wxString& out_DisplayName) const;
 
-    bool LookupTokenType(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition& Position,  ClTokenType& out_TokenType) const;
+    bool LookupTokenType(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenPosition Position,  ClTokenType& out_TokenType) const;
 
     void GetFileTokens(const ClFileId fId, const int tokenTypeMask, std::vector<ClIndexToken>& out_tokens) const;
+    void GetFileTokens(const ClFileId fId, const int tokenTypeMask, const ClUSRString& usr, std::vector<ClIndexToken>& out_tokens) const;
 
     void Clear()
     {
@@ -309,7 +310,8 @@ public:
 
     void GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out_tokens) const;
     void GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const;
-    void GetTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const;
+    void GetAllFileTokenScopes(const ClFileId fileId, const unsigned TokenTypeMask, std::vector<ClTokenScope>& out_Scopes) const;
+    void GetTokenScopeAt(const ClFileId fileId, const ClTokenPosition pos, const unsigned TokenTypeMask, ClTokenScope& out_Scope) const;
 
     void Clear();
     /**

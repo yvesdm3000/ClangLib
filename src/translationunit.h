@@ -116,7 +116,7 @@ public:
     bool HasCCContext( CXCompletionContext ctx ) const;
 
     CXCursor GetTokenAt(const std::string& filename, const ClTokenPosition& position);
-    ClIdentifierString GetTokenIdentifierAt(const std::string& filename, const ClTokenPosition& position);
+    ClIdentifierString GetTokenIdentifier(const CXCursor& cursor);
 
     void GetDiagnostics(const std::string& filename, std::vector<ClDiagnostic>& diagnostics);
     CXFile GetFileHandle(const std::string& filename) const;
@@ -124,10 +124,6 @@ public:
     void ExpandDiagnostic(CXDiagnostic diag, const wxString& srcText, std::vector<ClDiagnostic>& diagnostics);
 
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; std::sort(m_Files.begin(), m_Files.end()); }
-    void GetTokenScopes( const ClFileId fileId, unsigned int tokenMask, ClTokenScopeList& out_functionScopes )
-    {
-        m_pDatabase->GetTokenScopes(fileId, tokenMask, out_functionScopes);
-    }
 
 private:
     ClTokenDatabase* m_pDatabase;

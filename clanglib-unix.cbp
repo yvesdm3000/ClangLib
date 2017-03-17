@@ -91,6 +91,8 @@
 		<Unit filename="README.md">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="src/callhierarchyview.cpp" />
+		<Unit filename="src/callhierarchyview.h" />
 		<Unit filename="src/cclogger.cpp" />
 		<Unit filename="src/cclogger.h" />
 		<Unit filename="src/clangcc.cpp" />
