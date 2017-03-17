@@ -203,8 +203,8 @@ bool ClIndexToken::WriteOut( const ClIndexToken& token,  wxOutputStream& out )
         WriteString( out, it->first.c_str() );
         WriteString( out, it->second.c_str() );
     }
-    WriteString( out, token.scope.first.c_str() );
-    WriteString( out, token.scope.second.c_str() );
+    WriteString( out, token.semanticScope.first.c_str() );
+    WriteString( out, token.semanticScope.second.c_str() );
     return true;
 }
 
@@ -266,9 +266,9 @@ bool ClIndexToken::ReadIn( ClIndexToken& token, wxInputStream& in )
             return false;
         token.parentTokenList.push_back( std::make_pair( identifier, USR ) );
     }
-    if (!ReadString( in, token.scope.first ))
+    if (!ReadString( in, token.semanticScope.first ))
         return false;
-    if (!ReadString( in, token.scope.second ))
+    if (!ReadString( in, token.semanticScope.second ))
         return false;
 
     return true;
@@ -682,7 +682,7 @@ bool ClTokenIndexDatabase::LookupTokenDisplayName(const ClIdentifierString& iden
         {
             out_DisplayName = token.displayName;
             wxString parentScopeDisplayName;
-            if (LookupTokenDisplayName( token.scope.first, token.scope.second, parentScopeDisplayName ))
+            if (LookupTokenDisplayName( token.semanticScope.first, token.semanticScope.second, parentScopeDisplayName ))
             {
                 out_DisplayName = parentScopeDisplayName + wxT("::")+out_DisplayName;
             }

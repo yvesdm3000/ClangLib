@@ -369,11 +369,10 @@ public:
             }
         }
     ClangEvent( const wxEventType evtId, const ClTranslUnitId id, const ClangFile& file,
-                const wxString& tokenName, const ClTokenPosition& loc, const std::vector<ClTokenReference>& references) :
+                const ClTokenPosition& loc, const std::vector<ClTokenReference>& references) :
         wxCommandEvent(wxEVT_NULL, evtId),
         m_TranslationUnitId(id),
         m_File(file),
-        m_TokenName( tokenName ),
         m_Position(loc),
         m_ReferenceResults(references) {}
 
@@ -386,7 +385,6 @@ public:
         wxCommandEvent(other),
         m_TranslationUnitId(other.m_TranslationUnitId),
         m_File(other.m_File),
-        m_TokenName(other.m_TokenName),
         m_Position(other.m_Position),
         m_GetOccurrencesResults(other.m_GetOccurrencesResults),
         m_GetCodeCompletionResults(other.m_GetCodeCompletionResults),
@@ -402,10 +400,6 @@ public:
     ClTranslUnitId GetTranslationUnitId() const
     {
         return m_TranslationUnitId;
-    }
-    const wxString& GetTokenName() const
-    {
-        return m_TokenName;
     }
     const ClTokenPosition& GetPosition() const
     {
@@ -451,7 +445,6 @@ private:
     wxDateTime m_StartedTime;
     const ClTranslUnitId m_TranslationUnitId;
     const ClangFile m_File;
-    const wxString m_TokenName;
     const ClTokenPosition m_Position;
     const std::vector< std::pair<int, int> > m_GetOccurrencesResults;
     const std::vector<ClToken> m_GetCodeCompletionResults;

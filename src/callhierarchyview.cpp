@@ -255,6 +255,15 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
             if (scopeIds.empty())
             {
                 data = new TreeItemData(it->GetFile(), it->GetReferenceScope().GetTokenIdentifier(), it->GetReferenceScope().GetTokenDisplayName(), it->GetReferenceScope().GetScopeName(), it->GetReferenceScope().GetTokenRange());
+                if (m_pTree->ItemHasChildren(*idIt))
+                {
+                    wxTreeItemIdValue cookie;
+                    wxTreeItemId id = m_pTree->GetFirstChild(*idIt, cookie);
+                    if(m_pTree->GetItemText( id ).IsEmpty())
+                    {
+                        m_pTree->Delete( id );
+                    }
+                }
                 wxTreeItemId childId = m_pTree->AppendItem( *idIt, data->GetItemName() );
                 m_pTree->SetItemData( childId, data );
                 m_pTree->AppendItem( childId, wxT("") );
@@ -346,7 +355,7 @@ void ClangCallHierarchyView::OnTreeItemSelected( wxTreeEvent &evt )
                         m_pList->InsertItem( ln, lineStr );
                         in.SeekLine( it->GetTokenRange().beginLocation.line - 1 );
                         wxString str = in.ReadLine();
-                        m_pList->SetItem( ln, 1, str.Trim() );
+                        m_pList->SetItem( ln, 1, str.Trim().Trim(false) );
                         ++ln;
                     }
                 }

@@ -1777,10 +1777,12 @@ void ClangPlugin::OnClangLookupTokenReferencesFinished(wxEvent& event)
         {
             ClTokenReference scopeRef( tokenIdentifier, tokenDisplayName, tokenScopePath, it->second, ClangFile(wxString::FromUTF8( pJob->GetProject().c_str()), wxString::FromUTF8( it->first.c_str() )), scope );
             if (std::find( refs.begin(), refs.end(), scopeRef ) == refs.end())
+            {
                 refs.push_back( scopeRef );
+            }
         }
     }
-    ClangEvent evt(clEVT_GETREFERENCESCOPES_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetTokenDisplayName(), pJob->GetPosition(), refs);
+    ClangEvent evt(clEVT_GETREFERENCESCOPES_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile(), pJob->GetPosition(), refs);
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
 }

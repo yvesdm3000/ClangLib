@@ -75,7 +75,7 @@ struct ClIndexToken
     ClTokenType tokenTypeMask; // Different token types for the token that can be found in the file
     std::vector< ClIndexTokenLocation > locationList;
     std::vector< std::pair<ClIdentifierString,ClUSRString> > parentTokenList;   // Overrides and parent classes, first=identifier, second=USR
-    std::pair<ClIdentifierString,ClUSRString> scope; // namespaces, outer class in case of inner class, first=identifier, second=USR
+    std::pair<ClIdentifierString,ClUSRString> semanticScope; // namespaces, outer class in case of inner class, first=identifier, second=USR
 
     ClIndexToken(const ClIdentifierString& ident) : identifier(ident), USR(), tokenTypeMask(ClTokenType_Unknown){}
     ClIndexToken( const ClIdentifierString& ident, const wxString& name, const ClFileId fId, const std::string& usr, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector<std::pair<ClIdentifierString,ClUSRString> >& parentTokList, const std::pair<ClIdentifierString,ClUSRString>& parentScope )
@@ -84,7 +84,7 @@ struct ClIndexToken
           USR(usr),
           tokenTypeMask( tokType ),
           parentTokenList(parentTokList),
-          scope(std::make_pair( parentScope.first, parentScope.second))
+          semanticScope(std::make_pair( parentScope.first, parentScope.second))
     {
         locationList.push_back( ClIndexTokenLocation( tokType, fId, tokenRange ) );
     }
@@ -93,7 +93,7 @@ struct ClIndexToken
       : identifier( other.identifier ),
         displayName(other.displayName.c_str()),
         USR(other.USR), tokenTypeMask(other.tokenTypeMask),
-        scope(std::make_pair(other.scope.first,other.scope.second) )
+        semanticScope(std::make_pair(other.semanticScope.first,other.semanticScope.second) )
     {
         for (std::vector< ClIndexTokenLocation >::const_iterator it = other.locationList.begin(); it != other.locationList.end(); ++it)
         {

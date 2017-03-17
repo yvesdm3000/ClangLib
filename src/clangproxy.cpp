@@ -1553,7 +1553,10 @@ void ClangProxy::GetTokenCompletionAt( const ClTranslUnitId translUnitId, const 
     }
 }
 
-bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, ClIdentifierString& out_Identifier, ClUSRString& out_USR, ClIdentifierString& out_DisplayName )
+bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& filename,
+                             const ClTokenPosition& position, ClIdentifierString& out_Identifier,
+                             ClUSRString& out_USR, ClIdentifierString& out_DisplayName,
+                             std::vector<std::pair<ClIdentifierString,ClUSRString> >* out_pSemanticParentPath )
 {
     if (translId < 0)
     {
@@ -1581,6 +1584,24 @@ bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& f
     if (clang_getCString( str ))
         out_DisplayName = clang_getCString( str );
     clang_disposeString( str );
+
+    if (out_pSemanticParentPath)
+    {
+        CXCursor parentCursor = clang_getCursorSemanticParent( cursor );
+
+        while ( (!clang_Cursor_isNull(parentCursor))&&(!clang_isTranslationUnit( parentCursor.kind )) )
+        {
+            ClIdentifierString SemanticParentName = m_TranslUnits[translId].GetTokenIdentifier( parentCursor );
+            ClUSRString SemanticParentUSR;
+            str = clang_getCursorUSR( parentCursor );
+            if (clang_getCString( str ))
+                SemanticParentUSR = clang_getCString( str );
+            clang_disposeString( str );
+            out_pSemanticParentPath->push_back( std::make_pair(SemanticParentName,SemanticParentUSR) );
+            parentCursor = clang_getCursorSemanticParent( parentCursor );
+        }
+
+    }
 
     return true;
 }
@@ -1815,16 +1836,16 @@ void ClangProxy::ResolveTokenScopes(const ClTranslUnitId translUnitId, const std
             {
                 for (std::vector<ClIndexTokenLocation>::const_iterator itLoc = it->locationList.begin(); itLoc != it->locationList.end(); ++itLoc)
                 {
-                    if ( (it->scope.first != lastScopeIdent)||(it->scope.second != lastScopeUSR) )
+                    if ( (it->semanticScope.first != lastScopeIdent)||(it->semanticScope.second != lastScopeUSR) )
                     {
-                        if (!pTokenIndexDB->LookupTokenType( it->scope.first, fileId, it->scope.second, itLoc->range.beginLocation, scopeTokenType))
+                        if (!pTokenIndexDB->LookupTokenType( it->semanticScope.first, fileId, it->semanticScope.second, itLoc->range.beginLocation, scopeTokenType))
                         {
                             scopeTokenType = ClTokenType_Unknown;
                         }
-                        if( !pTokenIndexDB->LookupTokenDisplayName( it->scope.first, it->scope.second, scopeName ) )
+                        if( !pTokenIndexDB->LookupTokenDisplayName( it->semanticScope.first, it->semanticScope.second, scopeName ) )
                             scopeName = wxT("");
-                        lastScopeIdent = it->scope.first;
-                        lastScopeUSR = it->scope.second;
+                        lastScopeIdent = it->semanticScope.first;
+                        lastScopeUSR = it->semanticScope.second;
                     }
                     if (scopeTokenType == ClTokenType_FuncDef)
                     {
@@ -1915,7 +1936,9 @@ bool ClangProxy::ResolveTokenScopeAt(const ClTranslUnitId, const std::string& pr
                     if (itLoc->range.InRange( position ))
                     {
                         if (itLoc->range.beginLocation > scope.GetTokenRange().beginLocation)
-                            scope = ClTokenScope(wxString::FromUTF8( it->identifier.c_str() ), it->displayName, wxString::FromUTF8(it->scope.first.c_str()), itLoc->range);
+                        {
+                            scope = ClTokenScope(wxString::FromUTF8( it->identifier.c_str() ), it->displayName, wxString::FromUTF8(it->semanticScope.first.c_str()), itLoc->range);
+                        }
                     }
                 }
             }

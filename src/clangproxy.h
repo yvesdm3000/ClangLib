@@ -496,7 +496,8 @@ public:
                 m_Locations.push_back( std::make_pair(m_Filename, pos) );
                 return;
             }
-            if (clangproxy.GetTokenAt( m_TranslId, m_Filename, m_Position, m_TokenIdentifier, m_TokenUSR, m_TokenDisplayName ))
+            std::vector<std::pair<ClIdentifierString,ClUSRString> > SemanticParentPath;
+            if (clangproxy.GetTokenAt( m_TranslId, m_Filename, m_Position, m_TokenIdentifier, m_TokenUSR, m_TokenDisplayName, &SemanticParentPath ))
             {
                 ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( m_Project );
                 if (!db)
@@ -708,7 +709,7 @@ public:
         }
         void Execute(ClangProxy& clangproxy)
         {
-            if (clangproxy.GetTokenAt( m_TranslId, GetFilename(), m_Position, m_TokenIdentifier, m_USR, m_TokenDisplayName ))
+            if (clangproxy.GetTokenAt( m_TranslId, GetFilename(), m_Position, m_TokenIdentifier, m_USR, m_TokenDisplayName, &m_TokenScopePath ))
             {
                 // TODO: ask tu for references
 
@@ -767,7 +768,16 @@ public:
         }
         wxString GetTokenScopePath() const
         {
-            return wxString::FromUTF8(m_TokenScopePath.c_str());
+            wxString ret;
+            for (std::vector<std::pair<ClIdentifierString,ClUSRString> >::const_iterator it = m_TokenScopePath.begin(); it != m_TokenScopePath.end(); ++it)
+            {
+                ret = wxString::FromUTF8( it->first.c_str() ) + ret;
+                if (*it != m_TokenScopePath.back())
+                {
+                    ret = wxT("::") + ret;
+                }
+            }
+            return ret;
         }
         const std::set< std::pair<std::string, ClTokenRange> >& GetResults() const
         {
@@ -801,7 +811,7 @@ public:
         ClIdentifierString m_TokenIdentifier;
         ClUSRString m_USR;
         ClIdentifierString m_TokenDisplayName;
-        ClIdentifierString m_TokenScopePath; // Scope of declaration
+        std::vector<std::pair<ClIdentifierString,ClUSRString> > m_TokenScopePath; // Semantic scope path
         std::set<std::pair<std::string, ClTokenRange> > m_Locations;
     };
 
@@ -1403,10 +1413,16 @@ protected: // jobs that are run only on the thread
     void GetOccurrencesOf(const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position,
                           std::vector< std::pair<int, int> >& results);
     void RefineTokenType( const ClTranslUnitId translId, int tknId, ClTokenCategory& out_tknType); // TODO: cache TokenId (if resolved) for DocumentCCToken()
-    bool GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, ClIdentifierString& out_Identifier, ClUSRString& out_USR, ClIdentifierString& out_DisplayName );
+    bool GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, ClIdentifierString& out_Identifier, ClUSRString& out_USR, ClIdentifierString& out_DisplayName, std::vector<std::pair<ClIdentifierString,ClUSRString> >* out_pSemanticParentPath );
+    bool GetTokenAt( const ClTranslUnitId translId, const std::string& filename, const ClTokenPosition& position, ClIdentifierString& out_Identifier, ClUSRString& out_USR, ClIdentifierString& out_DisplayName )
+    {
+        return GetTokenAt(translId, filename, position, out_Identifier, out_USR, out_DisplayName, NULL);
+    }
+
     void GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList);
 
     bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_position);
+
     void StoreTokenIndexDatabase( const std::string& projectFileName ) const;
 
 public: // Tokens
