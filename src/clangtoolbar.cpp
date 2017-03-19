@@ -69,6 +69,7 @@ void ClangToolbar::OnAttach(IClangPlugin* pClangPlugin)
 
     wxCommandEvent evt2(clEVT_COMMAND_UPDATETOOLBARSELECTION, idToolbarUpdateSelection);
     AddPendingEvent(evt2);
+    m_CurrentState = CurrentState();
 }
 
 void ClangToolbar::OnRelease(IClangPlugin* pClangPlugin)
@@ -136,13 +137,13 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
         {
             cbStyledTextCtrl* stc = ed->GetControl();
             const unsigned int line = stc->GetCurrentLine();
-            if (line < m_CurrentState.m_CurrentEditorLine)
+            if (line < m_CurrentState.m_EditorLine)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
                     if (it->GetTokenRange().beginLocation.line >= line + 1)
                     {
-                        it->GetTokenRange().beginLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        it->GetTokenRange().beginLocation.line -= m_CurrentState.m_EditorLine - line;
                         if (it->GetTokenRange().beginLocation.line < line + 1)
                         {
                             it->GetTokenRange().beginLocation.line = line + 1;
@@ -150,7 +151,7 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
                     }
                     if (it->GetTokenRange().endLocation.line >= line + 1)
                     {
-                        it->GetTokenRange().endLocation.line -= m_CurrentState.m_CurrentEditorLine - line;
+                        it->GetTokenRange().endLocation.line -= m_CurrentState.m_EditorLine - line;
                         if (it->GetTokenRange().endLocation.line < line + 1)
                         {
                             it->GetTokenRange().endLocation.line = line + 1;
@@ -159,17 +160,17 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
                 }
                 updateLine = true;
             }
-            else if (line > m_CurrentState.m_CurrentEditorLine)
+            else if (line > m_CurrentState.m_EditorLine)
             {
                 for (std::vector<ClTokenScope>::iterator it = m_CurrentState.m_TokenScopes.begin(); it != m_CurrentState.m_TokenScopes.end(); ++it)
                 {
-                    if (it->GetTokenRange().beginLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
+                    if (it->GetTokenRange().beginLocation.line >= m_CurrentState.m_EditorLine + 1)
                     {
-                        it->GetTokenRange().beginLocation.line += line - m_CurrentState.m_CurrentEditorLine;
+                        it->GetTokenRange().beginLocation.line += line - m_CurrentState.m_EditorLine;
                     }
-                    if (it->GetTokenRange().endLocation.line >= m_CurrentState.m_CurrentEditorLine + 1)
+                    if (it->GetTokenRange().endLocation.line >= m_CurrentState.m_EditorLine + 1)
                     {
-                        it->GetTokenRange().endLocation.line += line - m_CurrentState.m_CurrentEditorLine;
+                        it->GetTokenRange().endLocation.line += line - m_CurrentState.m_EditorLine;
                     }
                 }
                 updateLine = true;
@@ -182,7 +183,7 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
         {
             cbStyledTextCtrl* stc = ed->GetControl();
             const unsigned int line = stc->GetCurrentLine();
-            if (line != m_CurrentState.m_CurrentEditorLine )
+            if (line != m_CurrentState.m_EditorLine )
             {
                 updateLine = true;
             }
@@ -192,8 +193,8 @@ void ClangToolbar::OnEditorHook(cbEditor* ed, wxScintillaEvent& event)
     {
         cbStyledTextCtrl* stc = ed->GetControl();
         const unsigned int line = stc->GetCurrentLine();
-        m_CurrentState.m_CurrentEditorLine = line;
-        if ( (ed->GetLastModificationTime() != m_CurrentState.m_CurrentEditorModificationTime)||(m_Function&&(m_Function->GetCount()==0)))
+        m_CurrentState.m_EditorLine = line;
+        if ( (ed->GetLastModificationTime() != m_CurrentState.m_EditorModificationTime)||(m_Function&&(m_Function->GetCount()==0)))
         {
             wxCommandEvent evt(clEVT_COMMAND_UPDATETOOLBARCONTENTS, idToolbarUpdateContents);
             AddPendingEvent(evt);
@@ -328,7 +329,7 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
     }
 
 
-    m_CurrentState.m_CurrentEditorModificationTime = ed->GetLastModificationTime();
+    m_CurrentState.m_EditorModificationTime = ed->GetLastModificationTime();
 }
 
 void ClangToolbar::OnScope( wxCommandEvent& /*evt*/ )

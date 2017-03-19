@@ -256,7 +256,10 @@ std::vector<cbCodeCompletionPlugin::CCToken> ClangCodeCompletion::GetAutocompLis
     }
 
     if (stc->IsString(style)||stc->IsComment(style)||stc->IsCharacter(style))
+    {
+        m_CCOutstandingLoc = ClTokenPosition(0,0);
         return tokens;
+    }
 
     const int line = stc->LineFromPosition(tknStart);
     const int lnStart = stc->PositionFromLine(line);
