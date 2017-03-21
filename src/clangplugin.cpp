@@ -157,7 +157,9 @@ void ClangPlugin::OnAttach()
         nullptr
     };
     for (const char** itr = imgs; *itr; ++itr)
+    {
         m_ImageList.Add(cbLoadBitmap(prefix + wxString::FromUTF8(*itr), wxBITMAP_TYPE_PNG));
+    }
 
     EditorColourSet* theme = Manager::Get()->GetEditorManager()->GetColourSet();
     wxStringTokenizer tokenizer(theme->GetKeywords(theme->GetHighlightLanguage(wxT("C/C++")), 0));
@@ -1768,16 +1770,20 @@ void ClangPlugin::OnClangLookupTokenReferencesFinished(wxEvent& event)
     wxString tokenIdentifier = wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() );
     wxString tokenDisplayName = pJob->GetTokenDisplayName();
     wxString tokenScopePath = pJob->GetTokenScopePath();
+    ClTokenCategory tokenCategory = pJob->GetTokenCategory();
 
-    std::set<std::pair<std::string, ClTokenRange> > Refs = pJob->GetResults();
-    for (std::set<std::pair<std::string, ClTokenRange> >::const_iterator it = Refs.begin(); it != Refs.end(); ++it)
+    CCLogger::Get()->DebugLog( F(wxT("finish lookup: category=%d"),(int)tokenCategory) );
+
+    std::set<ClangProxy::LookupTokenReferencesAtJob::TokenRef> Refs = pJob->GetResults();
+    for (std::set<ClangProxy::LookupTokenReferencesAtJob::TokenRef>::const_iterator it = Refs.begin(); it != Refs.end(); ++it)
     {
         ClTokenScope scope;
-        if (m_Proxy.ResolveTokenScopeAt(pJob->GetTranslationUnitId(), pJob->GetProject(), it->first, it->second.beginLocation, scope))
+        if (m_Proxy.ResolveTokenScopeAt(pJob->GetTranslationUnitId(), pJob->GetProject(), it->Filename, it->Range.beginLocation, scope))
         {
-            ClTokenReference scopeRef( tokenIdentifier, tokenDisplayName, tokenScopePath, it->second, ClangFile(wxString::FromUTF8( pJob->GetProject().c_str()), wxString::FromUTF8( it->first.c_str() )), scope );
+            ClTokenReference scopeRef( tokenIdentifier, tokenDisplayName, tokenScopePath, it->Range, it->Category, ClangFile(wxString::FromUTF8( pJob->GetProject().c_str()), wxString::FromUTF8( it->Filename.c_str() )), scope, it->Type );
             if (std::find( refs.begin(), refs.end(), scopeRef ) == refs.end())
             {
+                CCLogger::Get()->DebugLog( F(wxT("Adding scopeRef ")+scopeRef.GetTokenDisplayName()+wxT(" with category %d and refscope ")+scope.GetTokenDisplayName()+wxT(" category %d"), scopeRef.GetTokenCategory(), scopeRef.GetReferenceScope().GetTokenCategory()));
                 refs.push_back( scopeRef );
             }
         }

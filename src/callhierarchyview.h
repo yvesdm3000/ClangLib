@@ -12,6 +12,7 @@ class ClangCallHierarchyView: public wxPanel
 {
 public:
     ClangCallHierarchyView(ClangRefactoring& controller);
+    virtual ~ClangCallHierarchyView();
     void AddViewToManager();
     void RemoveViewFromManager();
     void ActivateView();
@@ -35,6 +36,7 @@ private:
     ClangRefactoring& m_Controller;
     wxSplitterWindow* m_pSplitter;
     wxTreeCtrl* m_pTree;
+    wxImageList m_TreeImageList;
     wxTreeItemId m_RootId;
     wxListView* m_pList;
 };

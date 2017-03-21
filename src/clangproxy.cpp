@@ -24,124 +24,6 @@ const int idClangGetCompileCommand = wxNewId();
 
 namespace ProxyHelper
 {
-static ClTokenCategory GetTokenCategory(CXCursorKind kind, CX_CXXAccessSpecifier access = CX_CXXInvalidAccessSpecifier)
-{
-    switch (kind)
-    {
-    case CXCursor_StructDecl:
-    case CXCursor_UnionDecl:
-    case CXCursor_ClassDecl:
-    case CXCursor_ClassTemplate:
-        switch (access)
-        {
-        case CX_CXXPublic:
-            return tcClassPublic;
-        case CX_CXXProtected:
-            return tcClassProtected;
-        case CX_CXXPrivate:
-            return tcClassPrivate;
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-            return tcClass;
-        }
-
-    case CXCursor_Constructor:
-        switch (access)
-        {
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-        case CX_CXXPublic:
-            return tcCtorPublic;
-        case CX_CXXProtected:
-            return tcCtorProtected;
-        case CX_CXXPrivate:
-            return tcCtorPrivate;
-        }
-
-    case CXCursor_Destructor:
-        switch (access)
-        {
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-        case CX_CXXPublic:
-            return tcDtorPublic;
-        case CX_CXXProtected:
-            return tcDtorProtected;
-        case CX_CXXPrivate:
-            return tcDtorPrivate;
-        }
-
-    case CXCursor_FunctionDecl:
-    case CXCursor_CXXMethod:
-    case CXCursor_FunctionTemplate:
-        switch (access)
-        {
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-        case CX_CXXPublic:
-            return tcFuncPublic;
-        case CX_CXXProtected:
-            return tcFuncProtected;
-        case CX_CXXPrivate:
-            return tcFuncPrivate;
-        }
-
-    case CXCursor_FieldDecl:
-    case CXCursor_VarDecl:
-    case CXCursor_ParmDecl:
-        switch (access)
-        {
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-        case CX_CXXPublic:
-            return tcVarPublic;
-        case CX_CXXProtected:
-            return tcVarProtected;
-        case CX_CXXPrivate:
-            return tcVarPrivate;
-        }
-
-    case CXCursor_MacroDefinition:
-        return tcMacroDef;
-
-    case CXCursor_EnumDecl:
-        switch (access)
-        {
-        case CX_CXXPublic:
-            return tcEnumPublic;
-        case CX_CXXProtected:
-            return tcEnumProtected;
-        case CX_CXXPrivate:
-            return tcEnumPrivate;
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-            return tcEnum;
-        }
-
-    case CXCursor_EnumConstantDecl:
-        return tcEnumerator;
-
-    case CXCursor_Namespace:
-        return tcNamespace;
-
-    case CXCursor_TypedefDecl:
-        switch (access)
-        {
-        case CX_CXXPublic:
-            return tcTypedefPublic;
-        case CX_CXXProtected:
-            return tcTypedefProtected;
-        case CX_CXXPrivate:
-            return tcTypedefPrivate;
-        default:
-        case CX_CXXInvalidAccessSpecifier:
-            return tcTypedef;
-        }
-
-    default:
-        return tcNone;
-    }
-}
 
 static CXChildVisitResult ClCallTipCtorAST_Visitor(CXCursor cursor,
         CXCursor WXUNUSED(parent),
@@ -979,7 +861,7 @@ void ClangProxy::CodeCompleteAt( const ClTranslUnitId translUnitId, const std::s
                 CXString completeTxt = clang_getCompletionChunkText(token.CompletionString, chunkIdx);
                 out_results.push_back(ClToken(wxString::FromUTF8(clang_getCString(completeTxt)) + type,
                                           resIdx, clang_getCompletionPriority(token.CompletionString),
-                                          ProxyHelper::GetTokenCategory(token.CursorKind)));
+                                          ClTranslationUnit::GetTokenCategory(token.CursorKind)));
                 clang_disposeString(completeTxt);
                 type.Empty();
                 break;
@@ -1254,7 +1136,7 @@ void ClangProxy::RefineTokenType( const ClTranslUnitId translUnitId, int tknId, 
             if (!clang_Cursor_isNull(clTkn) && !clang_isInvalid(clTkn.kind))
             {
                 ClTokenCategory tkCat
-                    = ProxyHelper::GetTokenCategory(token->CursorKind, clang_getCXXAccessSpecifier(clTkn));
+                    = ClTranslationUnit::GetTokenCategory(token->CursorKind, clang_getCXXAccessSpecifier(clTkn));
                 if (tkCat != tcNone)
                     tknType = tkCat;
             }
@@ -1321,7 +1203,7 @@ void ClangProxy::GetCallTipsAt( const ClTranslUnitId translUnitId, const std::st
     for (size_t tknIdx = 0; tknIdx < tokenSet.size(); ++tknIdx)
     {
         CXCursor token = tokenSet[tknIdx];
-        switch (ProxyHelper::GetTokenCategory(token.kind, CX_CXXPublic))
+        switch (ClTranslationUnit::GetTokenCategory(token.kind, CX_CXXPublic))
         {
         case tcVarPublic:
         {
@@ -1606,7 +1488,7 @@ bool ClangProxy::GetTokenAt( const ClTranslUnitId translId, const std::string& f
     return true;
 }
 
-void ClangProxy::GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList)
+void ClangProxy::GetTokenOverrideParentsAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList)
 {
     if (translUnitId < 0)
     {
@@ -1617,15 +1499,24 @@ void ClangProxy::GetTokenOverridesAt( const ClTranslUnitId translUnitId, const s
     ClIdentifierString displayName;
     if (GetTokenAt(translUnitId, filename, position, identifier, USR, displayName))
     {
-        wxMutexLocker lock(m_Mutex);
-        if (translUnitId >= (int)m_TranslUnits.size())
+        const ClTokenIndexDatabase* pIndexDB = NULL;
+        std::vector<ClUSRString> overrideList;
         {
-            return;
+            wxMutexLocker lock(m_Mutex);
+            if (translUnitId >= (int)m_TranslUnits.size())
+            {
+                return;
+            }
+            m_TranslUnits[translUnitId].GetTokenDatabase().LookupTokenOverrideParents( identifier, USR, overrideList );
+            pIndexDB = m_TranslUnits[translUnitId].GetTokenDatabase().GetTokenIndexDatabase();
         }
-        std::set<std::pair<ClFileId,ClUSRString> > list = m_TranslUnits[translUnitId].GetTokenDatabase().GetTokenIndexDatabase()->LookupTokenOverrides( identifier, USR, ClTokenType_DefGroup );
-        for (std::set<std::pair<ClFileId,ClUSRString> >::const_iterator it = list.begin(); it != list.end(); ++it)
+        if (pIndexDB&&(overrideList.empty()))
         {
-            out_USRList.push_back( it->second );
+            pIndexDB->LookupTokenOverrideParents( identifier, USR, overrideList );
+        }
+        for (std::vector<ClUSRString>::const_iterator it = overrideList.begin(); it != overrideList.end(); ++it)
+        {
+            out_USRList.push_back( *it );
         }
     }
 }
@@ -1855,9 +1746,10 @@ void ClangProxy::ResolveTokenScopes(const ClTranslUnitId translUnitId, const std
                     {
                         continue;
                     }
-                    if (std::find( out_Scopes.begin(), out_Scopes.end(), ClTokenScope(wxString::FromUTF8( it->identifier.c_str()), it->displayName, scopeName, itLoc->range) ) == out_Scopes.end())
+                    ClTokenScope scope(wxString::FromUTF8( it->identifier.c_str()), it->displayName, scopeName, itLoc->range, it->category);
+                    if (std::find( out_Scopes.begin(), out_Scopes.end(), scope ) == out_Scopes.end())
                     {
-                        out_Scopes.push_back( ClTokenScope(wxString::FromUTF8(it->identifier.c_str()), it->displayName, scopeName, itLoc->range) );
+                        out_Scopes.push_back( scope );
                     }
                 }
             }
@@ -1878,7 +1770,6 @@ void ClangProxy::ResolveTokenScopes(const ClTranslUnitId translUnitId, const std
             ClFileId fId = m_TranslUnits[translUnitId].GetTokenDatabase().GetFilenameId( filename );
             m_TranslUnits[translUnitId].GetTokenDatabase().GetAllFileTokenScopes(fId, tokenMask, out_Scopes);
         }
-        CCLogger::Get()->DebugLog(F(wxT("Token scopes returned from TU: %d"), out_Scopes.size()));
     }
 }
 
@@ -1937,7 +1828,7 @@ bool ClangProxy::ResolveTokenScopeAt(const ClTranslUnitId, const std::string& pr
                     {
                         if (itLoc->range.beginLocation > scope.GetTokenRange().beginLocation)
                         {
-                            scope = ClTokenScope(wxString::FromUTF8( it->identifier.c_str() ), it->displayName, wxString::FromUTF8(it->semanticScope.first.c_str()), itLoc->range);
+                            scope = ClTokenScope(wxString::FromUTF8( it->identifier.c_str() ), it->displayName, wxString::FromUTF8(it->semanticScope.first.c_str()), itLoc->range, it->category);
                         }
                     }
                 }
@@ -1952,6 +1843,75 @@ bool ClangProxy::ResolveTokenScopeAt(const ClTranslUnitId, const std::string& pr
     return false;
 }
 
+bool ClangProxy::LookupAllTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, std::vector<ClUSRString>& out_USRList) const
+{
+    if ( TranslId < 0 )
+    {
+        return false;
+    }
+    std::vector<ClUSRString> usrList;
+    const ClTokenIndexDatabase* indexDB = NULL;
+    {
+        wxMutexLocker lock(m_Mutex);
+        if (TranslId > (ClTranslUnitId)m_TranslUnits.size())
+        {
+            return false;
+        }
+        if (!m_TranslUnits[TranslId].GetTokenDatabase().LookupTokenOverrideParents( TokenIdentifier, TokenUSR, usrList )  )
+        {
+            indexDB = m_TranslUnits[TranslId].GetTokenIndexDatabase();
+        }
+    }
+    if (indexDB)
+    {
+        if(!indexDB->LookupTokenOverrideParents( TokenIdentifier, TokenUSR, usrList ))
+            return false;
+    }
+    for (std::vector<ClUSRString>::const_iterator it = usrList.begin(); it != usrList.end(); ++it)
+    {
+        if (std::find(out_USRList.begin(),out_USRList.end(),*it) == out_USRList.end())
+        {
+            out_USRList.push_back( *it );
+            LookupAllTokenOverrideParents( TranslId, TokenIdentifier, *it, out_USRList );
+        }
+    }
+    return true;
+}
+
+bool ClangProxy::LookupAllTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, std::vector<ClUSRString>& out_USRList) const
+{
+    if ( TranslId < 0 )
+    {
+        return false;
+    }
+    std::vector<ClUSRString> usrList;
+    const ClTokenIndexDatabase* indexDB = NULL;
+    {
+        wxMutexLocker lock(m_Mutex);
+        if (TranslId > (ClTranslUnitId)m_TranslUnits.size())
+        {
+            return false;
+        }
+        if (!m_TranslUnits[TranslId].GetTokenDatabase().LookupTokenOverrideChildren( TokenIdentifier, TokenUSR, usrList )  )
+        {
+            indexDB = m_TranslUnits[TranslId].GetTokenIndexDatabase();
+        }
+    }
+    if (indexDB)
+    {
+        if(!indexDB->LookupTokenOverrideChildren( TokenIdentifier, TokenUSR, usrList ))
+            return false;
+    }
+    for (std::vector<ClUSRString>::const_iterator it = usrList.begin(); it != usrList.end(); ++it)
+    {
+        if (std::find(out_USRList.begin(),out_USRList.end(),*it) == out_USRList.end())
+        {
+            out_USRList.push_back( *it );
+            LookupAllTokenOverrideChildren( TranslId, TokenIdentifier, *it, out_USRList );
+        }
+    }
+    return true;
+}
 
 
 /** @brief Reparse a translation unit
@@ -2010,8 +1970,6 @@ void ClangProxy::UpdateTokenDatabase( const ClTranslUnitId translUnitId )
             tu.SetFiles(includeFiles);
             tu.SwapTokenDatabase( tokenDatabase );
         }
-    } else {
-        CCLogger::Get()->DebugLog( F(_T("UpdateTokenDatabase: Translation unit %d is not valid!"), translUnitId) );
     }
     {
         wxMutexLocker lock(m_Mutex);

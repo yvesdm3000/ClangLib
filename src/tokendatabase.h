@@ -20,13 +20,13 @@ typedef std::string ClIdentifierString;
 struct ClAbstractToken
 {
     ClAbstractToken() :
-        tokenType(ClTokenType_Unknown), fileId(-1), range(ClTokenPosition( 0, 0 ), ClTokenPosition(0,0) ), identifier(), USR(), tokenHash(0) {}
-    ClAbstractToken(ClTokenType typ, ClFileId fId, const ClTokenRange tokRange, const ClIdentifierString& name, const wxString& dispName, const ClUSRString& usr, int tokHash) :
-        tokenType(typ), fileId(fId), range(tokRange), identifier(name), displayName(dispName), USR(usr), tokenHash( tokHash ) {}
+        tokenType(ClTokenType_Unknown), fileId(-1), range(ClTokenPosition( 0, 0 ), ClTokenPosition(0,0) ), identifier(), USR(), category(tcNone), tokenHash(0) {}
+    ClAbstractToken(ClTokenType typ, ClFileId fId, const ClTokenRange tokRange, const ClIdentifierString& name, const wxString& dispName, const ClUSRString& usr, const ClTokenCategory cat, int tokHash) :
+        tokenType(typ), fileId(fId), range(tokRange), identifier(name), displayName(dispName), USR(usr), category(cat), tokenHash( tokHash ) {}
     ClAbstractToken( const ClAbstractToken& other ) :
         tokenType(other.tokenType), fileId(other.fileId), range(other.range),
         identifier(other.identifier), displayName( other.displayName ),
-        USR(other.USR), scope(other.scope)
+        USR(other.USR), scope(other.scope), category(other.category), tokenHash(other.tokenHash)
     {
         for (std::vector<std::pair<ClIdentifierString,ClUSRString> >::const_iterator it = other.parentTokenList.begin(); it != other.parentTokenList.end(); ++it)
         {
@@ -40,6 +40,7 @@ struct ClAbstractToken
     ClIdentifierString identifier;
     wxString displayName; ///< Human readable representation of the token, e.g. function name + parameters and return type
     ClUSRString USR;
+    ClTokenCategory category;
     int tokenHash;
     std::vector<std::pair<ClIdentifierString,ClUSRString> > parentTokenList; // overrides and parent classes
     std::pair<ClIdentifierString,ClUSRString> scope;
@@ -72,16 +73,18 @@ struct ClIndexToken
     ClIdentifierString identifier;  ///< Identifier of the token e.g. function name (without arguments)
     wxString displayName; ///< Human readable representation of the token e.g. function name + arguments + return type
     ClUSRString USR;
+    ClTokenCategory category;
     ClTokenType tokenTypeMask; // Different token types for the token that can be found in the file
     std::vector< ClIndexTokenLocation > locationList;
     std::vector< std::pair<ClIdentifierString,ClUSRString> > parentTokenList;   // Overrides and parent classes, first=identifier, second=USR
     std::pair<ClIdentifierString,ClUSRString> semanticScope; // namespaces, outer class in case of inner class, first=identifier, second=USR
 
-    ClIndexToken(const ClIdentifierString& ident) : identifier(ident), USR(), tokenTypeMask(ClTokenType_Unknown){}
-    ClIndexToken( const ClIdentifierString& ident, const wxString& name, const ClFileId fId, const std::string& usr, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector<std::pair<ClIdentifierString,ClUSRString> >& parentTokList, const std::pair<ClIdentifierString,ClUSRString>& parentScope )
+    ClIndexToken(const ClIdentifierString& ident) : identifier(ident), USR(), category(tcNone), tokenTypeMask(ClTokenType_Unknown){}
+    ClIndexToken( const ClIdentifierString& ident, const wxString& name, const ClFileId fId, const std::string& usr, const ClTokenType tokType, const ClTokenRange& tokenRange, const ClTokenCategory cat, const std::vector<std::pair<ClIdentifierString,ClUSRString> >& parentTokList, const std::pair<ClIdentifierString,ClUSRString>& parentScope )
         : identifier( ident ),
           displayName( name.c_str() ),
           USR(usr),
+          category(cat),
           tokenTypeMask( tokType ),
           parentTokenList(parentTokList),
           semanticScope(std::make_pair( parentScope.first, parentScope.second))
@@ -92,7 +95,7 @@ struct ClIndexToken
     ClIndexToken(const ClIndexToken& other)
       : identifier( other.identifier ),
         displayName(other.displayName.c_str()),
-        USR(other.USR), tokenTypeMask(other.tokenTypeMask),
+        USR(other.USR), category( other.category ), tokenTypeMask(other.tokenTypeMask),
         semanticScope(std::make_pair(other.semanticScope.first,other.semanticScope.second) )
     {
         for (std::vector< ClIndexTokenLocation >::const_iterator it = other.locationList.begin(); it != other.locationList.end(); ++it)
@@ -218,8 +221,6 @@ public:
 
     std::set<ClFileId> LookupTokenFileList( const ClIdentifierString& identifier, const ClUSRString& USR, const ClTokenType typeMask ) const;
 
-    std::set< std::pair<ClFileId, ClUSRString> > LookupTokenOverrides( const ClIdentifierString& identifier, const ClUSRString& USR, const ClTokenType typeMask ) const;
-
     uint32_t GetTokenCount() const
     {
         wxMutexLocker locker(m_Mutex);
@@ -227,12 +228,13 @@ public:
         return m_pIndexTokenMap->GetCount();
     }
 
-    void UpdateToken( const ClIdentifierString& identifier, const wxString& displayName, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const std::vector< std::pair<ClIdentifierString,ClUSRString> >& overrideTokenList, const std::pair<ClIdentifierString,ClUSRString>& scope);
+    void UpdateToken( const ClIdentifierString& identifier, const wxString& displayName, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokType, const ClTokenRange& tokenRange, const ClTokenCategory category, const std::vector< std::pair<ClIdentifierString,ClUSRString> >& overrideTokenList, const std::pair<ClIdentifierString,ClUSRString>& scope);
     void RemoveFileTokens(const ClFileId fileId);
 
     bool LookupTokenPosition(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenPosition& out_Position) const;
-
     bool LookupTokenPosition(const ClIdentifierString& identifier, const ClFileId fileId, const ClUSRString& USR, const ClTokenType tokenTypeMask, ClTokenRange& out_Range) const;
+    bool LookupTokenOverrideParents( const ClIdentifierString& identifier, const ClUSRString& USR, std::vector<ClUSRString>& out_overrideList ) const;
+    bool LookupTokenOverrideChildren( const ClIdentifierString &identifier, const std::string &USR, std::vector<ClUSRString> &out_overrideList ) const;
 
     bool LookupTokenDisplayName(const ClIdentifierString& identifier, const ClUSRString& USR, wxString& out_DisplayName) const;
 
@@ -307,6 +309,8 @@ public:
 
     bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_Position) const;
     bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenRange& out_Range) const;
+    bool LookupTokenOverrideParents( const ClIdentifierString& identifier, const ClUSRString& usr, std::vector<ClUSRString>& out_List) const;
+    bool LookupTokenOverrideChildren( const ClIdentifierString& identifier, const ClUSRString& usr, std::vector<ClUSRString>& out_List) const;
 
     void GetFileTokens(const ClFileId fId, std::set<ClTokenId>& out_tokens) const;
     void GetAllTokenFiles(std::set<ClFileId>& out_fileIds) const;

@@ -519,7 +519,7 @@ public:
                 }
                 // Find token in subclasses
                 std::vector<ClUSRString> USRList;
-                clangproxy.GetTokenOverridesAt( m_TranslId, m_Filename, m_Position, USRList);
+                clangproxy.LookupAllTokenOverrideChildren(m_TranslId, m_TokenIdentifier, m_TokenUSR, USRList);
                 for (std::vector<std::string>::const_iterator it = USRList.begin(); it != USRList.end(); ++it)
                 {
                     const ClUSRString& USR = *it;
@@ -686,6 +686,22 @@ public:
     class LookupTokenReferencesAtJob : public EventJob
     {
     public:
+        struct TokenRef{
+            std::string Filename;
+            ClTokenRange Range;
+            ClTokenCategory Category;
+            ClTokenReferenceType Type;
+            TokenRef(const std::string& filename, const ClTokenRange range, const ClTokenCategory cat, const ClTokenReferenceType typ) : Filename(filename), Range(range), Category( cat ), Type(typ){}
+            bool operator<(const TokenRef& other) const
+            {
+                if (Filename < other.Filename)
+                    return true;
+                else if (Filename > other.Filename)
+                    return false;
+                return Range < other.Range;
+            }
+        };
+    public:
         /** @brief Constructor
          *
          * @param evtType wxEventType to use when the job is completed
@@ -700,42 +716,59 @@ public:
             m_Position(position),
             m_TokenIdentifier(),
             m_USR(),
-            m_TokenDisplayName()
+            m_TokenDisplayName(),
+            m_TokenCategory(tcNone)
             {}
         ClangJob* Clone() const
         {
             LookupTokenReferencesAtJob* pJob = new LookupTokenReferencesAtJob(*this);
             return static_cast<ClangJob*>(pJob);
         }
-        void Execute(ClangProxy& clangproxy)
+    private:
+        void AddTokenRefs(ClTokenIndexDatabase* db, const std::vector<ClUSRString>& usrList, const ClTokenReferenceType refType)
         {
-            if (clangproxy.GetTokenAt( m_TranslId, GetFilename(), m_Position, m_TokenIdentifier, m_USR, m_TokenDisplayName, &m_TokenScopePath ))
+            for (std::vector<ClUSRString>::const_iterator usrIt = usrList.begin(); usrIt != usrList.end(); ++usrIt )
             {
-                // TODO: ask tu for references
-
-                ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( GetProject() );
-                if (!db)
-                {
-                    CCLogger::Get()->DebugLog( wxT("TokenIndexDB not found") );
-                    return;
-                }
-                std::set<ClFileId> fileIdSet = db->LookupTokenFileList( m_TokenIdentifier, m_USR, ClTokenType_RefGroup );
+                std::set<ClFileId> fileIdSet = db->LookupTokenFileList( m_TokenIdentifier, *usrIt, ClTokenType_RefGroup );
                 for (std::set<ClFileId>::const_iterator it = fileIdSet.begin(); it != fileIdSet.end(); ++it)
                 {
                     std::string filename = db->GetFilename( *it );
                     std::vector<ClIndexToken> tokens;
-                    db->GetFileTokens( *it, ClTokenType_RefGroup, m_USR, tokens );
+                    db->GetFileTokens( *it, ClTokenType_RefGroup, *usrIt, tokens );
                     for (std::vector<ClIndexToken>::const_iterator itToken = tokens.begin(); itToken != tokens.end(); ++itToken)
                     {
                         for (std::vector<ClIndexTokenLocation>::const_iterator itLoc = itToken->locationList.begin(); itLoc != itToken->locationList.end(); ++itLoc)
                         {
                             if ((itLoc->fileId == *it)&&(itLoc->tokenType&ClTokenType_RefGroup))
                             {
-                                m_Locations.insert( std::make_pair( filename, itLoc->range ) );
+                                m_References.insert( TokenRef(filename, itLoc->range, itToken->category, refType ) );
                             }
                         }
                     }
                 }
+            }
+        }
+    public:
+        void Execute(ClangProxy& clangproxy)
+        {
+            if (clangproxy.GetTokenAt( m_TranslId, GetFilename(), m_Position, m_TokenIdentifier, m_USR, m_TokenDisplayName, &m_TokenScopePath ))
+            {
+                // TODO: ask tu for references
+                std::vector<ClUSRString> usrList;
+                usrList.push_back(m_USR);
+                ClTokenIndexDatabase* db = clangproxy.LoadTokenIndexDatabase( GetProject() );
+                if (!db)
+                {
+                    CCLogger::Get()->DebugLog( wxT("TokenIndexDB not found") );
+                    return;
+                }
+                AddTokenRefs( db, usrList, ClTokenReferenceType_None );
+                usrList.clear();
+                clangproxy.LookupAllTokenOverrideParents( m_TranslId, m_TokenIdentifier, m_USR, usrList );
+                AddTokenRefs( db, usrList, ClTokenReferenceType_OverrideParent );
+                clangproxy.LookupAllTokenOverrideChildren( m_TranslId, m_TokenIdentifier, m_USR, usrList );
+                usrList.clear();
+                AddTokenRefs( db, usrList, ClTokenReferenceType_OverrideChild );
             }
         }
         int GetTranslationUnitId() const
@@ -766,6 +799,10 @@ public:
         {
             return wxString::FromUTF8(m_TokenDisplayName.c_str());
         }
+        const ClTokenCategory& GetTokenCategory() const
+        {
+            return m_TokenCategory;
+        }
         wxString GetTokenScopePath() const
         {
             wxString ret;
@@ -779,9 +816,9 @@ public:
             }
             return ret;
         }
-        const std::set< std::pair<std::string, ClTokenRange> >& GetResults() const
+        const std::set<TokenRef>& GetResults() const
         {
-            return m_Locations;
+            return m_References;
         }
     protected:
         /** @brief Copy constructor
@@ -799,8 +836,9 @@ public:
             m_TokenIdentifier( other.m_TokenIdentifier ),
             m_USR( other.m_USR ),
             m_TokenDisplayName( other.m_TokenDisplayName ),
+            m_TokenCategory(other.m_TokenCategory),
             m_TokenScopePath( other.m_TokenScopePath ),
-            m_Locations(other.m_Locations)
+            m_References(other.m_References)
         {
         }
     protected:
@@ -811,8 +849,9 @@ public:
         ClIdentifierString m_TokenIdentifier;
         ClUSRString m_USR;
         ClIdentifierString m_TokenDisplayName;
+        ClTokenCategory m_TokenCategory;
         std::vector<std::pair<ClIdentifierString,ClUSRString> > m_TokenScopePath; // Semantic scope path
-        std::set<std::pair<std::string, ClTokenRange> > m_Locations;
+        std::set<TokenRef> m_References;
     };
 
     /*abstract */
@@ -1419,10 +1458,11 @@ protected: // jobs that are run only on the thread
         return GetTokenAt(translId, filename, position, out_Identifier, out_USR, out_DisplayName, NULL);
     }
 
-    void GetTokenOverridesAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList);
+    void GetTokenOverrideParentsAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList);
 
     bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_position);
-
+    bool LookupAllTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, std::vector<ClUSRString>& out_USRList) const;
+    bool LookupAllTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, std::vector<ClUSRString>& out_USRList) const;
     void StoreTokenIndexDatabase( const std::string& projectFileName ) const;
 
 public: // Tokens
@@ -1448,6 +1488,6 @@ private: // Thread
     wxEvtHandler* m_pEventCallbackHandler;
     BackgroundThread* m_pThread;
     BackgroundThread* m_pReindexThread;
-};
+};;
 
 #endif // CLANGPROXY_H

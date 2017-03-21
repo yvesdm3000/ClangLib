@@ -263,13 +263,15 @@ class ClTokenScope
     wxString m_TokenDisplayName;
     wxString m_ScopeName;  // Sepantic scope e.g. class or namespace where the token is declared
     ClTokenRange m_Range;
+    ClTokenCategory m_Category;
 public:
-    ClTokenScope() : m_TokenIdentifier(), m_ScopeName(), m_Range() {}
-    ClTokenScope(const wxString& tokIdent, const wxString& tokDisplayName, const wxString& semanticScopeName, const ClTokenRange scopeRange) :
+    ClTokenScope() : m_TokenIdentifier(), m_ScopeName(), m_Range(), m_Category(tcNone) {}
+    ClTokenScope(const wxString& tokIdent, const wxString& tokDisplayName, const wxString& semanticScopeName, const ClTokenRange scopeRange, const ClTokenCategory category) :
         m_TokenIdentifier(tokIdent),
         m_TokenDisplayName(tokDisplayName),
         m_ScopeName(semanticScopeName),
-        m_Range(scopeRange){}
+        m_Range(scopeRange),
+        m_Category( category ){}
     bool operator==(const ClTokenScope& other) const
     {
         if (other.m_TokenIdentifier != m_TokenIdentifier)
@@ -290,8 +292,10 @@ public:
     wxString& GetTokenDisplayName() { return m_TokenDisplayName; }
     const wxString& GetScopeName() const { return m_ScopeName; }
     wxString& GetScopeName() { return m_ScopeName; }
-    const ClTokenRange& GetTokenRange() const { return m_Range; }
+    ClTokenRange GetTokenRange() const { return m_Range; }
     ClTokenRange& GetTokenRange() { return m_Range; }
+    ClTokenCategory GetTokenCategory() const { return m_Category; }
+    ClTokenCategory& GetTokenCategory() { return m_Category; }
     wxString GetFullName() const
     {
         if (m_TokenDisplayName.IsEmpty())
@@ -302,17 +306,28 @@ public:
     }
 };
 
+typedef enum _ClTokenReferenceType
+{
+    ClTokenReferenceType_None = 0,
+    ClTokenReferenceType_OverrideParent = 1<<0,
+    ClTokenReferenceType_OverrideChild = 1<<1,
+}ClTokenReferenceType;
+
 class ClTokenReference : public ClTokenScope
 {
     ClangFile m_File;
     ClTokenScope m_ReferenceScope; // Scope where the reference is
+    ClTokenReferenceType m_ReferenceType;
+
 public:
-    ClTokenReference(const wxString& name, const wxString& displayName, const wxString& declScope, const ClTokenRange& range, const ClangFile& file, const ClTokenScope& referenceScope) :
-        ClTokenScope(name,displayName, declScope, range),
+    ClTokenReference(const class wxString& name, const wxString& displayName, const wxString& declScope, const struct ClTokenRange& range, const ClTokenCategory category, const ClangFile& file, const ClTokenScope& referenceScope, const ClTokenReferenceType referenceType) :
+        ClTokenScope(name,displayName, declScope, range, category),
         m_File(file),
-        m_ReferenceScope(referenceScope){}
+        m_ReferenceScope(referenceScope),
+        m_ReferenceType( referenceType ){}
     const ClangFile& GetFile() const { return m_File; }
     const ClTokenScope& GetReferenceScope() const { return m_ReferenceScope; }
+    const ClTokenReferenceType& GetReferenceType() const { return m_ReferenceType; }
 };
 
 

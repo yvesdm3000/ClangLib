@@ -704,6 +704,124 @@ unsigned HashToken(CXCompletionString token, ClIdentifierString& out_identifier)
     return hVal;
 }
 
+ClTokenCategory ClTranslationUnit::GetTokenCategory(CXCursorKind kind, CX_CXXAccessSpecifier access)
+{
+    switch (kind)
+    {
+    case CXCursor_StructDecl:
+    case CXCursor_UnionDecl:
+    case CXCursor_ClassDecl:
+    case CXCursor_ClassTemplate:
+        switch (access)
+        {
+        case CX_CXXPublic:
+            return tcClassPublic;
+        case CX_CXXProtected:
+            return tcClassProtected;
+        case CX_CXXPrivate:
+            return tcClassPrivate;
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+            return tcClass;
+        }
+
+    case CXCursor_Constructor:
+        switch (access)
+        {
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+        case CX_CXXPublic:
+            return tcCtorPublic;
+        case CX_CXXProtected:
+            return tcCtorProtected;
+        case CX_CXXPrivate:
+            return tcCtorPrivate;
+        }
+
+    case CXCursor_Destructor:
+        switch (access)
+        {
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+        case CX_CXXPublic:
+            return tcDtorPublic;
+        case CX_CXXProtected:
+            return tcDtorProtected;
+        case CX_CXXPrivate:
+            return tcDtorPrivate;
+        }
+
+    case CXCursor_FunctionDecl:
+    case CXCursor_CXXMethod:
+    case CXCursor_FunctionTemplate:
+    case CXCursor_ConversionFunction:
+        switch (access)
+        {
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+        case CX_CXXPublic:
+            return tcFuncPublic;
+        case CX_CXXProtected:
+            return tcFuncProtected;
+        case CX_CXXPrivate:
+            return tcFuncPrivate;
+        }
+    case CXCursor_FieldDecl:
+    case CXCursor_VarDecl:
+    case CXCursor_ParmDecl:
+        switch (access)
+        {
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+        case CX_CXXPublic:
+            return tcVarPublic;
+        case CX_CXXProtected:
+            return tcVarProtected;
+        case CX_CXXPrivate:
+            return tcVarPrivate;
+        }
+    case CXCursor_MacroDefinition:
+        return tcMacroDef;
+
+    case CXCursor_EnumDecl:
+        switch (access)
+        {
+        case CX_CXXPublic:
+            return tcEnumPublic;
+        case CX_CXXProtected:
+            return tcEnumProtected;
+        case CX_CXXPrivate:
+            return tcEnumPrivate;
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+            return tcEnum;
+        }
+
+    case CXCursor_EnumConstantDecl:
+        return tcEnumerator;
+
+    case CXCursor_Namespace:
+        return tcNamespace;
+
+    case CXCursor_TypedefDecl:
+        switch (access)
+        {
+        case CX_CXXPublic:
+            return tcTypedefPublic;
+        case CX_CXXProtected:
+            return tcTypedefProtected;
+        case CX_CXXPrivate:
+            return tcTypedefPrivate;
+        default:
+        case CX_CXXInvalidAccessSpecifier:
+            return tcTypedef;
+        }
+
+    default:
+        return tcNone;
+    }
+}
+
 /** @brief Static function used in the Clang AST visitor functions
  *
  * @param inclusion_stack
@@ -762,12 +880,15 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
     if (clang_getCString( str ))
         usr = clang_getCString(str);
     clang_disposeString( str );
+    CXCursor declCursor = referencedCursor;
     if (usr.empty())
     {
-        CXCursor declCursor = clang_getCursorDefinition( referencedCursor );
+        declCursor = clang_getCursorDefinition( referencedCursor );
         str = clang_getCursorUSR( declCursor );
         if (clang_getCString(str))
             usr = clang_getCString( str );
+        else
+            declCursor = referencedCursor;
         clang_disposeString( str );
     }
 
@@ -820,6 +941,7 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             case CXCursor_FunctionTemplate:
             case CXCursor_EnumDecl:
             case CXCursor_EnumConstantDecl:
+            case CXCursor_ConversionFunction:
                 {
                     CXCompletionString token = clang_getCursorCompletionString(cursorWalk);
                     HashToken( token, scopeIdentifier );
@@ -848,7 +970,12 @@ static void ClImportClangToken(CXCursor cursor, CXCursor scopeCursor, ClTokenTyp
             ctx->database->RemoveFileTokens(fileId);
             ctx->unprocessedFileIds.erase( fileId );
         }
-        ClAbstractToken tok(typ, fileId, ClTokenRange(ClTokenPosition(line, col),ClTokenPosition(endLine, endCol)), identifier, displayName, usr, tokenHash);
+        ClTokenCategory category = ClTranslationUnit::GetTokenCategory( cursor.kind, clang_getCXXAccessSpecifier( cursor ) );
+        if (category == tcNone)
+        {
+            category = ClTranslationUnit::GetTokenCategory( referencedCursor.kind, clang_getCXXAccessSpecifier( referencedCursor ) );
+        }
+        ClAbstractToken tok(typ, fileId, ClTokenRange(ClTokenPosition(line, col),ClTokenPosition(endLine, endCol)), identifier, displayName, usr, category, tokenHash);
         {
             CXCursor* cursorList = NULL;
             unsigned int cursorNum = 0;
@@ -906,6 +1033,7 @@ static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClie
         typ = ClTokenType_ValueDecl;
         ret = CXChildVisit_Continue;
         break;
+    case CXCursor_ConversionFunction:
     case CXCursor_FunctionDecl:
         typ = ClTokenType_FuncDecl;
         ret = CXChildVisit_Recurse;

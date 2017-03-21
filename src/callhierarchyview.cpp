@@ -162,16 +162,22 @@ public:
 ClangCallHierarchyView::ClangCallHierarchyView(ClangRefactoring& controller) :
     wxPanel(Manager::Get()->GetAppWindow()),
     m_Controller( controller ),
-    m_pTree( nullptr )
+    m_pTree( nullptr ),
+    m_TreeImageList(16,16)
 {
+    for(int i=0; i<controller.GetTokenCategoryImageList().GetImageCount(); ++i)
+    {
+        m_TreeImageList.Add( controller.GetTokenCategoryImageList().GetBitmap( i ) );
+    }
     wxBoxSizer* pSizer = new wxBoxSizer(wxVERTICAL);
     m_pSplitter = new wxSplitterWindow(this,idSplitterWindow);
     pSizer->Add(m_pSplitter, 1, wxEXPAND, 0);
 
     wxPanel* pPanel1 = new wxPanel(m_pSplitter,wxID_ANY);
-    m_pTree = new wxTreeCtrl(pPanel1, idHierarchyTree, wxDefaultPosition, wxSize(1,1), wxTR_HAS_BUTTONS|wxTR_LINES_AT_ROOT|wxTR_FULL_ROW_HIGHLIGHT|wxTR_HIDE_ROOT|wxTR_DEFAULT_STYLE|wxSUNKEN_BORDER);
+    m_pTree = new wxTreeCtrl(pPanel1, idHierarchyTree, wxDefaultPosition, wxSize(1,1), wxTR_HAS_BUTTONS|wxTR_NO_LINES|wxTR_FULL_ROW_HIGHLIGHT|wxTR_HIDE_ROOT|wxTR_DEFAULT_STYLE);
+    m_pTree->SetImageList( &m_TreeImageList );
     m_pTree->SetMinSize(wxSize(100, 100));
-    m_RootId = m_pTree->AddRoot(wxEmptyString);
+    m_RootId = m_pTree->AddRoot(wxEmptyString,0,0);
     wxBoxSizer* pSizer1 = new wxBoxSizer(wxVERTICAL);
     pPanel1->SetSizer( pSizer1 );
     pSizer1->Add( m_pTree, 1, wxEXPAND, 0 );
@@ -195,6 +201,13 @@ ClangCallHierarchyView::ClangCallHierarchyView(ClangRefactoring& controller) :
     m_pTree->Show();
     m_pList->Show();
     m_pSplitter->Show();
+}
+
+ClangCallHierarchyView::~ClangCallHierarchyView()
+{
+    m_TreeImageList.RemoveAll();
+    delete m_pTree;
+    delete m_pList;
 }
 
 void ClangCallHierarchyView::AddViewToManager()
@@ -231,11 +244,10 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
         if (ids.empty())
         {
             TreeItemData* data = new TreeItemData(it->GetFile(), it->GetTokenIdentifier(), it->GetTokenDisplayName(), it->GetScopeName(), it->GetTokenRange());
-            wxTreeItemId id = m_pTree->InsertItem( m_RootId, 0, data->GetItemName() );
-            m_pTree->SetItemData( id, data );
+            wxTreeItemId id = m_pTree->InsertItem( m_RootId, 0, data->GetItemName(), it->GetTokenCategory(), it->GetTokenCategory(), data );
             data = new TreeItemData(it->GetFile(), it->GetReferenceScope().GetTokenIdentifier(), it->GetReferenceScope().GetTokenDisplayName(), it->GetReferenceScope().GetScopeName(), it->GetReferenceScope().GetTokenRange());
-            wxTreeItemId childId = m_pTree->AppendItem( id, data->GetItemName() );
-            m_pTree->SetItemData( childId, data );
+            int img = it->GetReferenceScope().GetTokenCategory();
+            wxTreeItemId childId = m_pTree->AppendItem( id, data->GetItemName(), img, img, data );
             m_pTree->AppendItem( childId, wxT("") );
             m_pTree->CollapseAllChildren( childId );
             m_pTree->Expand( id );
@@ -264,8 +276,8 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
                         m_pTree->Delete( id );
                     }
                 }
-                wxTreeItemId childId = m_pTree->AppendItem( *idIt, data->GetItemName() );
-                m_pTree->SetItemData( childId, data );
+                int img = it->GetReferenceScope().GetTokenCategory();
+                wxTreeItemId childId = m_pTree->AppendItem( *idIt, data->GetItemName(), img, img, data );
                 m_pTree->AppendItem( childId, wxT("") );
                 m_pTree->CollapseAllChildren( childId );
                 if (m_pTree->IsSelected( *idIt ))
@@ -273,7 +285,7 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
                     m_pTree->Expand( *idIt );
                 }
             }
-        }
+        };
     }
 }
 void ClangCallHierarchyView::FindReferences( const wxTreeItemId fromId, const ClangFile& file, const wxString& displayName, const wxString& declScopeName, std::vector<wxTreeItemId>& out_ids)

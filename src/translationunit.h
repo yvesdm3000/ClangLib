@@ -17,6 +17,9 @@ typedef std::map<ClFileId, ClTokenScopeList> ClTokenScopeMap;
 
 class ClTranslationUnit
 {
+public: // Static function helpers
+    static ClTokenCategory GetTokenCategory(CXCursorKind kind, CX_CXXAccessSpecifier access = CX_CXXInvalidAccessSpecifier);
+
 public:
     ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id);
     ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex clIndex);
