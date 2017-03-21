@@ -146,10 +146,13 @@ void ClangIndexer::OnEditorSave(CodeBlocksEvent& evt)
 {
     EditorManager* edMgr = Manager::Get()->GetEditorManager();
     cbEditor* ed = edMgr->GetBuiltinEditor(evt.GetEditor());
+    ClangFile file(ed->GetFilename());
     if (ed->GetProjectFile())
-        m_pClangPlugin->BeginReindexFile( ClangFile(*ed->GetProjectFile()) );
-    else
-        m_pClangPlugin->BeginReindexFile( ed->GetFilename() );
+        file = ClangFile(*ed->GetProjectFile());
+    std::set<ClangFile>::iterator it = m_StagingFiles.find( file );
+    if (it != m_StagingFiles.end())
+        m_StagingFiles.erase( it );
+    m_pClangPlugin->BeginReindexFile( ed->GetFilename() );
 }
 
 /** @brief Event handler for when the reindexing of a file was finished
@@ -160,14 +163,23 @@ void ClangIndexer::OnEditorSave(CodeBlocksEvent& evt)
  */
 void ClangIndexer::OnReindexFileFinished(ClangEvent& evt)
 {
-    if (m_StagingFiles.find( evt.GetFile() ) == m_StagingFiles.end())
-    {
-        // File not found... To make sure we don't have an endless loop we remove the first as this is the most likely one
-        m_StagingFiles.erase( *m_StagingFiles.begin() );
-    }
-    else
-        m_StagingFiles.erase( evt.GetFile() );
+    CCLogger::Get()->DebugLog( wxT("OnReindexFileFinished ")+evt.GetFile().GetFilename() );
     if (!m_StagingFiles.empty())
+    {
+        if (m_StagingFiles.find( evt.GetFile() ) == m_StagingFiles.end())
+        {
+            // File not found... To make sure we don't have an endless loop we remove the first as this is the most likely one
+            m_StagingFiles.erase( *m_StagingFiles.begin() );
+        }
+        else
+        {
+            m_StagingFiles.erase( evt.GetFile() );
+        }
+    }
+    if (!m_StagingFiles.empty())
+    {
+        CCLogger::Get()->DebugLog( F(wxT("Reindexing next file ")+m_StagingFiles.begin()->GetFilename()+wxT(" on a total of %d"), (int)m_StagingFiles.size()));
         m_pClangPlugin->BeginReindexFile( *m_StagingFiles.begin() );
+    }
 }
 
