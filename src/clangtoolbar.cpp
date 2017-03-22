@@ -280,6 +280,15 @@ static int SortByName( const ClTokenScope& first, const ClTokenScope& second )
     return first.GetScopeName() < second.GetScopeName();
 }
 
+static bool EqualsName( const ClTokenScope& first, const ClTokenScope& second )
+{
+    if (first.GetTokenDisplayName() == second.GetTokenDisplayName())
+    {
+        return first.GetScopeName() == second.GetScopeName();
+    }
+    return false;
+}
+
 void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
 {
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
@@ -301,6 +310,7 @@ void ClangToolbar::OnUpdateContents( wxCommandEvent& /*event*/ )
     }
     EnableToolbarTools(true);
     std::sort( m_CurrentState.m_TokenScopes.begin(), m_CurrentState.m_TokenScopes.end(), SortByName );
+    std::unique( m_CurrentState.m_TokenScopes.begin(), m_CurrentState.m_TokenScopes.end(), EqualsName );
     wxString selScope;
     if (m_Scope)
     {
@@ -441,9 +451,12 @@ void ClangToolbar::UpdateFunctions( const wxString& scopeItem )
     {
         if (!it->GetTokenDisplayName().IsEmpty())
         {
+            if ( (it->GetTokenCategory() == tcVarPrivate)||(it->GetTokenCategory() == tcVarProtected)||(it->GetTokenCategory() == tcVarPublic) )
+                continue;
             if ( (!m_Scope) || (it->GetScopeName() == scopeName) )
             {
-                m_Function->Append(it->GetTokenDisplayName());
+                if (m_Function->FindString( it->GetTokenDisplayName() ) == wxNOT_FOUND)
+                    m_Function->Append(it->GetTokenDisplayName());
             }
         }
     }
