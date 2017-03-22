@@ -2,6 +2,7 @@
 #define CLANGINDEXER_H
 
 #include "clangpluginapi.h"
+#include <deque>
 
 class ClangIndexer : public ClangPluginComponent
 {
@@ -15,13 +16,14 @@ public:
     void OnRelease(IClangPlugin* pClangPlugin);
 
     void OnProjectOpen(CodeBlocksEvent& evt);
+    void OnProjectClose(CodeBlocksEvent& evt);
     void OnEditorOpen(CodeBlocksEvent& evt);
     void OnEditorSave(CodeBlocksEvent& evt);
 
     void OnReindexFileFinished(ClangEvent& evt);
 
 private:
-    std::set<ClangFile> m_StagingFiles;
+    std::deque<ClangFile> m_StagingFiles;
 };
 
 #endif //CLANGINDEXER_H

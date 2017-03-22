@@ -40,6 +40,7 @@ void ClangIndexer::OnAttach(IClangPlugin* pClangPlugin)
 
     typedef cbEventFunctor<ClangIndexer, CodeBlocksEvent> CbEvent;
     Manager::Get()->RegisterEventSink(cbEVT_PROJECT_OPEN,        new CbEvent(this, &ClangIndexer::OnProjectOpen));
+    Manager::Get()->RegisterEventSink(cbEVT_PROJECT_CLOSE,       new CbEvent(this, &ClangIndexer::OnProjectClose));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_OPEN,         new CbEvent(this, &ClangIndexer::OnEditorOpen));
     Manager::Get()->RegisterEventSink(cbEVT_EDITOR_SAVE,         new CbEvent(this, &ClangIndexer::OnEditorSave));
 
@@ -79,13 +80,38 @@ void ClangIndexer::OnProjectOpen(CodeBlocksEvent& evt)
             ProjectFile* f = *it;
             wxDateTime ts = m_pClangPlugin->GetFileIndexingTimestamp( ClangFile(*f) );
             if ( (!ts.IsValid()) ||((*it)->file.GetModificationTime() > ts ) )
-                m_StagingFiles.insert( ClangFile(*f));
+                m_StagingFiles.push_back( ClangFile(*f));
         }
     }
     if (!m_StagingFiles.empty())
     {
         ClangFile file = *m_StagingFiles.begin();
         m_pClangPlugin->BeginReindexFile( file );
+    }
+}
+
+/** @brief Event handler for the event that a project has been closed
+ *
+ * @param evt CodeBlocksEvent&
+ * @return void
+ *
+ */
+void ClangIndexer::OnProjectClose(CodeBlocksEvent& evt)
+{
+    evt.Skip();
+    cbProject* proj = evt.GetProject();
+    if (proj)
+    {
+        wxString project = proj->GetFilename();
+        for( std::deque<ClangFile>::iterator it = m_StagingFiles.begin();it != m_StagingFiles.end();++it )
+        {
+            if (it->GetProject() == project)
+            {
+                it = m_StagingFiles.erase( it );
+                if (it == m_StagingFiles.end())
+                    break;
+            }
+        }
     }
 }
 
@@ -129,7 +155,7 @@ void ClangIndexer::OnEditorOpen(CodeBlocksEvent& event)
             wxFileName fn(ed->GetFilename());
             if (fn.GetModificationTime() > ts)
             {
-                m_StagingFiles.insert( file );
+                m_StagingFiles.push_back( file );
                 m_pClangPlugin->BeginReindexFile( *m_StagingFiles.begin() );
             }
         }
@@ -149,7 +175,7 @@ void ClangIndexer::OnEditorSave(CodeBlocksEvent& evt)
     ClangFile file(ed->GetFilename());
     if (ed->GetProjectFile())
         file = ClangFile(*ed->GetProjectFile());
-    std::set<ClangFile>::iterator it = m_StagingFiles.find( file );
+    std::deque<ClangFile>::iterator it = std::find(m_StagingFiles.begin(), m_StagingFiles.end(), file );
     if (it != m_StagingFiles.end())
         m_StagingFiles.erase( it );
     m_pClangPlugin->BeginReindexFile( ed->GetFilename() );
@@ -166,14 +192,15 @@ void ClangIndexer::OnReindexFileFinished(ClangEvent& evt)
     CCLogger::Get()->DebugLog( wxT("OnReindexFileFinished ")+evt.GetFile().GetFilename() );
     if (!m_StagingFiles.empty())
     {
-        if (m_StagingFiles.find( evt.GetFile() ) == m_StagingFiles.end())
+        std::deque<ClangFile>::iterator it = std::find( m_StagingFiles.begin(), m_StagingFiles.end(), evt.GetFile() );
+        if (it == m_StagingFiles.end())
         {
             // File not found... To make sure we don't have an endless loop we remove the first as this is the most likely one
-            m_StagingFiles.erase( *m_StagingFiles.begin() );
+            m_StagingFiles.erase( m_StagingFiles.begin() );
         }
         else
         {
-            m_StagingFiles.erase( evt.GetFile() );
+            m_StagingFiles.erase( it );
         }
     }
     if (!m_StagingFiles.empty())
