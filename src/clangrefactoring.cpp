@@ -500,7 +500,6 @@ void ClangRefactoring::OnGetCallHierarchyFinished(ClangEvent& event)
         m_pCallHierarchyView = new ClangCallHierarchyView(*this);
         m_pCallHierarchyView->AddViewToManager();
     }
-    event.GetReferenceResults();
     m_pCallHierarchyView->ActivateView();
     m_pCallHierarchyView->AddReferences( event.GetReferenceResults() );
 }

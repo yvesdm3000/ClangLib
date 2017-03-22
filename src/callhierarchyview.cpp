@@ -232,11 +232,15 @@ void ClangCallHierarchyView::RemoveViewFromManager()
 }
 void ClangCallHierarchyView::ActivateView()
 {
+    CodeBlocksLogEvent evtShow(cbEVT_SHOW_LOG_MANAGER);
+    Manager::Get()->ProcessEvent(evtShow);
     CodeBlocksLogEvent evtSwitch(cbEVT_SWITCH_TO_LOG_WINDOW, this);
     Manager::Get()->ProcessEvent(evtSwitch);
 }
+
 void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& refs)
 {
+    m_pTree->Freeze();
     for (std::vector<ClTokenReference>::const_iterator it = refs.begin(); it != refs.end(); ++it)
     {
         std::vector<wxTreeItemId> ids;
@@ -285,9 +289,11 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
                     m_pTree->Expand( *idIt );
                 }
             }
-        };
+        }
     }
+    m_pTree->Thaw();
 }
+
 void ClangCallHierarchyView::FindReferences( const wxTreeItemId fromId, const ClangFile& file, const wxString& displayName, const wxString& declScopeName, std::vector<wxTreeItemId>& out_ids)
 {
     if (displayName.IsEmpty())

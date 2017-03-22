@@ -1770,9 +1770,6 @@ void ClangPlugin::OnClangLookupTokenReferencesFinished(wxEvent& event)
     wxString tokenIdentifier = wxString::FromUTF8( pJob->GetTokenIdentifier().c_str() );
     wxString tokenDisplayName = pJob->GetTokenDisplayName();
     wxString tokenScopePath = pJob->GetTokenScopePath();
-    ClTokenCategory tokenCategory = pJob->GetTokenCategory();
-
-    CCLogger::Get()->DebugLog( F(wxT("finish lookup: category=%d"),(int)tokenCategory) );
 
     std::set<ClangProxy::LookupTokenReferencesAtJob::TokenRef> Refs = pJob->GetResults();
     for (std::set<ClangProxy::LookupTokenReferencesAtJob::TokenRef>::const_iterator it = Refs.begin(); it != Refs.end(); ++it)
@@ -1783,7 +1780,6 @@ void ClangPlugin::OnClangLookupTokenReferencesFinished(wxEvent& event)
             ClTokenReference scopeRef( tokenIdentifier, tokenDisplayName, tokenScopePath, it->Range, it->Category, ClangFile(wxString::FromUTF8( pJob->GetProject().c_str()), wxString::FromUTF8( it->Filename.c_str() )), scope, it->Type );
             if (std::find( refs.begin(), refs.end(), scopeRef ) == refs.end())
             {
-                CCLogger::Get()->DebugLog( F(wxT("Adding scopeRef ")+scopeRef.GetTokenDisplayName()+wxT(" with category %d and refscope ")+scope.GetTokenDisplayName()+wxT(" category %d"), scopeRef.GetTokenCategory(), scopeRef.GetReferenceScope().GetTokenCategory()));
                 refs.push_back( scopeRef );
             }
         }
