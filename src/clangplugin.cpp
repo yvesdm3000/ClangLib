@@ -406,7 +406,6 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int WXUNUS
     }
     if (m_TranslUnitId == wxNOT_FOUND)
     {
-        std::cout<<"GetCallTips: No translUnitId yet"<<std::endl;
         return tips;
     }
 
@@ -427,7 +426,6 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int WXUNUS
         const wxChar ch = stc->GetCharAt(pos);
         if (ch == wxT(';'))
         {
-            std::cout<<"GetCalltips: Error?"<<std::endl;
             return tips; // error?
         }
         else if (ch == wxT(','))
@@ -468,8 +466,6 @@ std::vector<ClangPlugin::CCCallTip> ClangPlugin::GetCallTips(int pos, int WXUNUS
             if (job.WaitCompletion(40) == wxCOND_TIMEOUT)
                 return tips;
             m_LastCallTips = job.GetResults();
-            // m_Proxy.GetCallTipsAt(ed->GetFilename(), line + 1, column + 1,
-            //           m_TranslUnitId, tknText, m_LastCallTips);
         }
     }
     m_LastCallTipPos = argsPos;
@@ -796,6 +792,10 @@ void ClangPlugin::OnTimer(wxTimerEvent& event)
     cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
     if ((!ed) || (m_TranslUnitId == wxNOT_FOUND))
         return;
+    cbStyledTextCtrl* stc = ed->GetControl();
+    if (stc->AutoCompActive())
+        return;
+
     const int evId = event.GetId();
     if (evId == idReparseTimer)
     {
@@ -1317,15 +1317,27 @@ void ClangPlugin::OnClangCreateTUFinished( wxEvent& event )
 void ClangPlugin::OnClangReparseFinished( wxEvent& event )
 {
     event.Skip();
-    ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
     m_ReparsingTranslUnitId = wxNOT_FOUND;
-    if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
+    bool bUpdate = true;
+    cbEditor* ed = Manager::Get()->GetEditorManager()->GetBuiltinActiveEditor();
+    if (ed)
     {
-        ClangProxy::GetDiagnosticsJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangGetDiagnostics, pJob->GetTranslationUnitId(), pJob->GetFile());
-        m_Proxy.AppendPendingJob(job);
+        cbStyledTextCtrl* stc = ed->GetControl();
+        if (stc&&stc->AutoCompActive())
+            bUpdate = false;
     }
-    ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
-    m_Proxy.AppendPendingJob(updateDbJob);
+
+    ClangProxy::ReparseJob* pJob = static_cast<ClangProxy::ReparseJob*>(event.GetEventObject());
+    if (bUpdate)
+    {
+        if (HasEventSink(clEVT_DIAGNOSTICS_UPDATED))
+        {
+            ClangProxy::GetDiagnosticsJob job(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangGetDiagnostics, pJob->GetTranslationUnitId(), pJob->GetFile());
+            m_Proxy.AppendPendingJob(job);
+        }
+        ClangProxy::UpdateTokenDatabaseJob updateDbJob(cbEVT_CLANG_ASYNCTASK_FINISHED, idClangUpdateTokenDatabase, pJob->GetTranslationUnitId());
+        m_Proxy.AppendPendingJob(updateDbJob);
+    }
     ClangEvent evt(clEVT_REPARSE_FINISHED, pJob->GetTranslationUnitId(), pJob->GetFile());
     evt.SetStartedTime(pJob->GetTimestamp());
     ProcessEvent(evt);
