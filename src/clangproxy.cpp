@@ -1565,7 +1565,7 @@ void ClangProxy::GetOccurrencesOf( const ClTranslUnitId translUnitId, const std:
 
 /** @brief Resolve a token declaration.
  *
- * @param translUnitId const ClTranslUnitId
+ * @param translUnitId The translation unit ID
  * @param filename wxString&
  * @param location[in,out] The position of the token
  * @return true if the token declaration could be found, false otherwise
@@ -1613,7 +1613,7 @@ bool ClangProxy::ResolveTokenDeclarationAt( const ClTranslUnitId translUnitId, s
 
 /** @brief Resolve the definition of a token.
  *
- * @param translUnitId const ClTranslUnitId
+ * @param translUnitId The translation unit ID
  * @param inout_filename wxString&
  * @param inout_location ClTokenPosition&
  * @return bool
@@ -1678,7 +1678,7 @@ bool ClangProxy::ResolveTokenDefinitionAt( const ClTranslUnitId translUnitId, st
  * @return bool
  *
  */
-bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_Position)
+bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_Position) const
 {
     wxMutexLocker lock(m_Mutex);
     for (ClTranslUnitId id = 0; id < (ClTranslUnitId)m_TranslUnits.size(); ++id)
@@ -1694,7 +1694,7 @@ bool ClangProxy::LookupTokenDefinition( const ClFileId fileId, const ClIdentifie
 
 /** @brief Resolve all scopes found in a file. This includes all class declarations and function definitions.
  *
- * @param translUnitId const ClTranslUnitId
+ * @param translUnitId The translation unit ID
  * @param project const std::string&
  * @param filename const std::string&
  * @param tokenMask unsigned int
@@ -1776,7 +1776,7 @@ void ClangProxy::ResolveTokenScopes(const ClTranslUnitId translUnitId, const std
 /** @brief Resolves the scope of a token. For a reference token, this will be the function where the reference is,
  * otherwise it will be the semantic parent in case of a declaration or definition.
  *
- * @param ClTranslUnitId const
+ * @param ClTranslUnitId The translation unit ID
  * @param project const std::string&
  * @param filename const std::string&
  * @param position const ClTokenPosition&
@@ -1843,7 +1843,17 @@ bool ClangProxy::ResolveTokenScopeAt(const ClTranslUnitId, const std::string& pr
     return false;
 }
 
-bool ClangProxy::LookupAllTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, std::vector<ClUSRString>& out_USRList) const
+/** @brief Get all the USR strings of all parents that the specified symbol overrides
+ *
+ * @param TranslId[in]        The translation unit ID
+ * @param TokenIdentifier[in] The token identifier
+ * @param TokenUSR[in]        The token USR
+ * @param recurse[in]         Also return parent overrides of the parent overrides
+ * @param USRList[out]        Returned list of USR symbols (token identifier is the same as the passed one)
+ * @return true if the call was successful (but can still return an empty list if no overrides exist)
+ *
+ */
+bool ClangProxy::LookupTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, bool recurse, std::vector<ClUSRString>& out_USRList) const
 {
     if ( TranslId < 0 )
     {
@@ -1872,13 +1882,26 @@ bool ClangProxy::LookupAllTokenOverrideParents(const ClTranslUnitId TranslId, co
         if (std::find(out_USRList.begin(),out_USRList.end(),*it) == out_USRList.end())
         {
             out_USRList.push_back( *it );
-            LookupAllTokenOverrideParents( TranslId, TokenIdentifier, *it, out_USRList );
+            if (recurse)
+            {
+                LookupTokenOverrideParents( TranslId, TokenIdentifier, *it, true, out_USRList );
+            }
         }
     }
     return true;
 }
 
-bool ClangProxy::LookupAllTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, std::vector<ClUSRString>& out_USRList) const
+/** @brief Get all the USR strings of all children that overrides the specified symbol
+ *
+ * @param TranslId[in] The translation unit ID
+ * @param TokenIdentifier[in] The token identifier
+ * @param TokenUSR[in] The token USR
+ * @param recurse[in] Also return overrides of the overrides
+ * @param USRList[out] Returned list of USR symbols (token identifier is the same as the passed one)
+ * @return true if the call was successful (but can still return an empty list if no overrides exist)
+ *
+ */
+bool ClangProxy::LookupTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& TokenIdentifier, const ClUSRString& TokenUSR, bool recurse, std::vector<ClUSRString>& out_USRList) const
 {
     if ( TranslId < 0 )
     {
@@ -1907,12 +1930,14 @@ bool ClangProxy::LookupAllTokenOverrideChildren(const ClTranslUnitId TranslId, c
         if (std::find(out_USRList.begin(),out_USRList.end(),*it) == out_USRList.end())
         {
             out_USRList.push_back( *it );
-            LookupAllTokenOverrideChildren( TranslId, TokenIdentifier, *it, out_USRList );
+            if (recurse)
+            {
+                LookupTokenOverrideChildren( TranslId, TokenIdentifier, *it, true, out_USRList );
+            }
         }
     }
     return true;
 }
-
 
 /** @brief Reparse a translation unit
  *

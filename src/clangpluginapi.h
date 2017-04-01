@@ -112,6 +112,14 @@ struct ClTokenRange
             return false;
         return endLocation < other.endLocation;
     }
+    bool operator==(const ClTokenRange& other) const
+    {
+        if (beginLocation != other.beginLocation)
+            return false;
+        if (endLocation != other.endLocation)
+            return false;
+        return true;
+    }
 
     bool InRange(const ClTokenPosition pos) const
     {

@@ -519,7 +519,7 @@ public:
                 }
                 // Find token in subclasses
                 std::vector<ClUSRString> USRList;
-                clangproxy.LookupAllTokenOverrideChildren(m_TranslId, m_TokenIdentifier, m_TokenUSR, USRList);
+                clangproxy.LookupTokenOverrideChildren(m_TranslId, m_TokenIdentifier, m_TokenUSR, true, USRList);
                 for (std::vector<std::string>::const_iterator it = USRList.begin(); it != USRList.end(); ++it)
                 {
                     const ClUSRString& USR = *it;
@@ -741,7 +741,19 @@ public:
                         {
                             if ((itLoc->fileId == *it)&&(itLoc->tokenType&ClTokenType_RefGroup))
                             {
-                                m_References.insert( TokenRef(filename, itLoc->range, itToken->category, refType ) );
+                                struct compare_fileline : public std::unary_function<TokenRef, bool>
+                                {
+                                    explicit compare_fileline(const TokenRef& tokenRef) : Token(tokenRef) {}
+                                    bool operator() (const TokenRef &arg) const
+                                    {
+                                        if (arg.Filename != Token.Filename)
+                                            return false;
+                                        return (arg.Range == Token.Range);
+                                    }
+                                    const TokenRef& Token;
+                                };
+                                TokenRef tokRef(filename, itLoc->range, itToken->category, refType );
+                                m_References.insert( tokRef );
                             }
                         }
                     }
@@ -764,11 +776,17 @@ public:
                 }
                 AddTokenRefs( db, usrList, ClTokenReferenceType_None );
                 usrList.clear();
-                clangproxy.LookupAllTokenOverrideParents( m_TranslId, m_TokenIdentifier, m_USR, usrList );
-                AddTokenRefs( db, usrList, ClTokenReferenceType_OverrideParent );
-                clangproxy.LookupAllTokenOverrideChildren( m_TranslId, m_TokenIdentifier, m_USR, usrList );
-                usrList.clear();
+                clangproxy.LookupTokenOverrideChildren( m_TranslId, m_TokenIdentifier, m_USR, true, usrList );
                 AddTokenRefs( db, usrList, ClTokenReferenceType_OverrideChild );
+                usrList.clear();
+                clangproxy.LookupTokenOverrideParents( m_TranslId, m_TokenIdentifier, m_USR, true, usrList );
+                AddTokenRefs( db, usrList, ClTokenReferenceType_OverrideParent );
+                for (std::vector< ClUSRString >::const_iterator it = usrList.begin(); it != usrList.end(); ++it)
+                {
+                    std::vector<ClUSRString> childUsrList;
+                    clangproxy.LookupTokenOverrideChildren( m_TranslId, m_TokenIdentifier, *it, true, childUsrList );
+                    AddTokenRefs( db, childUsrList, ClTokenReferenceType_OverrideParent );
+                }
             }
         }
         int GetTranslationUnitId() const
@@ -1460,9 +1478,9 @@ protected: // jobs that are run only on the thread
 
     void GetTokenOverrideParentsAt( const ClTranslUnitId translUnitId, const std::string& filename, const ClTokenPosition& position, std::vector<ClUSRString>& out_USRList);
 
-    bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_position);
-    bool LookupAllTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, std::vector<ClUSRString>& out_USRList) const;
-    bool LookupAllTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, std::vector<ClUSRString>& out_USRList) const;
+    bool LookupTokenDefinition( const ClFileId fileId, const ClIdentifierString& identifier, const ClUSRString& usr, ClTokenPosition& out_position) const;
+    bool LookupTokenOverrideParents(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, bool recurse, std::vector<ClUSRString>& out_USRList) const;
+    bool LookupTokenOverrideChildren(const ClTranslUnitId TranslId, const ClIdentifierString& m_TokenIdentifier, const ClUSRString& m_TokenUSR, bool recurse, std::vector<ClUSRString>& out_USRList) const;
     void StoreTokenIndexDatabase( const std::string& projectFileName ) const;
 
 public: // Tokens
