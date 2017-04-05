@@ -186,6 +186,8 @@ private: // Internal utility functions
 public: // IClangPlugin
     bool IsProviderFor(cbEditor* ed);
     ClTranslUnitId GetTranslationUnitId(const ClangFile& file);
+    const wxImageList& GetImageList(const ClTranslUnitId WXUNUSED(id)){ return m_ImageList; }
+    int GetTokenImageIndex(const ClTranslUnitId id, ClTokenCategory tokenCategory, ClTokenReferenceType refType ) const;
     void RegisterEventSink(const wxEventType, IEventFunctorBase<ClangEvent>* functor);
     void RemoveAllEventSinksFor(void* owner);
     void RequestReparse(const ClTranslUnitId id, const ClangFile& file);
@@ -206,10 +208,6 @@ public: // IClangPlugin
                                  ClangFile& out_file, ClTokenPosition& out_loc);
     void RequestTokenReferenceScopesAt(const ClTranslUnitId id, const ClangFile& file, const ClTokenPosition loc);
 
-    const wxImageList& GetImageList(const ClTranslUnitId WXUNUSED(id))
-    {
-        return m_ImageList;
-    }
     const wxStringVec& GetKeywords(const ClTranslUnitId WXUNUSED(id))
     {
         return m_CppKeywords;
@@ -224,6 +222,9 @@ private: // Members
     wxStringVec m_CppKeywords;
     ClangProxy m_Proxy;
     wxImageList m_ImageList;
+    unsigned m_ImageListRefParentIndex;
+    unsigned m_ImageListRefChildIndex;
+
     ProjectSettingMap m_ProjectSettingsMap;
 
     ClangProxy::CodeCompleteAtJob* m_pOutstandingCodeCompletion;

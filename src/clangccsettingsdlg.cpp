@@ -143,6 +143,7 @@ ClangSettingsDlg::ClangSettingsDlg(wxWindow* parent, ClangPlugin* pPlugin /*, Na
     XRCCTRL(*this, "chkClangOptionNoAttributes",wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wnoattributes"),  false));
     XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->SetValue(cfg->ReadBool(_T("/cmdoption_wextratokens"),   false));
 
+    XRCCTRL(*this, "chkClearCallHierarchy",     wxCheckBox)->SetValue(cfg->ReadBool(_T("/inspection_clearcallhierarchy"), false));
 
     // Page "C / C++ parser"
     // NOTE (Morten#1#): Keep this in sync with files in the XRC file (settings.xrc) and nativeparser.cpp
@@ -280,6 +281,9 @@ void ClangSettingsDlg::OnApply()
     cfg->Write(_T("/cmdoption_wnoattributes"),  (bool) XRCCTRL(*this, "chkClangOptionNoAttributes", wxCheckBox)->GetValue());
     cfg->Write(_T("/cmdoption_wextratokens"),   (bool) XRCCTRL(*this, "chkClangOptionExtraTokens", wxCheckBox)->GetValue());
 
+    // Page "Inspection"
+    cfg->Write(_T("/inspection_clearcallhierarchy"), (bool) XRCCTRL(*this, "chkClearCallHierarchy", wxCheckBox)->GetValue());
+
     // Page "Semantic"
 
     cfg->Write(_T("/occurrence_highlight"),     (bool) XRCCTRL(*this, "chkOccurrenceHighlight",        wxCheckBox)->GetValue());
@@ -395,6 +399,8 @@ void ClangSettingsDlg::OnUpdateUI(cb_unused wxUpdateUIEvent& event)
     XRCCTRL(*this, "chkClangOptionNoAttributes",    wxCheckBox)->Enable(en);
     XRCCTRL(*this, "chkClangOptionExtraTokens",     wxCheckBox)->Enable(en);
 
+    // Page "Inspection"
+    XRCCTRL(*this, "chkClearCallHierarchy",         wxCheckBox)->Enable(en);
 
     // keyword sets
     //XRCCTRL(*this, "chkKL_1",                 wxCheckBox)->Enable(en);

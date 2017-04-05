@@ -495,12 +495,18 @@ void ClangRefactoring::OnShowCallHierarchy( wxCommandEvent & )
 
 void ClangRefactoring::OnGetCallHierarchyFinished(ClangEvent& event)
 {
+    const std::vector<ClTokenReference>& results = event.GetReferenceResults();
+    if (results.empty())
+    {
+        wxMessageBox( wxT("No call references found.") );
+        return;
+    }
     if (!m_pCallHierarchyView)
     {
         m_pCallHierarchyView = new ClangCallHierarchyView(*this);
         m_pCallHierarchyView->AddViewToManager();
     }
     m_pCallHierarchyView->ActivateView();
-    m_pCallHierarchyView->AddReferences( event.GetReferenceResults() );
+    m_pCallHierarchyView->AddReferences( results );
 }
 

@@ -247,10 +247,18 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
         FindReferences( m_RootId, it->GetFile(), it->GetTokenDisplayName(), it->GetScopeName(), ids );
         if (ids.empty())
         {
+            ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
+
+            if (cfg->ReadBool( wxT("/inspection_clearcallhierarchy") ))
+            {
+                m_pTree->DeleteChildren( m_RootId );
+            }
+
+            int img = m_Controller.GetTokenImageIndex( it->GetTokenCategory(), it->GetReferenceType() );
             TreeItemData* data = new TreeItemData(it->GetFile(), it->GetTokenIdentifier(), it->GetTokenDisplayName(), it->GetScopeName(), it->GetTokenRange());
-            wxTreeItemId id = m_pTree->InsertItem( m_RootId, 0, data->GetItemName(), it->GetTokenCategory(), it->GetTokenCategory(), data );
+            wxTreeItemId id = m_pTree->InsertItem( m_RootId, 0, data->GetItemName(), img, img, data );
             data = new TreeItemData(it->GetFile(), it->GetReferenceScope().GetTokenIdentifier(), it->GetReferenceScope().GetTokenDisplayName(), it->GetReferenceScope().GetScopeName(), it->GetReferenceScope().GetTokenRange());
-            int img = it->GetReferenceScope().GetTokenCategory();
+            img = m_Controller.GetTokenImageIndex( it->GetReferenceScope().GetTokenCategory(), it->GetReferenceType());
             wxTreeItemId childId = m_pTree->AppendItem( id, data->GetItemName(), img, img, data );
             m_pTree->AppendItem( childId, wxT("") );
             m_pTree->CollapseAllChildren( childId );
@@ -280,7 +288,8 @@ void ClangCallHierarchyView::AddReferences(const std::vector<ClTokenReference>& 
                         m_pTree->Delete( id );
                     }
                 }
-                int img = it->GetReferenceScope().GetTokenCategory();
+                int img = m_Controller.GetTokenImageIndex( it->GetReferenceScope().GetTokenCategory(), it->GetReferenceType() );
+                CCLogger::Get()->DebugLog( F(wxT("For token ")+data->GetItemName()+wxT(" index=%d category=%d"), img, (int)it->GetReferenceScope().GetTokenCategory()) );
                 wxTreeItemId childId = m_pTree->AppendItem( *idIt, data->GetItemName(), img, img, data );
                 m_pTree->AppendItem( childId, wxT("") );
                 m_pTree->CollapseAllChildren( childId );

@@ -31,6 +31,7 @@ public:
     void LookupCallHierarchy(const ClangFile& file, const ClTokenPosition position);
 
     const wxImageList& GetTokenCategoryImageList(){ return m_pClangPlugin->GetImageList(GetCurrentTranslationUnitId()); }
+    int GetTokenImageIndex(ClTokenCategory tokenCategory, ClTokenReferenceType refType ) { return m_pClangPlugin->GetTokenImageIndex( GetCurrentTranslationUnitId(), tokenCategory, refType ); }
 public: // Code::Blocks events
     void OnEditorActivate(CodeBlocksEvent& event);
     void OnEditorHook(cbEditor* ed, wxScintillaEvent& event);

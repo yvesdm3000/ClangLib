@@ -498,6 +498,7 @@ public:
     virtual bool IsProviderFor(cbEditor* ed) = 0;
     virtual ClTranslUnitId GetTranslationUnitId(const ClangFile& file) = 0;
     virtual const wxImageList& GetImageList(const ClTranslUnitId id) = 0;
+    virtual int GetTokenImageIndex(const ClTranslUnitId id, ClTokenCategory tokenCategory, ClTokenReferenceType refType ) const = 0;
     virtual const wxStringVec& GetKeywords(const ClTranslUnitId id) = 0;
     /* Events  */
     virtual void RegisterEventSink(const wxEventType, IEventFunctorBase<ClangEvent>* functor) = 0;

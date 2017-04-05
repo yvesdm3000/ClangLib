@@ -37,14 +37,53 @@
 #include <wx/choice.h>
 #include <wx/timer.h>
 #endif // CB_PRECOMP
+#include <wx/graphics.h>
 
 #define CLANGPLUGIN_TRACE_FUNCTIONS
 
 // this auto-registers the plugin
 namespace
 {
+
 PluginRegistrant<ClangPlugin> reg(wxT("ClangLib"));
+
+void AddImages(wxBitmap& directionImage, unsigned cnt, wxImageList& destList)
+{
+    for (unsigned i=0; i<cnt; ++i)
+    {
+        int w = destList.GetBitmap( i ).GetHeight();
+        int h = std::max(directionImage.GetHeight(), destList.GetBitmap( i ).GetHeight() );
+
+        unsigned char* alphaData = new unsigned char[w * h];
+        memset (alphaData, wxIMAGE_ALPHA_TRANSPARENT, w * h);
+
+        wxImage image(w, h);
+        image.InitAlpha();
+        memset(image.GetAlpha(), 0, w*h);
+        wxBitmap bm(image);
+        #if 0
+        wxGraphicsContext* gc = wxGraphicsContext::Create (image);
+
+        gc->DrawBitmap(destList.GetBitmap( i ), 0.0, 0.0, w, h);
+        gc->DrawBitmap(directionImage);
+        delete gc;
+
+        // Scale the image and convert to a bitmap.
+        wxBitmap bm (image.Scale(w, h), 32);
+#endif
+        wxMemoryDC dc;
+
+        dc.SelectObject( bm );
+        dc.DrawBitmap( destList.GetBitmap( i ), wxPoint(0, 0));
+        dc.DrawBitmap( directionImage, wxPoint(0,0) );
+        dc.SelectObject( wxNullBitmap );
+
+        CCLogger::Get()->DebugLog( F(wxT("Inserting index %d from source index %d direction width=%d"), (int)destList.GetImageCount(), i, w) );
+        destList.Add( bm );
+    }
 }
+
+};
 
 DEFINE_EVENT_TYPE(clEVT_TRANSLATIONUNIT_CREATED);
 DEFINE_EVENT_TYPE(clEVT_REPARSE_FINISHED);
@@ -160,6 +199,13 @@ void ClangPlugin::OnAttach()
     {
         m_ImageList.Add(cbLoadBitmap(prefix + wxString::FromUTF8(*itr), wxBITMAP_TYPE_PNG));
     }
+    wxBitmap parentBitmap = cbLoadBitmap( prefix + wxT("hierarchy_parent.png"), wxBITMAP_TYPE_PNG );
+    m_ImageListRefParentIndex = m_ImageList.GetImageCount();
+
+    AddImages(parentBitmap,m_ImageListRefParentIndex,m_ImageList);
+    wxBitmap childBitmap = cbLoadBitmap( prefix + wxT("hierarchy_child.png"), wxBITMAP_TYPE_PNG );
+    m_ImageListRefChildIndex = m_ImageList.GetImageCount();
+    AddImages(childBitmap, m_ImageListRefParentIndex,m_ImageList);
 
     EditorColourSet* theme = Manager::Get()->GetEditorManager()->GetColourSet();
     wxStringTokenizer tokenizer(theme->GetKeywords(theme->GetHighlightLanguage(wxT("C/C++")), 0));
@@ -353,6 +399,22 @@ ClangPlugin::CCProviderStatus ClangPlugin::GetProviderStatusFor(cbEditor* ed)
     }
     return ccpsInactive;
 }
+
+int ClangPlugin::GetTokenImageIndex(const ClTranslUnitId, ClTokenCategory tokenCategory, ClTokenReferenceType refType ) const
+{
+    switch(refType)
+    {
+        case ClTokenReferenceType_OverrideParent:
+            return tokenCategory + m_ImageListRefParentIndex;
+        case ClTokenReferenceType_OverrideChild:
+            return tokenCategory + m_ImageListRefChildIndex;
+        case ClTokenReferenceType_None:
+        default:
+            break;
+    }
+    return static_cast<int>(tokenCategory);
+}
+
 
 cbConfigurationPanel* ClangPlugin::GetConfigurationPanel(wxWindow* parent)
 {
