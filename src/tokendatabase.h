@@ -203,9 +203,13 @@ public:
     }
     std::string GetFilename(ClFileId fId) const
     {
-        wxMutexLocker locker(m_Mutex);
+        std::string ret;
+        {
+            wxMutexLocker locker(m_Mutex);
 
-        return m_FileDB.GetFilename( fId );
+            ret = m_FileDB.GetFilename( fId );
+        }
+        return ret;
     }
     wxDateTime GetFilenameTimestamp( const ClFileId fId ) const
     {
@@ -259,8 +263,8 @@ public:
 
 private: // IPersistentTokenIndexDatabase
     virtual IPersistentFilenameDatabase* GetFilenameDatabase() { return this; }
-    void AddToken(const ClIndexToken& token);
     virtual const IPersistentFilenameDatabase* GetFilenameDatabase() const { return this; }
+    void AddToken(const ClIndexToken& token);
     std::vector<ClIndexToken> GetTokens() const;
 
 private: // IPersistentFilenameDatabase

@@ -519,9 +519,8 @@ void ClangProxy::ReindexFileJob::Execute(ClangProxy& clangproxy)
     { // Scope for TU
         ClTranslationUnit tu(database, 127, clangIndex);
         ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(m_Filename);
-        std::vector<std::string> argsBuffer;
-        std::vector<const char*> args;
-        clangproxy.BuildCompileArgs( m_Filename, m_CompileCommand, argsBuffer, args );
+        std::vector<std::string> args;
+        clangproxy.BuildCompileArgs( m_Filename, m_CompileCommand, args );
         const std::map<std::string, wxString> unsavedFiles; // No unsaved files for reindex...
         if (!tu.Parse( m_Filename, fileId, args, unsavedFiles, false ))
         {
@@ -552,12 +551,16 @@ ClangProxy::ClangProxy( wxEvtHandler* pEvtCallbackHandler, const std::vector<wxS
     m_Mutex(),
     m_DatabaseMap(),
     m_CppKeywords(cppKeywords),
+    m_ReparseTranslUnit( NULL, -1 ),
     m_MaxTranslUnits(5),
     m_pEventCallbackHandler(pEvtCallbackHandler)
 {
-    m_ClIndex = clang_createIndex(1, 1);
+    m_ClIndex[0] = clang_createIndex(1, 1);
+    m_ClIndex[1] = nullptr;
     m_pThread = new BackgroundThread(false);
     m_pThread->SetPriority( 0 );
+    m_pReparseThread = new BackgroundThread(false);
+    m_pReparseThread->SetPriority( 0 );
     m_pReindexThread = new BackgroundThread(false);
     m_pReindexThread->SetPriority( 0 );
 }
@@ -576,7 +579,9 @@ ClangProxy::~ClangProxy()
     }
 #endif
     //pThread->Wait();
-    clang_disposeIndex(m_ClIndex);
+    clang_disposeIndex(m_ClIndex[0]);
+    if (m_ClIndex[1])
+        clang_disposeIndex(m_ClIndex[1]);
 }
 
 /** @brief Create a translation unit
@@ -596,15 +601,14 @@ void ClangProxy::CreateTranslationUnit( const std::string& project, const std::s
         CCLogger::Get()->DebugLog( wxT("Cannot create TU from file '")+wxString::FromUTF8(filename.c_str())+wxT("'") );
         return;
     }
-    std::vector<std::string> argsBuffer;
-    std::vector<const char*> args;
     ClTokenIndexDatabase* db = GetTokenIndexDatabase( project );
     if (!db)
     {
         db = LoadTokenIndexDatabase( project );
     }
 
-    BuildCompileArgs(filename, compileCommand, argsBuffer, args);
+    std::vector<std::string> args;
+    BuildCompileArgs(filename, compileCommand, args);
 
     bool newTU = false;
     ClTranslUnitId translId = -1;
@@ -640,7 +644,7 @@ void ClangProxy::CreateTranslationUnit( const std::string& project, const std::s
             }
         }
     }
-    ClTranslationUnit tu = ClTranslationUnit(db, translId, m_ClIndex);
+    ClTranslationUnit tu(db, translId, m_ClIndex[0]);
     ClFileId fileId = tu.GetTokenDatabase().GetFilenameId(filename);
     if (tu.Parse(filename, fileId, args, unsavedFiles) )
     {
@@ -680,7 +684,7 @@ void ClangProxy::RemoveTranslationUnit( const ClTranslUnitId translUnitId )
         return;
     }
     // Replace with empty one
-    ClTranslationUnit tu(nullptr, translUnitId, nullptr);
+    ClTranslationUnit tu(nullptr, translUnitId);
     swap(m_TranslUnits[translUnitId], tu);
 }
 
@@ -1947,24 +1951,50 @@ bool ClangProxy::LookupTokenOverrideChildren(const ClTranslUnitId TranslId, cons
  * @return void
  *
  */
-void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const std::vector<std::string>& /*compileCommand*/, const std::map<std::string, wxString>& unsavedFiles )
+void ClangProxy::Reparse( const ClTranslUnitId translUnitId, const std::vector<std::string>& compileCommand, const std::map<std::string, wxString>& unsavedFiles )
 {
+    ClTokenIndexDatabase* TokenIndexDB = nullptr;
     if (translUnitId < 0 )
         return;
-    ClTranslationUnit tu(nullptr, translUnitId);
+    if (m_ReparseTranslUnit.IsValid() && (m_ReparseTranslUnit.GetId() == translUnitId))
     {
-        wxMutexLocker lock(m_Mutex);
-        if (translUnitId >= (int)m_TranslUnits.size())
+        m_ReparseTranslUnit.Reparse(unsavedFiles);
+    }
+    else
+    {
+        ClFileId fileId;
+        std::string filename;
+        {
+            wxMutexLocker lock(m_Mutex);
+            if (translUnitId >= (int)m_TranslUnits.size())
+                return;
+            fileId = m_TranslUnits[translUnitId].GetFileId();
+            TokenIndexDB = m_TranslUnits[translUnitId].GetTokenIndexDatabase();
+            filename = TokenIndexDB->GetFilename(fileId);
+            if (m_TranslUnits[translUnitId].UsesClangIndex( m_ClIndex[0]) )
+            {
+                if (!m_ClIndex[1])
+                {
+                    m_ClIndex[1] = clang_createIndex(0, 1);
+                }
+                m_ReparseTranslUnit.Reset(TokenIndexDB, translUnitId, m_ClIndex[1]);
+            }
+            else
+            {
+                m_ReparseTranslUnit.Reset(TokenIndexDB, translUnitId, m_ClIndex[0]);
+            }
+        }
+        std::vector<std::string> args;
+        BuildCompileArgs(filename, compileCommand, args);
+        if (!m_ReparseTranslUnit.Parse( filename, fileId, args, unsavedFiles ))
+        {
+            CCLogger::Get()->DebugLog(wxT("Parsing failed"));
             return;
-        swap(m_TranslUnits[translUnitId], tu);
-    }
-    if ( tu.IsValid() )
-    {
-        tu.Reparse(unsavedFiles);
+        }
     }
     {
         wxMutexLocker lock(m_Mutex);
-        swap(m_TranslUnits[translUnitId], tu);
+        swap(m_TranslUnits[translUnitId], m_ReparseTranslUnit);
     }
 }
 
@@ -2033,21 +2063,43 @@ void ClangProxy::GetDiagnostics( const ClTranslUnitId translUnitId, const std::s
  */
 void ClangProxy::AppendPendingJob( ClangProxy::ClangJob& job )
 {
+    ClangProxy::ClangJob* pJob = job.Clone();
+    pJob->SetProxy(this);
+    if (pJob->GetJobType() == ClangJob::ReindexFileType)
+    {
+        if (!m_pReindexThread)
+        {
+            return;
+        }
+        m_pReindexThread->Queue( pJob );
+        return;
+    }
+    if (pJob->GetJobType() == ClangJob::UpdateTokenDatabaseType)
+    {
+        if (!m_pReindexThread)
+        {
+            return;
+        }
+        m_pReindexThread->Queue( pJob );
+        return;
+    }
+    if (pJob->GetJobType() == ClangJob::ReparseType)
+    {
+        if (!m_pReparseThread)
+        {
+            return;
+        }
+        m_pReparseThread->Queue(pJob);
+        return;
+    }
     if (!m_pThread)
     {
         return;
     }
-    ClangProxy::ClangJob* pJob = job.Clone();
-    pJob->SetProxy(this);
-    if (pJob->GetJobType() == ClangJob::ReindexFileType)
-        m_pReindexThread->Queue( pJob );
-    else
-        m_pThread->Queue(pJob);
-
-    return;
+     m_pThread->Queue(pJob);
 }
 
-void ClangProxy::BuildCompileArgs(const std::string& filename, const std::vector<std::string>& compileCommand, std::vector<std::string>& out_argsBuffer, std::vector<const char*>& out_args) const
+void ClangProxy::BuildCompileArgs(const std::string& filename, const std::vector<std::string>& compileCommand, std::vector<std::string>& out_args) const
 {
     wxString fn = wxString::FromUTF8(filename.c_str());
     std::vector<std::string> cCommand = compileCommand;
@@ -2069,8 +2121,7 @@ void ClangProxy::BuildCompileArgs(const std::string& filename, const std::vector
         //compilerSwitch.Replace(wxT("\""), wxT(""), true);
         if (std::binary_search(unknownOptions.begin(), unknownOptions.end(), compilerSwitch))
             continue;
-        out_argsBuffer.push_back(compilerSwitch);
-        out_args.push_back( out_argsBuffer.back().data() );
+        out_args.push_back(compilerSwitch);
     }
 }
 

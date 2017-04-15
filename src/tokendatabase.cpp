@@ -1045,6 +1045,7 @@ ClFileId ClTokenDatabase::GetFilenameId(const std::string& filename) const
  */
 std::string ClTokenDatabase::GetFilename(ClFileId fId) const
 {
+    assert(m_pTokenIndexDB);
     return m_pTokenIndexDB->GetFilename( fId );
 }
 

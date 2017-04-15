@@ -34,11 +34,11 @@ static void ClInclusionVisitor(CXFile included_file, CXSourceLocation* inclusion
 
 static CXChildVisitResult ClAST_Visitor(CXCursor cursor, CXCursor parent, CXClientData client_data);
 
-ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const ClTranslUnitId id, CXIndex clIndex) :
+ClTranslationUnit::ClTranslationUnit(ClTokenIndexDatabase* IndexDatabase, const ClTranslUnitId id, CXIndex& clIndex) :
     m_pDatabase(new ClTokenDatabase(IndexDatabase)),
     m_Id(id),
-    m_FileId(-1),
     m_ClIndex(clIndex),
+    m_FileId(-1),
     m_ClTranslUnit(nullptr),
     m_LastCC(nullptr),
     m_Diagnostics(),
@@ -66,16 +66,17 @@ ClTranslationUnit::ClTranslationUnit(ClTranslationUnit&& other) :
     m_pDatabase(nullptr),
     m_Id(other.m_Id),
     m_FileId(other.m_FileId),
-    m_Files(std::move(other.m_Files)),
+    m_Files(),
     m_ClIndex(other.m_ClIndex),
-    m_ClTranslUnit(other.m_ClTranslUnit),
+    m_ClTranslUnit(nullptr),
     m_LastCC(nullptr),
     m_Diagnostics(other.m_Diagnostics),
     m_LastPos(-1, -1),
     m_LastParsed(other.m_LastParsed)
 {
+    std::swap(m_Files,other.m_Files);
 	std::swap(m_pDatabase,other.m_pDatabase);
-    other.m_ClTranslUnit = nullptr;
+    std::swap(m_ClTranslUnit, other.m_ClTranslUnit);
 }
 #else
 ClTranslationUnit::ClTranslationUnit(const ClTranslationUnit& other) :
@@ -104,6 +105,27 @@ ClTranslationUnit::~ClTranslationUnit()
         clang_disposeTranslationUnit(m_ClTranslUnit);
     }
     delete m_pDatabase;
+}
+
+void ClTranslationUnit::Reset(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex& clIndex )
+{
+    if (m_LastCC)
+        clang_disposeCodeCompleteResults(m_LastCC);
+    m_LastCC = nullptr;
+    if (m_ClTranslUnit)
+    {
+        clang_disposeTranslationUnit(m_ClTranslUnit);
+    }
+    delete m_pDatabase;
+    m_pDatabase = new ClTokenDatabase(tokenIndexDatabase);
+    m_Id = id;
+    m_ClIndex = clIndex;
+    m_FileId = -1;
+    m_ClTranslUnit = nullptr;
+    m_LastCC = nullptr;
+    m_Diagnostics.clear();
+    m_LastPos.Set(-1, -1),
+    m_LastParsed = wxDateTime::Now();
 }
 
 std::ostream& operator << (std::ostream& str, const std::vector<ClFileId> files)
@@ -252,10 +274,10 @@ ClIdentifierString ClTranslationUnit::GetTokenIdentifier( const CXCursor& cursor
  * @arg filename The filename that is the main file of the translation unit
  * @arg fileId The fileid that is the view for this translation unit
  */
-bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, const std::vector<const char*>& args, const std::map<std::string, wxString>& unsavedFiles, const bool bReparse )
+bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, const std::vector<std::string>& args, const std::map<std::string, wxString>& unsavedFiles, const bool bReparse )
 {
-    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse id=%d"), (int)m_Id));
-
+    CCLogger::Get()->DebugLog(F(_T("ClTranslationUnit::Parse id=%d fn=")+wxString::FromUTF8( filename.c_str() )+wxT(" fileId=%d"), (int)m_Id, (int)fileId ));
+    assert(m_pDatabase);
     if (m_LastCC)
     {
         clang_disposeCodeCompleteResults(m_LastCC);
@@ -288,7 +310,17 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
 
     if (filename.length() != 0)
     {
-        m_ClTranslUnit = clang_parseTranslationUnit(m_ClIndex, filename.c_str(), args.empty() ? nullptr : &args[0], args.size(),
+        const char** argList = nullptr;
+        if (!args.empty())
+        {
+            argList = (const char**)malloc(sizeof(char*)*args.size());
+            unsigned i = 0;
+            for (std::vector<std::string>::const_iterator it = args.begin(); it != args.end(); ++it, ++i)
+            {
+                argList[i] = args[i].c_str();
+            }
+        }
+        m_ClTranslUnit = clang_parseTranslationUnit(m_ClIndex, filename.c_str(), argList, args.size(),
                          //clUnsavedFiles.empty() ? nullptr : &clUnsavedFiles[0], clUnsavedFiles.size(),
                          nullptr, 0,
                          clang_defaultEditingTranslationUnitOptions()
@@ -300,9 +332,11 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
                          //    CXTranslationUnit_Incomplete | CXTranslationUnit_DetailedPreprocessingRecord |
                          //    CXTranslationUnit_CXXChainedPCH
                                                    );
+        if (argList)
+            free(argList);
         if (m_ClTranslUnit == nullptr)
         {
-            //CCLogger::Get()->LogError( wxT("ClangLib: Parse Translation Unit failed for ")+filename );
+            CCLogger::Get()->LogError( wxT("ClangLib: Parse Translation Unit failed for ")+wxString::FromUTF8( filename.c_str()) );
             return false;
         }
         if (bReparse)
@@ -312,8 +346,7 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
                                                    clang_defaultReparseOptions(m_ClTranslUnit) );
             if (ret != 0)
             {
-                //CCLogger::Get()->DebugLog(wxT("ReparseTranslationUnit failed for ")+filename);
-                //CCLogger::Get()->LogError(wxT("ClangLib: Reparse Translation Unit failed for ")+filename);
+                CCLogger::Get()->LogError(wxT("ClangLib: Reparse Translation Unit failed for ")+wxString::FromUTF8( filename.c_str() ));
                 // clang spec specifies that the only valid operation on the translation unit after a failure is to dispose the TU
                 clang_disposeTranslationUnit(m_ClTranslUnit);
                 m_ClTranslUnit = nullptr;
@@ -335,7 +368,6 @@ bool ClTranslationUnit::Parse(const std::string& filename, ClFileId fileId, cons
             ExpandDiagnosticSet(diagSet, viewFilename, srcText, m_Diagnostics);
             clang_disposeDiagnosticSet(diagSet);
         }
-
         return true;
     }
     return false;

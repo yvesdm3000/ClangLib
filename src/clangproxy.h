@@ -637,9 +637,8 @@ public:
 
                 for (std::vector< std::pair<std::string,std::vector<std::string> > >::const_iterator it = m_fileAndCompileCommands.begin(); it != m_fileAndCompileCommands.end(); ++it)
                 {
-                    std::vector<std::string> argsBuffer;
-                    std::vector<const char*> args;
-                    clangproxy.BuildCompileArgs( it->first, it->second, argsBuffer, args );
+                    std::vector<std::string> args;
+                    clangproxy.BuildCompileArgs( it->first, it->second, args );
                     ClTokenIndexDatabase* indexdb = clangproxy.LoadTokenIndexDatabase( m_Project );
                     if (!indexdb)
                         continue;
@@ -1493,19 +1492,21 @@ public: // Function scopes
 
 
 private: // Utility functions
-    void BuildCompileArgs(const std::string& filename, const std::vector<std::string>& compileCommands, std::vector<std::string>& out_argsBuffer, std::vector<const char*>& out_args) const;
+    void BuildCompileArgs(const std::string& filename, const std::vector<std::string>& compileCommands, std::vector<std::string>& out_args) const;
 
 private:
     mutable wxMutex m_Mutex;
     ClTokenIndexDatabaseMap_t m_DatabaseMap;
     const std::vector<wxString>& m_CppKeywords;
     std::vector<ClTranslationUnit> m_TranslUnits;
+    ClTranslationUnit m_ReparseTranslUnit;
     unsigned int m_MaxTranslUnits;
-    CXIndex m_ClIndex;
+    CXIndex m_ClIndex[2];
 private: // Thread
     wxEvtHandler* m_pEventCallbackHandler;
     BackgroundThread* m_pThread;
+    BackgroundThread* m_pReparseThread;
     BackgroundThread* m_pReindexThread;
-};;
+};
 
 #endif // CLANGPROXY_H

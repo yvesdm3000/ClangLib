@@ -22,7 +22,7 @@ public: // Static function helpers
 
 public:
     ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id);
-    ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex clIndex);
+    ClTranslationUnit(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex& clIndex);
     // move ctor
 #if __cplusplus >= 201103L
     ClTranslationUnit(ClTranslationUnit&& other);
@@ -31,6 +31,8 @@ public:
     ClTranslationUnit(const ClTranslationUnit& other);
 #endif
     ~ClTranslationUnit();
+
+    void Reset(ClTokenIndexDatabase* tokenIndexDatabase, const ClTranslUnitId id, CXIndex& clIndex );
 
     /** @brief Swap 2 translation units. Function used mostly to make sure there is only 1 class that manages the Translation Unit resource.
      *
@@ -43,17 +45,17 @@ public:
     {
         using std::swap;
         assert( first.m_Id == second.m_Id );
-        swap(first.m_pDatabase, second.m_pDatabase);
-        swap(first.m_Id, second.m_Id);
-        swap(first.m_FileId, second.m_FileId);
-        swap(first.m_Files, second.m_Files);
-        swap(first.m_ClIndex, second.m_ClIndex);
-        swap(first.m_ClTranslUnit, second.m_ClTranslUnit);
-        swap(first.m_LastCC, second.m_LastCC);
-        swap(first.m_Diagnostics, second.m_Diagnostics);
-        swap(first.m_LastPos.line, second.m_LastPos.line);
+        swap(*first.m_pDatabase,     *second.m_pDatabase);
+        swap(first.m_Id,             second.m_Id);
+        swap(first.m_FileId,         second.m_FileId);
+        swap(first.m_Files,          second.m_Files);
+        swap(first.m_ClIndex,        second.m_ClIndex);
+        swap(first.m_ClTranslUnit,   second.m_ClTranslUnit);
+        swap(first.m_LastCC,         second.m_LastCC);
+        swap(first.m_Diagnostics,    second.m_Diagnostics);
+        swap(first.m_LastPos.line,   second.m_LastPos.line);
         swap(first.m_LastPos.column, second.m_LastPos.column);
-        swap(first.m_LastParsed, second.m_LastParsed);
+        swap(first.m_LastParsed,     second.m_LastParsed);
     }
     bool UsesClangIndex( const CXIndex& idx )
     {
@@ -80,6 +82,10 @@ public:
             return false;
         if (m_Id < 0)
             return false;
+        if (m_pDatabase==nullptr)
+            return false;
+        if (m_FileId < 0)
+            return false;
         return true;
     }
     ClTranslUnitId GetId() const
@@ -105,7 +111,7 @@ public:
         return m_pDatabase->GetTokenIndexDatabase();
     }
 
-    bool Parse( const std::string& filename, ClFileId FileId, const std::vector<const char*>& args,
+    bool Parse( const std::string& filename, ClFileId FileId, const std::vector<std::string>& args,
                 const std::map<std::string, wxString>& unsavedFiles, const bool bReparse = true );
     void Reparse(const std::map<std::string, wxString>& unsavedFiles);
     bool ProcessAllTokens(std::vector<ClFileId>* out_pIncludeFileList, ClTokenDatabase* out_pTokenDatabase) const;
@@ -128,12 +134,13 @@ public:
 
     void SetFiles( const std::vector<ClFileId>& files ){ m_Files = files; std::sort(m_Files.begin(), m_Files.end()); }
 
+
 private:
     ClTokenDatabase* m_pDatabase;
     ClTranslUnitId m_Id;
     ClFileId m_FileId; ///< The file that triggered the creation of this TU. Index in the local TokenDatabase.
-    std::vector<ClFileId> m_Files; ///< All files linked to this TU
     CXIndex m_ClIndex;
+    std::vector<ClFileId> m_Files; ///< All files linked to this TU
     CXTranslationUnit m_ClTranslUnit;
     CXCodeCompleteResults* m_LastCC;
     std::vector<ClDiagnostic> m_Diagnostics;
