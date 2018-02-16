@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="clanglib wx30 (Windows)" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="plugin">
+				<Option platforms="Windows;" />
+				<Option output="bin/plugin30/clanglib" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/plugins30/clanglib" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option projectCompilerOptionsRelation="2" />
+				<Compiler>
+					<Add option="-m32" />
+					<Add option="-DcbDEBUG" />
+					<Add directory="." />
+				</Compiler>
+				<Linker>
+					<Add option="-m32" />
+				</Linker>
+				<ExtraCommands>
+					<Add after="zip -j9 bin/plugin30/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -jr9 bin/plugin30/clanglib.cbplugin  bin/plugin30/clanglib.dll  bin/plugin30/clanglib.zip" />
+					<Mode after="always" />
+				</ExtraCommands>
+			</Target>
+			<Target title="to_codeblocks30">
+				<Option platforms="Windows;" />
+				<Option output="$(#cb)/devel30/share/codeblocks/plugins/clanglib" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/plugins30/clanglib" />
+				<Option type="3" />
+				<Option compiler="gcc" />
+				<Option parameters="--debug-log --multiple-instance -ns -v -p debug" />
+				<Option host_application="$(#cb)/devel30/codeblocks.exe" />
+				<Option run_host_application_in_terminal="0" />
+				<Option projectCompilerOptionsRelation="2" />
+				<Compiler>
+					<Add option="-m32" />
+					<Add option="-DcbDEBUG" />
+					<Add directory="." />
+				</Compiler>
+				<Linker>
+					<Add option="-m32" />
+				</Linker>
+				<ExtraCommands>
+					<Add after="zip -j9  $(#cb)/devel30/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Mode after="always" />
+				</ExtraCommands>
+			</Target>
+			<Environment>
+				<Variable name="WX_CFG" value="" />
+				<Variable name="WX_SUFFIX" value="u" />
+			</Environment>
+		</Build>
+		<VirtualTargets>
+			<Add alias="All" targets="plugin;to_codeblocks30;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="-std=c++11" />
+			<Add option="-fmessage-length=0" />
+			<Add option="-fexceptions" />
+			<Add option="-Winvalid-pch" />
+			<Add option="-pthread" />
+			<Add option="$(#CB_RELEASE_TYPE)" />
+			<Add option="-DCB_PRECOMP" />
+			<Add option="-DWX_PRECOMP" />
+			<Add option="-DwxUSE_UNICODE" />
+			<Add option="-DwxUSE_WCHAR_T" />
+			<Add option="-DBUILDING_PLUGIN" />
+			<Add option="-DwxUSE_GUI=1" />
+			<Add option="-D__WXMSW__" />
+			<Add directory="$(#CB)/include" />
+			<Add directory='&quot;$(#CB)/sdk/wxscintilla/include&quot;' />
+			<Add directory='&quot;$(#WX30)/include&quot;' />
+			<Add directory='&quot;$(#CB)/include/tinyxml&quot;' />
+			<Add directory='&quot;$(#CLANG)/include&quot;' />
+			<Add directory="$(#WX30)/lib/gcc_dll/msw$(WX_SUFFIX)" />
+		</Compiler>
+		<Linker>
+			<Add option="-Wl,--no-undefined" />
+			<Add library="codeblocks" />
+			<Add library="libclang" />
+			<Add library="wxmsw30$(WX_SUFFIX)" />
+			<Add directory='&quot;$(#CB)/devel30&quot;' />
+			<Add directory='&quot;$(#CLANG)/lib&quot;' />
+			<Add directory='&quot;$(#WX30)/lib/gcc_dll&quot;' />
+		</Linker>
+		<ExtraCommands>
+			<Add after="zip -j bin/plugin30/clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml resources/clang_project_settings_dlg.xrc" />
+			<Mode after="always" />
+		</ExtraCommands>
+		<Unit filename="README.md">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Unit filename="resources/ccsettings.xrc" />
+		<Unit filename="resources/clangcodecompletion_toolbar.xrc" />
+		<Unit filename="resources/manifest.xml" />
+		<Unit filename="src/callhierarchyview.cpp" />
+		<Unit filename="src/callhierarchyview.h" />
+		<Unit filename="src/cclogger.cpp" />
+		<Unit filename="src/cclogger.h" />
+		<Unit filename="src/clangcc.cpp" />
+		<Unit filename="src/clangcc.h" />
+		<Unit filename="src/clangccsettingsdlg.cpp" />
+		<Unit filename="src/clangccsettingsdlg.h" />
+		<Unit filename="src/clangdiagnostics.cpp" />
+		<Unit filename="src/clangdiagnostics.h" />
+		<Unit filename="src/clangindexer.cpp" />
+		<Unit filename="src/clangindexer.h" />
+		<Unit filename="src/clangplugin.cpp" />
+		<Unit filename="src/clangplugin.h" />
+		<Unit filename="src/clangpluginapi.h" />
+		<Unit filename="src/clangprojectsettingsdlg.cpp" />
+		<Unit filename="src/clangprojectsettingsdlg.h" />
+		<Unit filename="src/clangproxy.cpp" />
+		<Unit filename="src/clangproxy.h" />
+		<Unit filename="src/clangrefactoring.cpp" />
+		<Unit filename="src/clangrefactoring.h" />
+		<Unit filename="src/clangtoolbar.cpp" />
+		<Unit filename="src/clangtoolbar.h" />
+		<Unit filename="src/tokendatabase.cpp" />
+		<Unit filename="src/tokendatabase.h" />
+		<Unit filename="src/translationunit.cpp" />
+		<Unit filename="src/translationunit.h" />
+		<Unit filename="src/treemap.cpp" />
+		<Unit filename="src/treemap.h" />
+		<Extensions>
+			<code_completion />
+			<envvars set="default" />
+			<debugger />
+			<LibClang>
+				<TargetSettings name="to_codeblocks28">
+					<Options compile_command_source="0" />
+				</TargetSettings>
+			</LibClang>
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>
