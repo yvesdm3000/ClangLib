@@ -38,14 +38,77 @@
 #include <wx/timer.h>
 #endif // CB_PRECOMP
 #include <wx/graphics.h>
+#include <wx/animate.h>
 
+#include <exception>
 #define CLANGPLUGIN_TRACE_FUNCTIONS
 
 // this auto-registers the plugin
+
+const wxString ResourceFileName(wxT("clanglib.zip"));
+
+
 namespace
 {
 
+
 PluginRegistrant<ClangPlugin> reg(wxT("ClangLib"));
+
+/** \brief Short exception class for file loading
+ */
+struct bad_file_execp : public  std::exception
+{
+    bad_file_execp(wxString msg) : m_msg(msg)    {};
+    const char* what()      { return m_msg.ToUTF8().data(); };
+    const wxString  whatStr()  { return m_msg; };
+    wxString m_msg;
+};
+
+
+/** \brief Load PNG file with the name \p name from the resource zip file
+ *
+ * \param name wxString Name of the PNG file.
+ * \return wxBitmap On success the loaded Bitmap. On error it throws a \ref bad_file_execp exception
+ *
+ */
+wxBitmap LoadPNGFromResourceFile(wxString name)
+{
+	wxFileSystem filesystem;
+	wxString filename =  wxT("file:") + ConfigManager::GetDataFolder() + wxT("/") + ResourceFileName + wxT("#zip:/") + name;
+	wxFSFile *file = filesystem.OpenFile( filename, wxFS_READ | wxFS_SEEKABLE );
+	if(file == nullptr)
+        throw bad_file_execp(_("File not found: ") + filename);
+	wxImage img;
+	img.LoadFile(*file->GetStream(), wxBITMAP_TYPE_PNG);
+	wxBitmap ret(img);
+	if(!ret.IsOk())
+        throw bad_file_execp(_("File not loaded correctly: ") + filename);
+
+	return ret;
+}
+/** \brief Load GIF file with the name \p name from the resource zip file
+ *
+ * \param name wxString Name of the PNG file.
+ * \return wxAnimation On success the loaded GIF animation. On error it throws a \ref bad_file_execp exception
+ *
+ */
+wxAnimation LoadGifFromResourceFile(wxString name)
+{
+	wxFileSystem filesystem;
+	wxString filename =  wxT("file:") + ConfigManager::GetDataFolder() + wxT("/") + ResourceFileName + wxT("#zip:/") + name;
+	wxFSFile *file = filesystem.OpenFile( filename, wxFS_READ | wxFS_SEEKABLE);
+	if(file == nullptr)
+        throw bad_file_execp(_("File not found: ") + filename);
+
+	wxAnimation ret;
+	if( ret.Load(*file->GetStream(), wxANIMATION_TYPE_GIF) == false)
+        throw bad_file_execp(_("File not loaded correctly: ") + filename);
+	if(!ret.IsOk())
+        throw bad_file_execp(_("File not loaded correctly: ") + filename);
+
+	return ret;
+}
+
 
 void AddImages(wxBitmap& directionImage, unsigned cnt, wxImageList& destList)
 {
@@ -136,8 +199,8 @@ ClangPlugin::ClangPlugin() :
     m_StoreIndexDBTimer(this, idStoreIndexDBTimer)
 {
     CCLogger::Get()->Init(this, g_idCCLogger, g_idCCDebugLogger, g_idCCErrorLogger);
-    if (!Manager::LoadResource(wxT("clanglib.zip")))
-        NotifyMissingFile(wxT("clanglib.zip"));
+    if (!Manager::LoadResource(ResourceFileName))
+        NotifyMissingFile(ResourceFileName);
 }
 
 ClangPlugin::~ClangPlugin()
@@ -148,7 +211,7 @@ void ClangPlugin::OnAttach()
 {
     wxBitmap bmp;
     ConfigManager* cfg = Manager::Get()->GetConfigManager(CLANG_CONFIGMANAGER);
-    wxString prefix = ConfigManager::GetDataFolder() + wxT("/images/clanglib/");
+    wxString prefix = wxT("images/");
     // bitmaps must be added by order of PARSER_IMG_* consts (which are also TokenCategory enums)
     const char* imgs[] =
     {
@@ -195,17 +258,29 @@ void ClangPlugin::OnAttach()
         "cpp_lang.png",            // tcLangKeyword
         nullptr
     };
+
+    try
+    {
+
     for (const char** itr = imgs; *itr; ++itr)
     {
-        m_ImageList.Add(cbLoadBitmap(prefix + wxString::FromUTF8(*itr), wxBITMAP_TYPE_PNG));
+        m_ImageList.Add(LoadPNGFromResourceFile(prefix + wxString::FromUTF8(*itr)));
     }
-    wxBitmap parentBitmap = cbLoadBitmap( prefix + wxT("hierarchy_parent.png"), wxBITMAP_TYPE_PNG );
+    wxBitmap parentBitmap = LoadPNGFromResourceFile( prefix + wxT("hierarchy_parent.png"));
     m_ImageListRefParentIndex = m_ImageList.GetImageCount();
 
     AddImages(parentBitmap,m_ImageListRefParentIndex,m_ImageList);
-    wxBitmap childBitmap = cbLoadBitmap( prefix + wxT("hierarchy_child.png"), wxBITMAP_TYPE_PNG );
+    wxBitmap childBitmap = LoadPNGFromResourceFile( prefix + wxT("hierarchy_child.png"));
     m_ImageListRefChildIndex = m_ImageList.GetImageCount();
     AddImages(childBitmap, m_ImageListRefParentIndex,m_ImageList);
+
+    }
+    catch(bad_file_execp& e)
+    {
+        Manager::Get()->GetLogManager()->LogError( e.whatStr() );
+    }
+
+
 
     EditorColourSet* theme = Manager::Get()->GetEditorManager()->GetColourSet();
     wxStringTokenizer tokenizer(theme->GetKeywords(theme->GetHighlightLanguage(wxT("C/C++")), 0));

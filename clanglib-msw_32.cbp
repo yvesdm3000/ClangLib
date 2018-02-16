@@ -19,6 +19,7 @@
 				</Compiler>
 				<ExtraCommands>
 					<Add after="zip -j9 bin/plugin/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -9  bin/plugin/clanglib.zip images/*" />
 					<Add after="zip -jr9 bin/plugin/clanglib.cbplugin  bin/plugin/clanglib.dll  bin/plugin/clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>
@@ -38,6 +39,7 @@
 					<Add directory="." />
 				</Compiler>
 				<ExtraCommands>
+					<Add after="zip -9  $(#cb)/devel/share/codeblocks/clanglib.zip images/*" />
 					<Add after="zip -j9  $(#cb)/devel/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Mode after="always" />
 				</ExtraCommands>
