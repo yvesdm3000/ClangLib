@@ -4,53 +4,43 @@
 	<Project>
 		<Option title="clanglib wx2.8.x (Unix)" />
 		<Option pch_mode="2" />
-		<Option default_target="ClangLib" />
 		<Option compiler="gcc" />
 		<Build>
-			<Target title="release">
-				<Option output="$(TARGET_NAME)/clanglib" prefix_auto="0" extension_auto="1" />
+			<Target title="plugin">
+				<Option output="bin/plugin/clanglib" prefix_auto="0" extension_auto="1" />
 				<Option object_output=".objs/plugins/clanglib" />
 				<Option type="3" />
 				<Option compiler="gcc" />
-				<Option parameters="--debug-log --multiple-instance -ns -ni -v -p debug" />
-				<Option host_application="./codeblocks" />
-				<Option run_host_application_in_terminal="0" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
 					<Add option="-O2" />
-					<Add option="-DBUILDING_PLUGIN" />
-					<Add option="-DCB_PRECOMP" />
 					<Add directory="." />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
 				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
-					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
-					<Add after="zip -r clanglib.cbplugin images/" />
+					<Add after="zip -j9 bin/plugin/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -j9 bin/plugin/clanglib.cbplugin bin/plugin/clanglib.so clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
-			<Target title="debug">
-				<Option output="$(TARGET_NAME)/clanglib" prefix_auto="0" extension_auto="1" />
+			<Target title="to_codeblocks_wx28">
+				<Option output="$(#cb)/devel/share/codeblocks/plugins/clanglib" prefix_auto="0" extension_auto="1" />
+				<Option working_dir="$(#cb)/devel" />
 				<Option object_output=".objs/plugins/clanglib" />
 				<Option type="3" />
 				<Option compiler="gcc" />
-				<Option parameters="--debug-log --multiple-instance -ns -ni -v -p debug" />
-				<Option host_application="./codeblocks" />
+				<Option parameters="--debug-log --multiple-instance --no-splash-screen --verbose -p debug --no-ipc " />
+				<Option host_application="$(#cb)/devel/codeblocks" />
 				<Option run_host_application_in_terminal="0" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
 					<Add option="-g" />
-					<Add option="-DBUILDING_PLUGIN" />
-					<Add option="-DNOPCH" />
 					<Add directory="." />
 				</Compiler>
 				<ExtraCommands>
-					<Add after="zip -j9 clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
-					<Add after="zip -j9 clanglib.cbplugin $(TARGET_NAME)/clanglib.so clanglib.zip" />
-					<Add after="zip -r clanglib.cbplugin images/" />
+					<Add after="zip -j9 $(#cb)/devel/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -59,38 +49,41 @@
 			</Environment>
 		</Build>
 		<VirtualTargets>
-			<Add alias="All" targets="release;" />
+			<Add alias="All" targets="plugin;to_codeblocks_wx28;" />
 		</VirtualTargets>
 		<Compiler>
 			<Add option="-Wextra" />
 			<Add option="-Wall" />
 			<Add option="-std=c++11" />
-			<Add option="-ansi" />
 			<Add option="-fPIC" />
-			<Add option="$(#CB_RELEASE_TYPE)" />
 			<Add option="`$(WX_CONFIG) --cflags`" />
+			<Add option="$(#CB_RELEASE_TYPE)" />
 			<Add option="-I`llvm-config --includedir`" />
 			<Add option="-fmessage-length=0" />
 			<Add option="-fexceptions" />
 			<Add option="-Winvalid-pch" />
 			<Add option="-pthread" />
-			<Add option="`pkg-config --cflags codeblocks`" />
-			<Add option="-DcbDEBUG" />
+			<Add option="-DBUILDING_PLUGIN" />
+			<Add option="-DCB_PRECOMP" />
+			<Add directory="$(#CB)/include" />
+			<Add directory="$(#CB)/include/tinyxml" />
+			<Add directory="$(#CB)/sdk/wxscintilla/include" />
 		</Compiler>
 		<Linker>
 			<Add option="`$(WX_CONFIG) --libs`" />
 			<Add option="-L`llvm-config --libdir`" />
 			<Add option="-Wl,--no-undefined" />
-			<Add option="`pkg-config --libs codeblocks`" />
 			<Add library="clang" />
+			<Add library="codeblocks" />
+			<Add directory="$(#CB)/devel" />
 		</Linker>
-		<ExtraCommands>
-			<Add before="echo libs: `pkg-config --libs codeblocks`" />
-			<Add before="echo cflags: `pkg-config --cflags codeblocks`" />
-		</ExtraCommands>
 		<Unit filename="README.md">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="resources/ccsettings.xrc" />
+		<Unit filename="resources/clang_project_settings_dlg.xrc" />
+		<Unit filename="resources/clangcodecompletion_toolbar.xrc" />
+		<Unit filename="resources/manifest.xml" />
 		<Unit filename="src/callhierarchyview.cpp" />
 		<Unit filename="src/callhierarchyview.h" />
 		<Unit filename="src/cclogger.cpp" />
@@ -114,10 +107,6 @@
 		<Unit filename="src/clangrefactoring.h" />
 		<Unit filename="src/clangtoolbar.cpp" />
 		<Unit filename="src/clangtoolbar.h" />
-		<Unit filename="resources/ccsettings.xrc" />
-		<Unit filename="resources/clang_project_settings_dlg.xrc" />
-		<Unit filename="resources/clangcodecompletion_toolbar.xrc" />
-		<Unit filename="resources/manifest.xml" />
 		<Unit filename="src/tokendatabase.cpp" />
 		<Unit filename="src/tokendatabase.h" />
 		<Unit filename="src/translationunit.cpp" />
