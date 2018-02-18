@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<resource xmlns="http://www.wxwidgets.org/wxxrc" version="2.5.3.0">
+	<object class="wxPanel" name="dlgClangProjectSettings">
+		<object class="wxBoxSizer">
+			<orient>wxHORIZONTAL</orient>
+			<object class="sizeritem">
+                <object class="wxBoxSizer">
+                    <orient>wxVERTICAL</orient>
+                    <object class="sizeritem">
+                        <object class="wxStaticText" name="ID_STATICTEXT1">
+                            <label>Select target:</label>
+                        </object>
+                        <flag>wxALL|wxALIGN_LEFT</flag>
+                        <border>5</border>
+                    </object>
+                    <object class="sizeritem">
+                        <object class="wxListBox" name="lstTargets">
+                            <default>-1</default>
+                        </object>
+                        <flag>wxEXPAND</flag>
+                        <border>5</border>
+                        <option>1</option>
+                    </object>
+                </object>
+                <flag>wxALL|wxEXPAND</flag>
+                <border>5</border>
+            </object>
+			<object class="sizeritem">
+                <object class="wxBoxSizer">
+                    <orient>wxVERTICAL</orient>
+                    <object class="sizeritem">
+                        <object class="wxStaticBoxSizer">
+                            <orient>wxVERTICAL</orient>
+                            <label>Compile commands source:</label>
+                            <object class="sizeritem">
+                                <object class="wxRadioButton" name="rdoCompileCommandsProject">
+                                    <label>Project</label>
+                                    <selected>1</selected>
+                                </object>
+                                <flag>wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+                                <border>5</border>
+                                <option>1</option>
+                            </object>
+                            <object class="sizeritem">
+                                <object class="wxRadioButton" name="rdoCompileCommandsJSON">
+                                    <label>File "compile_commands.json" in project directory</label>
+                                </object>
+                                <flag>wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+                                <border>5</border>
+                                <option>1</option>
+                            </object>
+                            <flag>wxLEFT|wxRIGHT|wxALIGN_LEFT</flag>
+                            <border>5</border>
+                            <option>1</option>
+                        </object>
+                        <flag>wxBOTTOM|wxEXPAND</flag>
+                        <border>5</border>
+                        <option>1</option>
+                    </object>
+                    <object class="sizeritem">
+                        <object class="wxBoxSizer">
+                            <flag>wxALL|wxEXPAND</flag>
+                            <border>5</border>
+                            <option>1</option>
+                        </object>
+                        <flag>wxALL|wxEXPAND</flag>
+                        <border>5</border>
+                    </object>
+                    <border>5</border>
+                </object>
+                <border>5</border>
+            </object>
+        </object>
+	</object>
+</resource>

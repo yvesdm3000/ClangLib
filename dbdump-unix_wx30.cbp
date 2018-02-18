@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="dbdump wx30 (Unix)" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="release">
+				<Option output="bin/dbdump30/$(TARGET_NAME)/dbdump" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/dbdump30/$(TARGET_NAME)" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Option host_application="./bin/$(TARGET_NAME)/dbdump" />
+				<Option run_host_application_in_terminal="1" />
+				<Option projectCompilerOptionsRelation="2" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-DCB_PRECOMP" />
+					<Add directory="." />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+			<Target title="debug">
+				<Option output="bin/dbdump30/$(TARGET_NAME)/dbdump" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/dbdump30/$(TARGET_NAME)" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Option host_application="./bin/$(TARGET_NAME)/dbdump" />
+				<Option run_host_application_in_terminal="1" />
+				<Option projectCompilerOptionsRelation="2" />
+				<Compiler>
+					<Add option="-g" />
+					<Add option="-DNOPCH" />
+					<Add directory="." />
+				</Compiler>
+			</Target>
+			<Environment>
+				<Variable name="WX_CONFIG" value="wx-config --version=3.0" />
+			</Environment>
+		</Build>
+		<VirtualTargets>
+			<Add alias="All" targets="release;debug;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="-Wextra" />
+			<Add option="-Wall" />
+			<Add option="-std=c++11" />
+			<Add option="-fPIC" />
+			<Add option="$(#CB_RELEASE_TYPE)" />
+			<Add option="`$(WX_CONFIG) --cflags`" />
+			<Add option="-I`llvm-config --includedir`" />
+			<Add option="-fmessage-length=0" />
+			<Add option="-fexceptions" />
+			<Add option="-Winvalid-pch" />
+			<Add option="-pthread" />
+			<Add option="`pkg-config --cflags codeblocks`" />
+			<Add option="-DcbDEBUG" />
+			<Add directory="$(#CB)/include" />
+		</Compiler>
+		<Linker>
+			<Add option="`$(WX_CONFIG) --libs`" />
+			<Add option="-L`llvm-config --libdir`" />
+			<Add option="-Wl,--no-undefined" />
+			<Add library="clang" />
+			<Add library="codeblocks" />
+			<Add directory="$(#CB)/devel30" />
+		</Linker>
+		<Unit filename="README.md">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Unit filename="dbdump/dbdump.cpp" />
+		<Unit filename="dbdump/dbdump.h" />
+		<Unit filename="resources/manifest.xml" />
+		<Unit filename="src/cclogger.cpp" />
+		<Unit filename="src/cclogger.h" />
+		<Unit filename="src/tokendatabase.cpp" />
+		<Unit filename="src/tokendatabase.h" />
+		<Unit filename="src/treemap.cpp" />
+		<Unit filename="src/treemap.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<LibClang>
+				<TargetSettings name="release">
+					<Options compile_command_source="0" />
+				</TargetSettings>
+				<TargetSettings name="debug">
+					<Options compile_command_source="0" />
+				</TargetSettings>
+			</LibClang>
+			<DoxyBlocks>
+				<comment_style block="0" line="0" />
+				<doxyfile_project />
+				<doxyfile_build />
+				<doxyfile_warnings />
+				<doxyfile_output />
+				<doxyfile_dot />
+				<general use_at_in_tags="1" />
+			</DoxyBlocks>
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

@@ -2,3 +2,16 @@
 *.depend
 *.layout
 *_build_log.html
+*.bmarks
+
+# ignore binary output files
+*.cbplugin
+.objs
+*.dll
+bin
+
+# ignore completion database
+*.indexdb*
+
+# ignore patch files
+*.patch
