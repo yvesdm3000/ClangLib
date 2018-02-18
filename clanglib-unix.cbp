@@ -21,6 +21,7 @@
 				</Linker>
 				<ExtraCommands>
 					<Add after="zip -j9 bin/plugin/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -9  bin/plugin/clanglib.zip images/*" />
 					<Add after="zip -j9 bin/plugin/clanglib.cbplugin bin/plugin/clanglib.so clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>
@@ -41,6 +42,7 @@
 				</Compiler>
 				<ExtraCommands>
 					<Add after="zip -j9 $(#cb)/devel/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -9  $(#cb)/devel/share/codeblocks/clanglib.zip images/*" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
