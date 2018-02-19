@@ -2,43 +2,51 @@
 <CodeBlocks_project_file>
 	<FileVersion major="1" minor="6" />
 	<Project>
-		<Option title="clanglib (Windows)" />
+		<Option title="clanglib wx30 (Windows)" />
 		<Option pch_mode="2" />
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="plugin">
 				<Option platforms="Windows;" />
-				<Option output="bin/plugin/clanglib" prefix_auto="0" extension_auto="1" />
-				<Option object_output=".objs/plugins/clanglib" />
+				<Option output="bin/plugin30/clanglib" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/plugins30/clanglib" />
 				<Option type="3" />
 				<Option compiler="gcc" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
+					<Add option="-m32" />
 					<Add option="-DcbDEBUG" />
 					<Add directory="." />
 				</Compiler>
+				<Linker>
+					<Add option="-m32" />
+				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9 bin/plugin/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
-					<Add after="zip -jr9 bin/plugin/clanglib.cbplugin  bin/plugin/clanglib.dll  bin/plugin/clanglib.zip" />
+					<Add after="zip -j9 bin/plugin30/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -jr9 bin/plugin30/clanglib.cbplugin  bin/plugin30/clanglib.dll  bin/plugin30/clanglib.zip" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
-			<Target title="to_codeblocks28">
+			<Target title="to_codeblocks30">
 				<Option platforms="Windows;" />
-				<Option output="$(#cb)/devel/share/codeblocks/plugins/clanglib" prefix_auto="0" extension_auto="1" />
-				<Option object_output=".objs/plugins/clanglib" />
+				<Option output="$(#cb)/devel30/share/codeblocks/plugins/clanglib" prefix_auto="0" extension_auto="1" />
+				<Option object_output=".objs/plugins30/clanglib" />
 				<Option type="3" />
 				<Option compiler="gcc" />
 				<Option parameters="--debug-log --multiple-instance -ns -v -p debug" />
-				<Option host_application="$(#cb)/devel/codeblocks.exe" />
+				<Option host_application="$(#cb)/devel30/codeblocks.exe" />
 				<Option run_host_application_in_terminal="0" />
 				<Option projectCompilerOptionsRelation="2" />
 				<Compiler>
+					<Add option="-m32" />
 					<Add option="-DcbDEBUG" />
 					<Add directory="." />
 				</Compiler>
+				<Linker>
+					<Add option="-m32" />
+				</Linker>
 				<ExtraCommands>
-					<Add after="zip -j9  $(#cb)/devel/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
+					<Add after="zip -j9  $(#cb)/devel30/share/codeblocks/clanglib.zip resources/manifest.xml resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/clang_project_settings_dlg.xrc" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
@@ -48,7 +56,7 @@
 			</Environment>
 		</Build>
 		<VirtualTargets>
-			<Add alias="All" targets="plugin;to_codeblocks28;" />
+			<Add alias="All" targets="plugin;to_codeblocks30;" />
 		</VirtualTargets>
 		<Compiler>
 			<Add option="-Wextra" />
@@ -68,22 +76,22 @@
 			<Add option="-D__WXMSW__" />
 			<Add directory="$(#CB)/include" />
 			<Add directory='&quot;$(#CB)/sdk/wxscintilla/include&quot;' />
-			<Add directory='&quot;$(#WX)/include&quot;' />
+			<Add directory='&quot;$(#WX30)/include&quot;' />
 			<Add directory='&quot;$(#CB)/include/tinyxml&quot;' />
 			<Add directory='&quot;$(#CLANG)/include&quot;' />
-			<Add directory="$(#WX)/lib/gcc_dll/msw$(WX_SUFFIX)" />
+			<Add directory="$(#WX30)/lib/gcc_dll/msw$(WX_SUFFIX)" />
 		</Compiler>
 		<Linker>
 			<Add option="-Wl,--no-undefined" />
 			<Add library="codeblocks" />
 			<Add library="libclang" />
-			<Add library="wxmsw28$(WX_SUFFIX)" />
-			<Add directory='&quot;$(#CB)/devel&quot;' />
+			<Add library="wxmsw30$(WX_SUFFIX)" />
+			<Add directory='&quot;$(#CB)/devel30&quot;' />
 			<Add directory='&quot;$(#CLANG)/lib&quot;' />
-			<Add directory='&quot;$(#WX)/lib/gcc_dll&quot;' />
+			<Add directory='&quot;$(#WX30)/lib/gcc_dll&quot;' />
 		</Linker>
 		<ExtraCommands>
-			<Add after="zip -j bin/plugin/clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml resources/clang_project_settings_dlg.xrc" />
+			<Add after="zip -j bin/plugin30/clanglib.zip resources/ccsettings.xrc resources/clangcodecompletion_toolbar.xrc resources/manifest.xml resources/clang_project_settings_dlg.xrc" />
 			<Mode after="always" />
 		</ExtraCommands>
 		<Unit filename="README.md">

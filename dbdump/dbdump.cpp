@@ -365,6 +365,22 @@ public:
     bool m_bResolveScope;
 };
 
+#if wxCHECK_VERSION(3,0,0)
+
+static const wxCmdLineEntryDesc cmdLineDesc[] =
+{
+    { wxCMD_LINE_SWITCH, ("v"),  ("verbose"),        ("Be verbose"),                wxCMD_LINE_VAL_NONE, 0 },
+    { wxCMD_LINE_SWITCH, ("rs"), ("resolvescope"),   ("Resolve scope"),             wxCMD_LINE_VAL_NONE, 0 },
+    { wxCMD_LINE_SWITCH, ("rp"), ("resolveparents"), ("Resolve parents"),           wxCMD_LINE_VAL_NONE, 0 },
+    { wxCMD_LINE_SWITCH, ("ra"), ("resolveall"),     ("Resolve scope and parents"), wxCMD_LINE_VAL_NONE, 0 },
+    { wxCMD_LINE_SWITCH, ("f"),  ("file"),           ("Show tokens in file"),       wxCMD_LINE_VAL_STRING, 0 },
+    { wxCMD_LINE_PARAM,   NULL,  NULL,               ("cmd"),                       wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
+    { wxCMD_LINE_PARAM,   NULL,  NULL,               ("input file"),                wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
+    { wxCMD_LINE_NONE, NULL, NULL, NULL, wxCMD_LINE_VAL_NONE, 0 }
+};
+
+#else
+
 static const wxCmdLineEntryDesc cmdLineDesc[] =
 {
     { wxCMD_LINE_SWITCH, wxT("v"), wxT("verbose"), wxT("Be verbose"), wxCMD_LINE_VAL_NONE, 0 },
@@ -376,6 +392,9 @@ static const wxCmdLineEntryDesc cmdLineDesc[] =
     { wxCMD_LINE_PARAM,  NULL, NULL, wxT("input file"), wxCMD_LINE_VAL_STRING, wxCMD_LINE_PARAM_MULTIPLE },
     { wxCMD_LINE_NONE, NULL, NULL, NULL, wxCMD_LINE_VAL_NONE, 0 }
 };
+
+#endif // wxCHECK_VERSION
+
 
 int main(int argc, char* argv[])
 {
